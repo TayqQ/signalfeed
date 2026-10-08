@@ -23,3 +23,34 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: signalfeed
+          POSTGRES_PASSWORD: signalfeed
+          POSTGRES_DB: signalfeed
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U signalfeed"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://signalfeed:signalfeed@localhost:5432/signalfeed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations
+        run: pnpm db:migrate
+      - name: Re-apply migrations (must be a no-op)
+        run: pnpm db:migrate
