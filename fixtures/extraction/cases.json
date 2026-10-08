@@ -1,0 +1,630 @@
+[
+  {
+    "id": "tc-vesta-30m-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/10/08/vesta-raises-30m-as-lenders-adopt-ai-agents/",
+    "headline": "Vesta raises $30M to bring swarms of agents to mortgage lenders",
+    "summary": "Mortgage software maker Vesta closed a $30 million funding round to expand AI agents that help lenders automate underwriting workflows.",
+    "publishedAt": "2026-10-08T12:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Vesta",
+          "countryCode": "US",
+          "roundType": "unknown",
+          "amountText": "$30M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "tc-mecka-60m-sequoia-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/10/07/robot-data-startup-mecka-ai-nabs-60m-from-sequoia/",
+    "headline": "Robot data startup Mecka AI nabs $60M from Sequoia",
+    "summary": "Mecka AI, which collects training data for robotics models, raised $60 million led by Sequoia Capital to scale its data platform.",
+    "publishedAt": "2026-10-07T23:36:57+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Mecka AI",
+          "countryCode": "US",
+          "roundType": "unknown",
+          "amountText": "$60M",
+          "leadInvestors": ["Sequoia Capital"],
+          "investors": ["Sequoia Capital"],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "tc-ghost-11m-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/10/05/at-19-ghost-founder-raises-11-million-to-build-a-3499-computer-for-your-personal-ai/",
+    "headline": "At 19, founder raises $11M for Ghost, maker of a $3,499 computer for personal AI",
+    "summary": "Personal AI hardware startup Ghost raised $11 million to ship a $3,499 desktop device aimed at local AI assistants.",
+    "publishedAt": "2026-10-05T18:07:07+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Ghost",
+          "countryCode": "US",
+          "roundType": "seed",
+          "amountText": "$11M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "tc-eliseai-350m-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/09/29/a16z-backed-eliseai-raises-350m-doubles-valuation-to-4b/",
+    "headline": "a16z-backed EliseAI raises $350M, doubles valuation to $4B",
+    "summary": "Property-management AI company EliseAI raised $350 million in new funding that doubled its valuation to about $4 billion, with Andreessen Horowitz among its backers.",
+    "publishedAt": "2026-09-29T21:51:36+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "EliseAI",
+          "countryCode": "US",
+          "roundType": "growth",
+          "amountText": "$350M",
+          "leadInvestors": [],
+          "investors": ["Andreessen Horowitz"],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-truelayer-27m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/truelayer-captures-27m-investment-as-targets-italy-expansion/",
+    "headline": "TrueLayer captures $27M investment, as targets Italy expansion",
+    "summary": "Open banking platform TrueLayer secured a $27 million investment to expand its payments products into Italy and other European markets.",
+    "publishedAt": "2026-10-08T10:31:43+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "TrueLayer",
+          "countryCode": "GB",
+          "roundType": "unknown",
+          "amountText": "$27M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-universal-quantum-100m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/university-of-sussex-quantum-spinout-raises-record-ps100m-series-a/",
+    "headline": "University of Sussex spinout Universal Quantum raises “record” $100M Series A",
+    "summary": "British quantum computing startup Universal Quantum closed a record $100 million Series A to scale modular quantum hardware developed from Sussex research.",
+    "publishedAt": "2026-10-08T09:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Universal Quantum",
+          "countryCode": "GB",
+          "roundType": "series_a",
+          "amountText": "$100M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-innercrowd-750k-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/dutch-startup-innercrowd-raises-eur750k-to-turn-festival-fans-into-marketers/",
+    "headline": "Dutch startup Innercrowd raises €750K to turn festival fans into marketers",
+    "summary": "Netherlands-based Innercrowd raised €750K to grow software that turns festival attendees into brand advocates for event promoters.",
+    "publishedAt": "2026-10-08T08:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Innercrowd",
+          "countryCode": "NL",
+          "roundType": "seed",
+          "amountText": "€750K",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-today-28m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/today-lands-eur28m-to-scale-its-ai-platform-for-financial-advisors/",
+    "headline": "TODAY lands €2.8M to scale its AI platform for financial advisors",
+    "summary": "Copenhagen fintech TODAY raised €2.8 million to roll out compliant AI assistants for financial and insurance advisers across Europe.",
+    "publishedAt": "2026-10-08T07:59:05+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "TODAY",
+          "countryCode": "DK",
+          "roundType": "seed",
+          "amountText": "€2.8M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-verso-6m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/verso-raises-6m-to-bring-consumer-intelligence-into-business-decision-making/",
+    "headline": "Verso raises $6M to bring consumer intelligence into business decision-making",
+    "summary": "Verso closed a $6 million round to expand analytics that blends consumer research data into corporate planning tools.",
+    "publishedAt": "2026-10-08T07:01:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Verso",
+          "countryCode": "US",
+          "roundType": "seed",
+          "amountText": "$6M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-golbriak-4m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/golbriak-space-raises-eur4m-to-scale-laser-communications-for-satellite-constellations/",
+    "headline": "Golbriak Space raises €4M to scale laser communications for satellite constellations",
+    "summary": "Golbriak Space raised €4 million to deploy laser links that connect low-Earth-orbit satellite constellations for faster downlink.",
+    "publishedAt": "2026-10-08T07:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Golbriak Space",
+          "countryCode": null,
+          "roundType": "seed",
+          "amountText": "€4M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-noah-38m-seed-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/07/uk-stablecoin-infrastructure-startup-noah-closes-38m-seed-round/",
+    "headline": "UK stablecoin infrastructure startup Noah closes $38M seed round",
+    "summary": "London stablecoin payments startup Noah finished a $38 million seed round, with Endeit Capital leading the latest $16 million tranche alongside FJ Labs, LocalGlobe and Felix Capital.",
+    "publishedAt": "2026-10-07T13:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Noah",
+          "countryCode": "GB",
+          "roundType": "seed",
+          "amountText": "$38M",
+          "leadInvestors": ["Endeit Capital"],
+          "investors": [
+            "Endeit Capital",
+            "FJ Labs",
+            "LocalGlobe",
+            "Felix Capital"
+          ],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-mintneuro-5m-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/07/mintneuro-raises-5m-to-scale-chips-purpose-built-for-neural-devices/",
+    "headline": "MintNeuro raises $5M to scale chips purpose-built for neural devices",
+    "summary": "UK semiconductor startup MintNeuro raised $5 million to manufacture chips tailored for implantable neural interfaces.",
+    "publishedAt": "2026-10-07T11:20:49+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "MintNeuro",
+          "countryCode": "GB",
+          "roundType": "seed",
+          "amountText": "$5M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "uk-neela-21m-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://www.uktech.news/biotech/cambridge-biotech-startup-neela-raises-2-1m-to-turn-waste-into-aviation-fuel-20261008",
+    "headline": "Cambridge biotech startup Neela raises £2.1m to turn waste into aviation fuel",
+    "summary": "Cambridge biotech Neela secured £2.1 million to pilot technology that converts agricultural waste into sustainable aviation fuel.",
+    "publishedAt": "2026-10-08T12:46:26+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Neela",
+          "countryCode": "GB",
+          "roundType": "seed",
+          "amountText": "£2.1m",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "es-immix-312m-2026",
+    "sourceSlug": "eu-startups",
+    "url": "https://www.eu-startups.com/2026/10/londons-immix-secures-e3-12-million-to-build-fx-infrastructure-for-stablecoin-payments-beyond-the-us-dollar/",
+    "headline": "London’s IMMIX secures €3.12 million to build FX infrastructure for stablecoin payments beyond the US dollar",
+    "summary": "London fintech IMMIX raised €3.12 million to build foreign-exchange rails so stablecoin payouts work outside dollar-centric corridors.",
+    "publishedAt": "2026-10-08T07:11:43+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "IMMIX",
+          "countryCode": "GB",
+          "roundType": "seed",
+          "amountText": "€3.12 million",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-delfos-seed-extension-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/03/12/delfos-energy-secures-eur3m-seed-extension-to-scale-ai-virtual-engineer-for-energy-infrastructure/",
+    "headline": "Delfos Energy secures €3M Seed extension to scale AI “virtual engineer” for energy infrastructure",
+    "summary": "Delfos Energy closed a €3 million seed extension to deploy its AI virtual engineer across more than 1,000 European energy sites.",
+    "publishedAt": "2026-03-12T12:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Delfos Energy",
+          "countryCode": null,
+          "roundType": "seed",
+          "amountText": "€3M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "es-elvy-investment-no-amount-2026",
+    "sourceSlug": "eu-startups",
+    "url": "https://www.eu-startups.com/2026/10/leonardo-dicaprio-yes-that-leo-announces-investment-in-swedish-energytech-startup-elvy/",
+    "headline": "Leonardo DiCaprio, yes that Leo, announces investment in Swedish EnergyTech startup Elvy",
+    "summary": "Actor Leonardo DiCaprio disclosed a personal investment in Swedish energy-tech company Elvy without stating how much capital changed hands.",
+    "publishedAt": "2026-10-08T15:47:29+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Elvy",
+          "countryCode": "SE",
+          "roundType": "unknown",
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-sap-techwolf-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/06/sap-buys-techwolf-in-record-belgian-vc-backed-deal/",
+    "headline": "SAP buys TechWolf in record Belgian VC-backed deal",
+    "summary": "Enterprise software giant SAP acquired Belgian HR analytics startup TechWolf in one of the largest venture-backed exits in Belgium.",
+    "publishedAt": "2026-10-06T13:29:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "acquisition",
+          "companyName": "TechWolf",
+          "countryCode": "BE",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": "SAP"
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-salesforce-convergence-2025",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2025/05/15/salesforce-acquires-uk-ai-startup-convergence-one-year-after-launch/",
+    "headline": "Salesforce acquires UK AI startup Convergence one year after launch",
+    "summary": "Salesforce bought London AI agent startup Convergence roughly a year after its launch, with financial terms undisclosed.",
+    "publishedAt": "2025-05-15T10:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "acquisition",
+          "companyName": "Convergence",
+          "countryCode": "GB",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": "Salesforce"
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-wayve-quality-match-2025",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2025/12/01/wayve-acquires-german-startup-quality-match/",
+    "headline": "Wayve acquires German startup Quality Match",
+    "summary": "Autonomous driving company Wayve acquired German training-data specialist Quality Match for an undisclosed sum to bolster its Germany hub.",
+    "publishedAt": "2025-12-01T10:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "acquisition",
+          "companyName": "Quality Match",
+          "countryCode": "DE",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": "Wayve"
+        }
+      ]
+    }
+  },
+  {
+    "id": "tc-anthropic-vercept-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/02/25/anthropic-acquires-vercept-ai-startup-agents-computer-use-founders-investors/",
+    "headline": "Anthropic acquires computer-use AI startup Vercept after Meta poached one of its founders",
+    "summary": "Anthropic acquired Seattle computer-use agent startup Vercept and plans to shut down its Vy product while hiring several founders.",
+    "publishedAt": "2026-02-25T20:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "acquisition",
+          "companyName": "Vercept",
+          "countryCode": "US",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": "Anthropic"
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-mistral-le-chonk-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/06/mistral-unveils-le-chonk-says-outperforms-any-open-weight-model-developed-in-the-us-or-europe/",
+    "headline": "Mistral unveils le Chonk, says \"significantly outperforms” any open-weight models developed in US or Europe",
+    "summary": "French AI lab Mistral launched le Chonk, a new open-weight model family positioned as faster than rival US and European checkpoints.",
+    "publishedAt": "2026-10-06T14:32:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "launch",
+          "companyName": "Mistral",
+          "countryCode": "FR",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "tc-neko-health-america-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/10/03/spotify-billionaires-body-scan-startup-has-come-to-america/",
+    "headline": "Spotify billionaire’s body scan startup has come to America",
+    "summary": "Full-body scanning health startup Neko Health opened its first US clinics after growing in Europe, bringing its preventative screening service to American customers.",
+    "publishedAt": "2026-10-03T14:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "launch",
+          "companyName": "Neko Health",
+          "countryCode": "SE",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "te-ireland-top-funded-h1-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/08/irelands-top-funded-tech-companies-in-h1-2026/",
+    "headline": "Ireland’s top-funded tech companies in H1 2026",
+    "summary": "A Tech.eu roundup ranks Ireland's biggest H1 2026 tech fundraisers, highlighting Fonoa's $110 million Series C and Manna's $50 million Series B among the largest deals.",
+    "publishedAt": "2026-10-08T10:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Fonoa",
+          "countryCode": "IE",
+          "roundType": "series_c",
+          "amountText": "$110 million",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        },
+        {
+          "type": "funding_round",
+          "companyName": "Manna",
+          "countryCode": "IE",
+          "roundType": "series_b",
+          "amountText": "$50 million",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "uk-opinion-golden-triangle-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://www.uktech.news/opinion/theres-more-than-the-golden-triangle-20261008",
+    "headline": "There’s more than the Golden Triangle",
+    "summary": "A contributor argues that UK innovation policy over-focuses on the Golden Triangle and should invest more evenly in regional tech clusters.",
+    "publishedAt": "2026-10-08T12:24:24+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "te-digitaleurope-opinion-2026",
+    "sourceSlug": "tech-eu",
+    "url": "https://tech.eu/2026/10/07/digitaleurope-europe-cant-regulate-its-way-to-tech-leadership/",
+    "headline": "DIGITALEUROPE: Europe can’t regulate its way to tech leadership",
+    "summary": "Trade body DIGITALEUROPE published an opinion piece urging policymakers to pair regulation with investment so European tech can compete globally.",
+    "publishedAt": "2026-10-07T10:50:09+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "eu-a5x-conference-recap-2026",
+    "sourceSlug": "eu-startups",
+    "url": "https://www.eu-startups.com/2026/10/from-lab-to-launchpad-our-time-at-the-a5x-conference-in-singapore-in-partnership-with-nusx/",
+    "headline": "From lab to launchpad – Our Time at the A5X Conference in Singapore, in partnership with NUSX",
+    "summary": "EU-Startups editors recap sessions and networking at the A5X deep-tech conference in Singapore rather than reporting a single company transaction.",
+    "publishedAt": "2026-10-08T14:49:45+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "tc-layoffs-disrupt-promo-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/10/02/disrupt-2026-layoff-expo-plus-passes-available-for-75-dollars/",
+    "headline": "Affected by layoffs? Don’t miss this $75 deal for your TechCrunch Disrupt 2026 Expo+ Pass",
+    "summary": "TechCrunch promoted discounted Disrupt expo passes for people affected by layoffs, without announcing a startup funding or M&A event.",
+    "publishedAt": "2026-10-02T19:15:51+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "tc-apple-earnings-macs-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/04/30/apple-was-surprised-by-ai-driven-demand-for-macs/",
+    "headline": "Apple was surprised by AI-driven demand for Macs",
+    "summary": "Coverage of Apple's quarterly earnings notes Mac revenue beat expectations as customers bought AI-capable desktops, a big-tech results story rather than a startup deal.",
+    "publishedAt": "2026-04-30T22:12:00+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "tc-openai-in-talks-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/09/29/openai-reportedly-in-talks-to-raise-30b-round-at-1-4t-valuation/",
+    "headline": "OpenAI reportedly in talks to raise $30B round at $1.4T valuation",
+    "summary": "Sources say OpenAI is discussing a $30 billion pre-IPO round, but no completed financing has been announced yet.",
+    "publishedAt": "2026-09-29T19:52:00+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  },
+  {
+    "id": "tc-ramp-valuation-talks-2026",
+    "sourceSlug": "techcrunch-venture",
+    "url": "https://techcrunch.com/2026/05/07/ramp-in-talks-to-hit-40b-valuation-6-months-after-reaching-32b/",
+    "headline": "Ramp in talks to hit $40B+ valuation, 6 months after reaching $32B",
+    "summary": "Ramp is negotiating a new round that could lift its valuation above $40 billion, but the piece focuses on rumored pricing rather than a closed investment.",
+    "publishedAt": "2026-05-07T23:11:00+00:00",
+    "expected": {
+      "isRelevant": false,
+      "events": []
+    }
+  }
+]
