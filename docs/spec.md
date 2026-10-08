@@ -49,12 +49,12 @@ The Phase 1 data model already covers acquisitions, launches, investors, company
 
 ```mermaid
 flowchart LR
-  subgraph GH[GitHub Actions - cron every 3h]
+  subgraph GH[GitHub Actions - cron hourly]
     C[collect RSS] --> P[prefilter] --> X[extract with LLM] --> R[resolve entities] --> F[FX conversion]
     B[(budget guard)] -.checks.- X
   end
   X <--> O[OpenAI API]
-  F <--> E[Frankfurter / ECB rates]
+  F <--> E[Frankfurter v2 / ECB rates]
   GH -- ingest role: read/write --> DB[(Neon Postgres + pgvector)]
   W[Next.js on Vercel] -- web role: read-only --> DB
   U[Visitors] --> W
@@ -184,7 +184,7 @@ Rumours ("in talks to raise"), valuations without a raise, and layoffs are not e
 
 ## 7. Pipeline
 
-Run with `pnpm pipeline run` (GitHub Actions every 3 hours) or one step at a time with `pnpm pipeline <step>`. Each step is idempotent, and nothing runs on server start.
+Run with `pnpm pipeline run` (GitHub Actions hourly) or one step at a time with `pnpm pipeline <step>`. Each step is idempotent, and nothing runs on server start.
 
 1. **Lock.** Take a Postgres advisory lock (constant key). If another run holds it, exit 0. The workflow also uses a concurrency group.
 2. **Collect.** For each enabled RSS source, make a conditional GET (ETag / Last-Modified), parse RSS 2.0 or Atom, and insert new `source_items` plus `source_item_texts`. Existing URLs are ignored (`ON CONFLICT DO NOTHING` on `canonical_url`). Canonical URL means lowercase host, no tracking parameters, no fragment and no trailing slash.
@@ -288,43 +288,45 @@ Initial extraction accuracy targets (`pnpm eval --live`):
 | Database | Neon | Free (A11) |
 | Scheduled jobs + CI | GitHub Actions | Free for public repos (A13) |
 | LLM | OpenAI API | Prepaid credits, auto-recharge off (A10) |
-| FX rates | Frankfurter (ECB data) | Free, no key (A9) |
+| FX rates | Frankfurter v2, ECB provider (`api.frankfurter.dev`) | Free, no key (A9). The v1 host `api.frankfurter.app` still responds but is legacy. |
 | Domain | `*.vercel.app` | Free |
 
 Secrets: Vercel has `DATABASE_URL` (web role). GitHub Actions has `DATABASE_URL` (ingest role), `DATABASE_URL_OWNER` (migrate workflow only) and `OPENAI_API_KEY`. The repo variable `INGEST_ENABLED` acts as a kill switch.
 
 ## 12. Monthly running-cost estimate
 
-Assumptions: about 6 feeds and about 100 new items/day, so about 3,000/month. About 40% pass the prefilter, giving about 1,200 LLM calls. Each call uses about 1,500 input and 300 output tokens, so about 1.8M input and 0.36M output tokens/month. Conversion is $1.30 = £1.
+Assumptions, measured on 8 October 2026 (`docs/sources.md`): five enabled feeds and about 33 new items/day, so about 1,000/month. About 40% pass the prefilter, giving about 400 LLM calls. Each call uses about 1,500 input and 300 output tokens, so about 0.6M input and 0.12M output tokens/month. Conversion is $1.30 = £1. Prices are the confirmed OpenAI rates for `gpt-4.1-nano` (cheap) and `gpt-4.1-mini` (mid).
 
 | Item | Estimate / month |
 |---|---|
-| LLM extraction, cheap tier (about $0.10 / $0.40 per M tokens) | ≈ £0.25 |
-| LLM extraction, mid tier (about $0.40 / $1.60 per M tokens) | ≈ £1.00 |
-| Same, if the prefilter were removed | ≈ £0.60-£2.50 |
+| LLM extraction, cheap tier ($0.10 / $0.40 per M tokens) | ≈ £0.08 |
+| LLM extraction, mid tier ($0.40 / $1.60 per M tokens) | ≈ £0.35 |
+| Same, if the prefilter were removed | ≈ £0.20-£0.90 |
 | Eval runs | < £0.05 |
 | Vercel, Neon, GitHub Actions, domain | £0 |
-| **Total** | **≈ £0.25-£2.50** |
+| **Total** | **≈ £0.10-£0.80** |
 
-The £3 cap sits just above the expected range. If the eval forces a mid-tier model and volume is higher than assumed, normal ingestion could reach the cap. In that case the run pauses with status `budget_paused`, and the remaining items wait in `pending` until next month or until the cap is raised. A full re-extraction of a year's history (about 14k items) would cost about £3-£12, so the cap spreads it across months unless you limit it with `--limit` or raise the cap temporarily. OpenAI's minimum prepaid top-up (about $5, A10) is a one-off payment that should last months.
+The £3 cap is well above normal ingestion. A run still pauses with status `budget_paused` if spend hits the cap, and remaining items stay `pending`. Re-extracting a year of prefiltered items on the cheap model stays under the cap. Re-extracting every stored item on the mid-tier model can approach or exceed it, so use `--limit` or raise the cap for that run. OpenAI's minimum prepaid top-up (about $5, A10) is a one-off payment that should last many months.
 
-Storage: about 10 MB/month (items, summaries, extraction JSON). That fits Neon's free storage for years.
+Storage: about 10 MB/month at the measured volume. Neon Free allows 1 GB per project, so this fits for years. Hourly ingestion wakes the database briefly; that stays inside the 100 CU-hour monthly allowance.
 
 ## 13. Assumptions for Task 001 to verify
 
+Verified on 8 October 2026. Outcomes and links are in `docs/sources.md`. The rows below are the verified facts, not the original guesses.
+
 | # | Assumption | Needed in |
 |---|---|---|
-| A1 | RSS feeds exist and return title, link, pubDate and description. Candidate URLs: TechCrunch venture `https://techcrunch.com/category/venture/feed/`, Crunchbase News `https://news.crunchbase.com/feed/`, Sifted `https://sifted.eu/feed`, Tech.eu `https://tech.eu/feed/`, EU-Startups `https://www.eu-startups.com/feed/`, UKTN `https://www.uktech.news/feed` | 1 |
-| A2 | Each publisher's terms allow showing headline, link and extracted facts with attribution on a free public site. Commercial use (Phase 4) may need permission. | 1, 4 |
-| A3 | Feeds hold enough items that polling every 3 hours misses nothing (check item count against publishing rate) | 1 |
+| A1 | Five feeds are enabled: TechCrunch Venture, Crunchbase News, Tech.eu, EU-Startups, UKTN. They return title, link, pubDate and a usable description. Sifted's feed has no description and is disabled. | 1 |
+| A2 | Phase 1 may show headline, link and extracted facts with attribution. Crunchbase is enabled: extraction is not model training (maintainer decision, 8 Oct 2026). Sifted stays off because its terms ban using content to develop or validate AI. Commercial use (Phase 4) still needs a separate review for every publisher. | 1, 4 |
+| A3 | Poll hourly. EU-Startups only keeps about a day of items, so a 3-hour schedule risks gaps when a run is delayed. | 1 |
 | A4 | HN Algolia API is free and keyless. Show HN is available via `tags=show_hn`. Launch HN needs a title query. | 2 |
 | A5 | YC has no official public directory API. Check unofficial mirrors (for example yc-oss) and their terms. | 2 |
 | A6 | GitHub REST API allows 5,000 requests/hour with a token. Search API is about 30 requests/minute. | 2 |
 | A7 | Companies House API: free key, 600 requests per 5 minutes. Filing history exposes SH01 under the capital category. The Document API serves PDFs. A streaming API exists. Reuse is permitted under its licence. | 3 |
 | A8 | SEC EDGAR requires a User-Agent with contact details and allows at most 10 requests/second. Form D is available as XML via daily indexes. | 3 |
-| A9 | Frankfurter serves free ECB daily rates (including GBP and USD) for historical dates without a key | 1 |
-| A10 | OpenAI: current cheap model IDs and prices; strict JSON-schema structured outputs; prepaid credits with auto-recharge off stop requests when exhausted; minimum top-up amount; `text-embedding-3-small` supports `dimensions: 512` | 1 |
-| A11 | Neon free tier: storage and compute allowances, autosuspend, `vector` and `pg_trgm` available, custom roles creatable with SQL | 1 |
+| A9 | Frankfurter v2 (`https://api.frankfurter.dev/v2/providers/ecb/rates`) serves free ECB daily rates, including GBP and USD, with no key. v1 still responds. | 1 |
+| A10 | Confirmed 8 Oct 2026: `gpt-4.1-nano` $0.10/$0.40 per M tokens (default candidate), `gpt-4o-mini` $0.15/$0.60, `gpt-4.1-mini` $0.40/$1.60. Strict JSON-schema output works. Prepaid credits, auto-recharge off, $5 minimum top-up. `text-embedding-3-small` supports `dimensions: 512`. | 1 |
+| A11 | Neon Free: 1 GB storage per project, 100 CU-hours/month, scale to zero after 5 minutes idle, `vector` and `pg_trgm` available, custom roles via SQL | 1 |
 | A12 | Vercel Hobby: free, non-commercial only; limits relevant to server rendering | 1, 4 |
 | A13 | GitHub Actions: free minutes for public repos; scheduled runs may be delayed; schedules are disabled after 60 days without repository activity | 1 |
-| A14 | Putting real headlines and URLs (not article text) in a public fixture file is acceptable | 1 |
+| A14 | Real headlines and URLs are acceptable for TechCrunch, Tech.eu, EU-Startups and UKTN. Do not put Sifted or Crunchbase headlines in the public fixture file. | 1 |

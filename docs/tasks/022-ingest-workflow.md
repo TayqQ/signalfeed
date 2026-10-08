@@ -4,7 +4,7 @@
 - **Depends on:** 019. **Wave:** 7 (the maintainer enables it after 021 is live).
 
 ## Goal
-Run `pnpm pipeline run --trigger schedule` every 3 hours on GitHub Actions, with a kill switch, a concurrency guard and a timeout.
+Run `pnpm pipeline run --trigger schedule` every hour on GitHub Actions, with a kill switch, a concurrency guard and a timeout.
 
 ## Why it matters
 Ingestion runs outside web requests, on a schedule, with its own secrets. That is the fix for visitors being able to trigger paid AI calls. It also starts the history that Phase 2 trends need.
@@ -20,7 +20,7 @@ Ingestion runs outside web requests, on a schedule, with its own secrets. That i
 - `.github/workflows/ingest.yml`
 
 ## Requirements
-- Triggers: `schedule` with cron `17 */3 * * *` (off the hour to avoid GitHub's peak; use the interval from `docs/sources.md` if it differs), and `workflow_dispatch`.
+- Triggers: `schedule` with cron `17 * * * *` (minute 17, every hour, so runs miss GitHub's top-of-the-hour peak), and `workflow_dispatch`. Hourly is required: EU-Startups only keeps about a day of items (`docs/sources.md`, A3).
 - The job runs only if `vars.INGEST_ENABLED == 'true'`.
 - `concurrency: { group: ingest, cancel-in-progress: false }`, `timeout-minutes: 20`, `permissions: contents: read`.
 - Steps: checkout, pnpm setup with cache, Node from `.nvmrc`, `pnpm install --frozen-lockfile`, then `pnpm pipeline run --trigger schedule`. Env comes from secrets (`DATABASE_URL`, `OPENAI_API_KEY`) and variables (`EXTRACTION_MODEL`, `LLM_MONTHLY_CAP_GBP`, `HTTP_CONTACT`). Never echo the env.

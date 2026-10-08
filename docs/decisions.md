@@ -18,7 +18,7 @@ Each entry records the decision, the alternatives considered, and why. New decis
 ## D4. Scheduled ingestion on GitHub Actions cron
 - **Alternatives:** Vercel Cron; Trigger.dev or Inngest; a small VPS.
 - **Why:** free for public repos, with long run times. Secrets stay out of the web host, and logs are public and inspectable. Vercel Hobby cron is limited and runs inside short function timeouts. A hosted job service adds an account and another free tier to watch.
-- **Trade-off:** cron start times are best-effort, and GitHub disables schedules after 60 days of repo inactivity (A13). Both are acceptable for a 3-hourly batch.
+- **Trade-off:** cron start times are best-effort, and GitHub disables schedules after 60 days of repo inactivity (A13). The schedule is hourly because EU-Startups only keeps about a day of items (A3). That still fits Neon's free compute allowance.
 
 ## D5. The web app cannot trigger ingestion or spend money
 - **Chosen:** no HTTP route starts any pipeline step. The web app uses a read-only Postgres role that cannot read `source_item_texts`, and its environment has no LLM key.
@@ -46,7 +46,7 @@ Each entry records the decision, the alternatives considered, and why. New decis
   1. An app-level monthly guard checked before every call, using worst-case cost. Unknown model prices are refused.
   2. A per-run item limit.
   3. Provider prepaid credits.
-- **Why:** each layer covers a different failure: a logic bug, a runaway loop, a leaked key. The default cap is £3, just above the estimated £0.25-£2.50 a month. That keeps the worst case close to normal spend, at the cost of pausing ingestion if volume or model price comes in higher than estimated. The status page shows when that happens.
+- **Why:** each layer covers a different failure: a logic bug, a runaway loop, a leaked key. The default cap is £3. Measured volume puts normal spend at about £0.10-£0.80 a month, so the cap is headroom rather than the expected bill. Ingestion pauses if spend reaches it, and the status page shows that.
 
 ## D11. Deterministic entity resolution plus a review queue (no embeddings in Phase 1)
 - **Alternatives:** LLM-judged matching; embedding similarity; hard-coded fixes.
@@ -101,3 +101,7 @@ Each entry records the decision, the alternatives considered, and why. New decis
 ## D25. Task-based development with file ownership
 - **Chosen:** work is split into numbered task files. Each lists the files it may touch. Tasks in the same wave never share a file. Shared contracts (`src/core`, `src/db/schema.ts`, `package.json`) each belong to exactly one task.
 - **Why:** this allows parallel work in separate git worktrees without merge conflicts, and each task is reviewable on its own.
+
+## D26. Which feeds are on in Phase 1
+- **Chosen:** TechCrunch Venture, Crunchbase News, Tech.eu, EU-Startups and UKTN. Sifted is off. Ingest runs hourly.
+- **Why:** Sifted's RSS feed has no article summary, and its terms ban using the content to develop or validate AI. Crunchbase's terms ban training models on its content; the maintainer decided on 8 October 2026 that fact extraction is not training, so that feed stays on. Commercial reuse is still a Phase 4 question for every publisher. Hourly polling is required because EU-Startups only keeps about a day of items.
