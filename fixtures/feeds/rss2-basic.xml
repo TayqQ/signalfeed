@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Venture Feed</title>
+    <link>https://example.com/</link>
+    <description>Synthetic RSS fixture</description>
+    <item>
+      <title>Example Robotics raises £4M seed</title>
+      <link>https://example.com/robotics?utm_source=rss&amp;utm_medium=feed</link>
+      <guid isPermaLink="false">example-robotics-seed</guid>
+      <pubDate>Thu, 08 Oct 2026 09:30:00 GMT</pubDate>
+      <description>Example Robotics raised a seed round for warehouse robots.</description>
+    </item>
+    <item>
+      <title>Northwind Labs opens a London office</title>
+      <link>https://example.com/northwind-london</link>
+      <pubDate>not-a-date</pubDate>
+      <description>No guid on this item.</description>
+    </item>
+  </channel>
+</rss>
