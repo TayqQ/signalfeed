@@ -22,7 +22,8 @@ Without a fixed, human-checked answer set, nobody can say whether the extractor 
 - `src/eval/fixtures.test.ts`
 
 ## Requirements
-- Take real headlines and URLs from the feeds in `docs/sources.md`.
+- Take real headlines and URLs from the **enabled** feeds in `docs/sources.md`: TechCrunch Venture, Tech.eu, EU-Startups and UKTN.
+- Do not use Sifted or Crunchbase News headlines. Their terms restrict AI use of the content (`docs/sources.md`, A2 and A14).
 - For each case, write `summary` yourself, in 1-3 sentences in your own words, carrying the facts a feed summary would contain. Never paste publisher text.
 - The mix:
   - 14-16 funding rounds, covering at least USD, GBP and EUR; at least 5 UK or Europe companies; at least 2 with a named lead; 1 with no amount; 1 with an unusual label such as "seed extension";

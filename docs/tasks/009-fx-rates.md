@@ -21,7 +21,7 @@ Funding amounts arrive in many currencies. Converting at the rate for the announ
 - `fixtures/fx/*.json` (responses written by hand in the documented format)
 
 ## Requirements
-- `createFrankfurterProvider({ fetcher: HttpFetcher, baseUrl? })` implements `FxProvider`. `getRates('YYYY-MM-DD')` requests rates with base EUR for that date and returns `{ date: <date the API actually returned>, perEur: { EUR: 1, GBP: ..., USD: ..., ... } }`.
+- `createFrankfurterProvider({ fetcher: HttpFetcher, baseUrl? })` implements `FxProvider`. Default base URL is `https://api.frankfurter.dev/v2/providers/ecb`. `getRates('YYYY-MM-DD')` requests `GET {baseUrl}/rates?from=YYYY-MM-DD&to=YYYY-MM-DD` and returns `{ date: <date the API actually returned>, perEur: { EUR: 1, GBP: ..., USD: ..., ... } }`. Write fixtures in the v2 response shape documented at frankfurter.dev (Task 001, A9). Do not call `api.frankfurter.app`.
 - The API returns the previous business day for weekends and holidays. Keep that returned date.
 - Validate the response with Zod. A non-2xx response or a malformed body throws a descriptive error.
 - Reject dates in the future and dates before 1999-01-04.
