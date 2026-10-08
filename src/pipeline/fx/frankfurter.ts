@@ -15,9 +15,7 @@ const frankfurterRateRowSchema = z.object({
   rate: z.number().finite().positive(),
 });
 
-const frankfurterRatesResponseSchema = z
-  .array(frankfurterRateRowSchema)
-  .min(1);
+const frankfurterRatesResponseSchema = z.array(frankfurterRateRowSchema).min(1);
 
 export interface FrankfurterProviderOptions {
   fetcher: HttpFetcher;
@@ -44,7 +42,9 @@ function assertValidRateDate(date: string, todayUtc: () => string): void {
   }
 }
 
-function rowsToFxRates(rows: z.infer<typeof frankfurterRatesResponseSchema>): FxRates {
+function rowsToFxRates(
+  rows: z.infer<typeof frankfurterRatesResponseSchema>,
+): FxRates {
   const date = rows[0]!.date;
   for (const row of rows) {
     if (row.date !== date) {

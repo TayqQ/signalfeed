@@ -17,7 +17,10 @@ function loadFixture(name: string): string {
   return readFileSync(path.join(repoRoot, "fixtures/fx", name), "utf8");
 }
 
-function stubFetcher(body: string, status = 200): {
+function stubFetcher(
+  body: string,
+  status = 200,
+): {
   fetcher: HttpFetcher;
   get: ReturnType<typeof vi.fn>;
 } {
@@ -86,9 +89,7 @@ describe("createFrankfurterProvider", () => {
     const { fetcher } = stubFetcher("{}", 503);
     const provider = createFrankfurterProvider({ fetcher });
 
-    await expect(provider.getRates("2024-05-15")).rejects.toThrow(
-      /HTTP 503/,
-    );
+    await expect(provider.getRates("2024-05-15")).rejects.toThrow(/HTTP 503/);
   });
 
   it("rejects a future date without calling the fetcher", async () => {
