@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example feed with bad items</title>
+    <link>https://example.com/</link>
+    <description>Synthetic RSS fixture</description>
+    <item>
+      <title>Example Robotics raises £4M seed</title>
+      <link>https://example.com/kept-first</link>
+      <guid>kept-first</guid>
+      <pubDate>Thu, 08 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Kept before the bad items.</description>
+    </item>
+    <item>
+      <link>https://example.com/missing-title</link>
+      <description>Skipped because there is no title.</description>
+    </item>
+    <item>
+      <title>   </title>
+      <link>https://example.com/blank-title</link>
+    </item>
+    <item>
+      <title>Missing a link</title>
+      <description>Skipped because there is no link.</description>
+    </item>
+    <item>not really an item</item>
+    <item>
+      <title>Northwind Labs opens a London office</title>
+      <link>https://example.com/kept-last</link>
+      <guid>kept-last</guid>
+      <pubDate>Thu, 08 Oct 2026 18:00:00 GMT</pubDate>
+      <description>Kept after the bad items.</description>
+    </item>
+  </channel>
+</rss>

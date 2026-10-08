@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Atom Feed</title>
+  <updated>2026-10-08T12:00:00Z</updated>
+  <entry>
+    <title>Example Robotics raises £4M seed</title>
+    <id>tag:example.com,2026:robotics-seed</id>
+    <link rel="alternate" type="text/html" href="https://example.com/atom/robotics"/>
+    <link rel="self" href="https://example.com/atom/robotics/feed"/>
+    <published>2026-10-08T09:30:00Z</published>
+    <updated>2026-10-08T11:00:00Z</updated>
+    <summary type="html"><![CDATA[<p>Synthetic <em>summary</em> for Example Robotics.</p>]]></summary>
+  </entry>
+  <entry>
+    <title type="html"><![CDATA[Northwind <b>Labs</b> launches a warehouse pilot]]></title>
+    <id>tag:example.com,2026:northwind</id>
+    <link href="https://example.com/atom/northwind"/>
+    <updated>2026-10-07T15:00:00Z</updated>
+    <content type="html"><![CDATA[<p>Only content, no summary element.</p>]]></content>
+  </entry>
+</feed>
