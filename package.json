@@ -1,0 +1,62 @@
+{
+  "name": "signalfeed",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@12.10.1",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "pipeline": "tsx src/cli/pipeline.ts",
+    "entities": "tsx src/cli/entities.ts",
+    "eval": "tsx src/eval/cli.ts",
+    "screenshots": "tsx scripts/screenshots.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "drizzle-orm": "^0.45.4",
+    "fast-xml-parser": "^5.3.3",
+    "next": "16.4.0",
+    "openai": "^6.16.0",
+    "pg": "^8.16.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@playwright/test": "^1.57.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.19.3",
+    "@types/pg": "^8.16.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "drizzle-kit": "^0.31.8",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.0",
+    "jsdom": "^27.0.1",
+    "prettier": "^3.7.4",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.0",
+    "vitest": "^5.0.3"
+  }
+}

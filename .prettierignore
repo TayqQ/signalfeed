@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+coverage
+pnpm-lock.yaml
+drizzle
+AGENTS.md
+LICENSE
+docs
