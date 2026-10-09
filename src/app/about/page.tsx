@@ -26,12 +26,14 @@ const ENABLED_SOURCES = [
   {
     name: "Tech.eu",
     url: "https://tech.eu/feed/",
-    attribution: "Headlines, links and feed summaries with clear source credit.",
+    attribution:
+      "Headlines, links and feed summaries with clear source credit.",
   },
   {
     name: "EU-Startups",
     url: "https://www.eu-startups.com/feed/",
-    attribution: "Headlines, links and feed summaries with clear source credit.",
+    attribution:
+      "Headlines, links and feed summaries with clear source credit.",
   },
   {
     name: "UKTN",
@@ -44,7 +46,9 @@ const ENABLED_SOURCES = [
 export default function AboutPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 text-zinc-900">
-      <h1 className="text-3xl font-semibold tracking-tight">About SignalFeed</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">
+        About SignalFeed
+      </h1>
       <p className="mt-4 text-lg text-zinc-700">
         SignalFeed collects public startup news from RSS feeds, uses a language
         model to extract structured facts (funding rounds, acquisitions,
@@ -58,14 +62,14 @@ export default function AboutPage() {
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-zinc-700">
           <li>
             <strong className="font-medium text-zinc-900">Collect.</strong>{" "}
-            Scheduled jobs poll enabled RSS feeds and store new headlines,
-            links and feed-provided summaries for processing.
+            Scheduled jobs poll enabled RSS feeds and store new headlines, links
+            and feed-provided summaries for processing.
           </li>
           <li>
             <strong className="font-medium text-zinc-900">Extract.</strong> A
-            keyword prefilter selects relevant items; each passes through one LLM
-            call that returns validated JSON (amounts stay as reported text and
-            are parsed in code).
+            keyword prefilter selects relevant items; each passes through one
+            LLM call that returns validated JSON (amounts stay as reported text
+            and are parsed in code).
           </li>
           <li>
             <strong className="font-medium text-zinc-900">Merge.</strong> Entity
@@ -113,8 +117,8 @@ export default function AboutPage() {
           shown on the site.
         </p>
         <p className="mt-3 text-zinc-700">
-          We do not store names of individual people (founders, angels, officers)
-          or any personal contact details.
+          We do not store names of individual people (founders, angels,
+          officers) or any personal contact details.
         </p>
       </section>
 

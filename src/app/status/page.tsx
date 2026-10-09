@@ -18,11 +18,9 @@ const USD_PER_GBP = 1.3;
 export const dynamic = "force-dynamic";
 
 function loadStatus(): Promise<StatusSummary> {
-  return cached(
-    () => getStatusSummary(getWebDb()),
-    ["status-summary"],
-    { revalidateSeconds: 60 },
-  );
+  return cached(() => getStatusSummary(getWebDb()), ["status-summary"], {
+    revalidateSeconds: 60,
+  });
 }
 
 function formatUtcDateTime(iso: string): string {
@@ -156,9 +154,7 @@ function SpendSection({ summary }: { summary: StatusSummary }) {
 
   const capMicros = capUsdMicros(capGbp);
   const pct =
-    capMicros > 0
-      ? Math.min(100, (monthToDateUsdMicros / capMicros) * 100)
-      : 0;
+    capMicros > 0 ? Math.min(100, (monthToDateUsdMicros / capMicros) * 100) : 0;
 
   return (
     <section className="mt-10">
@@ -307,7 +303,9 @@ export default async function StatusPage() {
 
       {empty ? (
         <div className="mt-10 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center">
-          <p className="text-lg font-medium text-zinc-800">No ingest runs yet</p>
+          <p className="text-lg font-medium text-zinc-800">
+            No ingest runs yet
+          </p>
           <p className="mt-2 text-zinc-600">
             Scheduled collection has not recorded a run. After the first
             pipeline run, recent activity and spend will appear here.
