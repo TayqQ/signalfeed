@@ -6,16 +6,16 @@
 
 Each entry in `cases.json` is an object with:
 
-| Field | Meaning |
-| --- | --- |
-| `id` | Stable slug, unique across the file |
-| `sourceSlug` | Ingest source id from `docs/sources.md` (`techcrunch-venture`, `tech-eu`, `eu-startups`, `uktech-news`) |
-| `url` | Canonical article URL |
-| `headline` | Verbatim RSS / page title |
-| `summary` | **1–3 sentences in our own words** — facts only, never copied publisher text |
-| `publishedAt` | ISO 8601 datetime **with timezone offset** (e.g. `2026-10-08T12:00:00+00:00`) |
-| `expected.isRelevant` | Whether the item reports a completed funding round, acquisition, or startup launch |
-| `expected.events` | Zero or more expected events (see `src/core/eval-fixture.ts`) |
+| Field                 | Meaning                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `id`                  | Stable slug, unique across the file                                                                     |
+| `sourceSlug`          | Ingest source id from `docs/sources.md` (`techcrunch-venture`, `tech-eu`, `eu-startups`, `uktech-news`) |
+| `url`                 | Canonical article URL                                                                                   |
+| `headline`            | Verbatim RSS / page title                                                                               |
+| `summary`             | **1–3 sentences in our own words** — facts only, never copied publisher text                            |
+| `publishedAt`         | ISO 8601 datetime **with timezone offset** (e.g. `2026-10-08T12:00:00+00:00`)                           |
+| `expected.isRelevant` | Whether the item reports a completed funding round, acquisition, or startup launch                      |
+| `expected.events`     | Zero or more expected events (see `src/core/eval-fixture.ts`)                                           |
 
 Event fields mirror the eval schema: `type`, `companyName`, `countryCode` (two-letter ISO or `null`), `roundType`, `amountText` (verbatim amount phrase from the headline or summary), `leadInvestors` and `investors` (organisations only), and `acquirerName` for acquisitions.
 
