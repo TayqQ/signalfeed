@@ -12,12 +12,12 @@ SignalFeed collects startup news, extracts structured facts with an LLM, merges 
 
 ## Commands
 - `pnpm install` / `pnpm dev`
-- `pnpm check`: lint, typecheck and test. This must pass before you finish.
+- `pnpm check`: lint, format check, typecheck and test. This must pass before you finish.
 - `pnpm build`: must pass without a database
 - `pnpm db:generate` (only the task that owns `src/db/schema.ts`) / `pnpm db:migrate`
-- `pnpm pipeline <run|collect|extract|resolve|fx|reextract>`
+- `pnpm ingest <run|collect|extract|resolve|fx|reextract>`
 - `pnpm entities <candidates|merge|dismiss|alias>`
-- `pnpm eval --replay | --live`
+- `pnpm eval --replay | --live | --resolution`
 
 ## Layout
 - `src/core/`: shared types, enums, Zod schemas, port interfaces, env schemas. No I/O.

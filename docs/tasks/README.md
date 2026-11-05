@@ -1,5 +1,7 @@
 # Phase 1 tasks
 
+All code tasks are now written. Steps that need accounts, keys or spending are still open: the live extraction eval in 014, the account steps in 021, and turning on the schedule in 022. These task files are the original plan, so they still say `pnpm pipeline`, which is now `pnpm ingest` (D31).
+
 Each task is designed for one fresh agent chat in its own git worktree. Tasks in the same wave can run in parallel: they never touch the same file. Start a wave only when every task it depends on has been merged to `main`.
 
 **Tiers:**

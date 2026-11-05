@@ -60,7 +60,7 @@ flowchart LR
   U[Visitors] --> W
 ```
 
-- One TypeScript package. The Next.js app lives in `src/app`. The pipeline lives in `src/pipeline` and runs only as a CLI (`pnpm pipeline run`).
+- One TypeScript package. The Next.js app lives in `src/app`. The pipeline lives in `src/pipeline` and runs only as a CLI (`pnpm ingest run`).
 - `src/core` holds shared types, Zod schemas and port interfaces, and has no I/O.
 - Lint rules stop `src/app` importing `src/pipeline` and vice versa. This keeps the OpenAI client out of the web bundle.
 - The web app connects with a read-only Postgres role. Its environment contains no LLM key.
@@ -184,11 +184,11 @@ Rumours ("in talks to raise"), valuations without a raise, and layoffs are not e
 
 ## 7. Pipeline
 
-Run with `pnpm pipeline run` (GitHub Actions hourly) or one step at a time with `pnpm pipeline <step>`. Each step is idempotent, and nothing runs on server start.
+Run with `pnpm ingest run` (GitHub Actions hourly) or one step at a time with `pnpm ingest <step>`. Each step is idempotent, and nothing runs on server start.
 
 1. **Lock.** Take a Postgres advisory lock (constant key). If another run holds it, exit 0. The workflow also uses a concurrency group.
 2. **Collect.** For each enabled RSS source, make a conditional GET (ETag / Last-Modified), parse RSS 2.0 or Atom, and insert new `source_items` plus `source_item_texts`. Existing URLs are ignored (`ON CONFLICT DO NOTHING` on `canonical_url`). Canonical URL means lowercase host, no tracking parameters, no fragment and no trailing slash.
-3. **Prefilter.** A deterministic keyword and money-pattern check on title and summary. Non-matching items become `filtered_out`. The eval measures recall to make sure relevant fixtures always pass.
+3. **Prefilter.** A deterministic keyword and money-pattern check on title and summary. Non-matching items become `filtered_out`. The eval measures recall to make sure relevant fixtures always pass. On 5 November 2026 it passed 49 of 70 live items (70%), well above the 40% assumed in section 12.
 4. **Extract.** Take up to `MAX_EXTRACTIONS_PER_RUN` (default 150) pending items, oldest first. For each:
    - ask the budget guard whether the worst-case cost fits the cap;
    - call the LLM;
@@ -200,7 +200,7 @@ Run with `pnpm pipeline run` (GitHub Actions hourly) or one step at a time with 
 6. **FX.** Fetch any missing ECB rates for dates referenced by events, then fill the `*_usd_minor` and `*_gbp_minor` columns. If there is no rate for a date, use the nearest earlier rate within 7 days.
 7. **Record.** Write `ingest_runs.stats` (counts per step, spend this run, month-to-date spend, cap) and release the lock.
 
-Re-extraction after a prompt change is explicit: `pnpm pipeline reextract --prompt-version v2 [--limit N] [--dry-run]`. A dry run prints the estimated cost. A real run requires `--yes`, stays subject to the cap, marks the new extraction current, and re-resolves the item. Events left with no sources are deleted, because they are derived data.
+Re-extraction after a prompt change is explicit: `pnpm ingest reextract --prompt-version v2 [--limit N] [--dry-run]`. A dry run prints the estimated cost. A real run requires `--yes`, stays subject to the cap, marks the new extraction current, and re-resolves the item. Events left with no sources are deleted, because they are derived data.
 
 ### Entity resolution rules
 
@@ -214,7 +214,7 @@ Company name normalisation (`src/lib/normalise.ts`):
 Company matching is applied in order, and the first match wins:
 1. **Domain.** The validated domain equals `companies.website_domain`. Match.
 2. **Exact name.** The normalised name equals a company's `normalised_name` or one of its aliases, and nothing conflicts. A conflict means both countries are known and differ, or both domains are known and differ. One candidate: match. Several: prefer one with no conflict and the most recent activity. If it is still ambiguous, create a new company and a merge candidate.
-3. **Fuzzy with corroboration.** Trigram similarity is at least 0.6 and the incoming event corroborates an existing event of that candidate. Corroboration means the same round type, or amounts within 15%, within ±45 days. Then match and add an alias.
+3. **Fuzzy with corroboration.** Trigram similarity is at least 0.6 and the incoming event corroborates an existing event of that candidate. For funding, corroboration means amounts within 15%, within ±45 days (D29). Then match and add an alias.
 4. Otherwise create a new company. If the best fuzzy score is at least 0.6, also add a merge candidate.
 
 Investors: a domain match or an exact normalised name/alias match. Anything else creates a new investor. Similar names (trigram ≥ 0.7) become merge candidates. Investor names are never merged automatically on fuzzy evidence.
@@ -265,6 +265,7 @@ Sort semantics: when `q` is present and `sort` is not set, results are ordered b
 - **Migrations:** a CI job applies migrations to a real `pgvector/pgvector` Postgres service container.
 - **No network in tests:** `vitest.setup.ts` makes `fetch` throw. Collectors and LLM clients are tested through fakes of the port interfaces.
 - **Extraction eval:** `pnpm eval --live` runs the fixture set against a real model and writes `docs/eval-results.md`. It costs pennies, needs a key, and is not run in CI. `pnpm eval --replay` scores recorded responses, which CI runs through a test so scorer and parser regressions are caught. Initial targets are below.
+- **Resolution eval:** `pnpm eval --resolution` runs hand-written reports through the real resolver and scores pairs of reports (D29). It needs no key. A test holds it above fixed floors.
 - **CI** (`.github/workflows/ci.yml`, on every push and PR): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, plus the migrations job.
 
 Initial extraction accuracy targets (`pnpm eval --live`):
@@ -295,7 +296,7 @@ Secrets: Vercel has `DATABASE_URL` (web role). GitHub Actions has `DATABASE_URL`
 
 ## 12. Monthly running-cost estimate
 
-Assumptions, measured on 8 October 2026 (`docs/sources.md`): five enabled feeds and about 33 new items/day, so about 1,000/month. About 40% pass the prefilter, giving about 400 LLM calls. Each call uses about 1,500 input and 300 output tokens, so about 0.6M input and 0.12M output tokens/month. Conversion is $1.30 = £1. Prices are the confirmed OpenAI rates for `gpt-4.1-nano` (cheap) and `gpt-4.1-mini` (mid).
+Assumptions, measured on 8 October 2026 (`docs/sources.md`): five enabled feeds and about 33 new items/day, so about 1,000/month. About 40% pass the prefilter, giving about 400 LLM calls. A later sample passed 70%, which would raise calls and LLM cost by about 70% and stays well under the cap. Each call uses about 1,500 input and 300 output tokens, so about 0.6M input and 0.12M output tokens/month. Conversion is $1.30 = £1. Prices are the confirmed OpenAI rates for `gpt-4.1-nano` (cheap) and `gpt-4.1-mini` (mid).
 
 | Item | Estimate / month |
 |---|---|
