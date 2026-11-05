@@ -1,4 +1,6 @@
 const LEGAL_SUFFIXES = new Set([
+  "technologies",
+  "technology",
   "ab",
   "bv",
   "co",
@@ -126,12 +128,14 @@ function suffixKey(token: string): string {
 }
 
 function stripLegalSuffixes(value: string): string {
+  // Trailing words only: "AB InBev" and "Co Op" must keep their leading word.
   const tokens = value.split(/\s+/).filter((token) => token.length > 0);
-  const kept = tokens.filter((token) => {
-    const key = suffixKey(token);
-    return key.length > 0 && !LEGAL_SUFFIXES.has(key);
-  });
-  return (kept.length > 0 ? kept : tokens).join(" ");
+  while (tokens.length > 1) {
+    const key = suffixKey(tokens[tokens.length - 1] ?? "");
+    if (key.length > 0 && !LEGAL_SUFFIXES.has(key)) break;
+    tokens.pop();
+  }
+  return tokens.join(" ");
 }
 
 function stripTrailingWords(value: string, words: ReadonlySet<string>): string {

@@ -10,14 +10,31 @@ const RATE_DECIMALS = 8;
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
 const NUMBER = String.raw`\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?`;
-const MAGNITUDE = String.raw`billions?|millions?|thousands?|mio\.?|mrd\.?|bn|mm|k|m|b`;
-const CURRENCY_TOKEN = String.raw`us\$|usd|eur|gbp|aud|cad|chf|jpy|cny|sek|nok|dkk|inr|sgd|hkd|nzd|pln|czk|huf|ron|brl|mxn|zar|krw|try|aed|sar|ils|qar|kwd|€|£|\$`;
+// A bare `t` must not swallow words such as "$5 T-shirts".
+const MAGNITUDE = String.raw`trillions?|billions?|millions?|thousands?|crores?|lakhs?|mio\.?|mrd\.?|bn|tn|mln|mil|mm|mn|mi|cr|t(?![-a-z])|k|m|b`;
+const CURRENCY_TOKEN = String.raw`us\$|(?:au?|ca?|sg?|nz|hk|r)\$|usd|eur|gbp|aud|cad|chf|jpy|cny|sek|nok|dkk|inr|sgd|hkd|nzd|pln|czk|huf|ron|brl|mxn|zar|krw|try|aed|sar|ils|qar|kwd|rs\.?|euros?|pounds?|sterling|dollars?|€|£|₹|¥|\$`;
 const RANGE_SEPARATOR = String.raw`(?:-|–|—|\bto\b|\band\b)`;
 
 const MULTIPLIERS: ReadonlyArray<{ pattern: RegExp; factor: bigint }> = [
+  { pattern: /^(?:trillions?|tn|t)$/i, factor: BigInt(1_000_000_000_000) },
   { pattern: /^(?:billions?|bn|b|mrd\.?)$/i, factor: BigInt(1_000_000_000) },
-  { pattern: /^(?:millions?|mio\.?|mm|m)$/i, factor: BigInt(1_000_000) },
+  { pattern: /^(?:crores?|cr)$/i, factor: BigInt(10_000_000) },
+  {
+    pattern: /^(?:millions?|mio\.?|mln|mil|mm|mn|mi|m)$/i,
+    factor: BigInt(1_000_000),
+  },
+  { pattern: /^lakhs?$/i, factor: BigInt(100_000) },
   { pattern: /^(?:thousands?|k)$/i, factor: BigInt(1_000) },
+];
+
+/** Dollar prefixes that are not US dollars. Checked before a bare `$`. */
+const PREFIXED_DOLLARS: ReadonlyArray<{ pattern: RegExp; code: string }> = [
+  { pattern: /(?<![a-z])au?\$/i, code: "AUD" },
+  { pattern: /(?<![a-z])ca?\$/i, code: "CAD" },
+  { pattern: /(?<![a-z])sg?\$/i, code: "SGD" },
+  { pattern: /(?<![a-z])nz\$/i, code: "NZD" },
+  { pattern: /(?<![a-z])hk\$/i, code: "HKD" },
+  { pattern: /(?<![a-z])r\$/i, code: "BRL" },
 ];
 
 const WORD_CURRENCIES = new Set([
@@ -151,7 +168,7 @@ function lowerAmountMinor(text: string): number | null {
   }
 
   const single = new RegExp(
-    `(?:${CURRENCY_TOKEN}\\s*)?(${NUMBER})\\s*(${MAGNITUDE})?(?![a-z])(?:\\s*(?:${CURRENCY_TOKEN}))?`,
+    `(?:${CURRENCY_TOKEN}\\s*)?(${NUMBER})(?![.,]?\\d)\\s*(${MAGNITUDE})?(?![a-z])(?:\\s*(?:${CURRENCY_TOKEN}))?`,
     "gi",
   );
   for (const match of text.matchAll(single)) {
@@ -166,8 +183,14 @@ function lowerAmountMinor(text: string): number | null {
 
 function detectCurrency(text: string, hint: string | null): string | null {
   if (/us\$|\busd\b/i.test(text)) return "USD";
-  if (/€|\beur\b/i.test(text)) return "EUR";
-  if (/£|\bgbp\b/i.test(text)) return "GBP";
+  for (const { pattern, code } of PREFIXED_DOLLARS) {
+    if (pattern.test(text)) return code;
+  }
+  if (/€|\beuros?\b|\beur\b/i.test(text)) return "EUR";
+  if (/£|\bgbp\b|\bpounds?\b|\bsterling\b/i.test(text)) return "GBP";
+  if (/₹|\brs\.?(?=\s|\d)|\bcrores?\b|\blakhs?\b/i.test(text)) return "INR";
+  if (/\bdollars?\b/i.test(text)) return hint ?? "USD";
+  if (text.includes("¥")) return hint ?? "JPY";
   if (hint && new RegExp(`\\b${hint}\\b`, "i").test(text)) return hint;
   const words = text.match(/\b[A-Za-z]{3}\b/g) ?? [];
   for (const word of words) {
