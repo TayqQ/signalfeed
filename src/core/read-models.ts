@@ -206,4 +206,6 @@ export interface StatusSummary {
   monthToDateUsdMicros: number;
   /** From the latest run's stats; null before the first run. */
   capGbp: number | null;
+  /** Latest stored rate. Null falls back to 1.0, as the budget guard does. */
+  usdPerGbp: number | null;
 }

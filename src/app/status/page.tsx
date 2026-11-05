@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   description: "Pipeline health, ingest runs and LLM spend against the cap.",
 };
 
-/** Matches the budget guard when no FX row exists yet (see spec §12). */
-const USD_PER_GBP = 1.3;
+/** What the budget guard uses when no rate is stored yet. */
+const FALLBACK_USD_PER_GBP = 1;
 
 export const dynamic = "force-dynamic";
 
@@ -64,13 +64,13 @@ function formatUsdFromMicros(usdMicros: number): string {
   }).format(dollars);
 }
 
-function gbpMinorFromUsdMicros(usdMicros: number): number {
-  const gbp = usdMicros / 1_000_000 / USD_PER_GBP;
+function gbpMinorFromUsdMicros(usdMicros: number, usdPerGbp: number): number {
+  const gbp = usdMicros / 1_000_000 / usdPerGbp;
   return Math.round(gbp * 100);
 }
 
-function capUsdMicros(capGbp: number): number {
-  return Math.floor(capGbp * USD_PER_GBP * 1_000_000);
+function capUsdMicros(capGbp: number, usdPerGbp: number): number {
+  return Math.floor(capGbp * usdPerGbp * 1_000_000);
 }
 
 function formatIngestStatus(status: IngestStatus): string {
@@ -139,7 +139,8 @@ function statusBadgeClass(status: IngestStatus): string {
 
 function SpendSection({ summary }: { summary: StatusSummary }) {
   const { monthToDateUsdMicros, capGbp } = summary;
-  const gbpMinor = gbpMinorFromUsdMicros(monthToDateUsdMicros);
+  const usdPerGbp = summary.usdPerGbp ?? FALLBACK_USD_PER_GBP;
+  const gbpMinor = gbpMinorFromUsdMicros(monthToDateUsdMicros, usdPerGbp);
 
   if (capGbp == null) {
     return (
@@ -152,7 +153,7 @@ function SpendSection({ summary }: { summary: StatusSummary }) {
     );
   }
 
-  const capMicros = capUsdMicros(capGbp);
+  const capMicros = capUsdMicros(capGbp, usdPerGbp);
   const pct =
     capMicros > 0 ? Math.min(100, (monthToDateUsdMicros / capMicros) * 100) : 0;
 
@@ -297,6 +298,31 @@ export default async function StatusPage() {
             The latest ingest run hit the monthly LLM spend cap. New extractions
             are paused until the next calendar month or the cap is raised;
             pending items stay in the queue.
+          </p>
+        </div>
+      ) : null}
+
+      {latest?.stats?.extract.skipped ? (
+        <div
+          className="mt-6 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3"
+          role="status"
+        >
+          <p className="font-medium">Extraction is off</p>
+          <p className="mt-1 text-sm">
+            Feeds are being collected and kept, but no language model key is
+            set, so they are not being turned into events yet.
+          </p>
+        </div>
+      ) : null}
+
+      {latest?.stats?.extract.providerError ? (
+        <div
+          className="mt-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3"
+          role="status"
+        >
+          <p className="font-medium">The language model provider refused</p>
+          <p className="mt-1 text-sm">
+            Items stay in the queue and will be retried on the next run.
           </p>
         </div>
       ) : null}
