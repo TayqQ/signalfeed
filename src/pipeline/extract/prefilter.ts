@@ -8,7 +8,7 @@ const ACQUISITION =
   /\b(?:acquires?|acquired|acquiring|acquisitions?|buys|bought|mergers?)\b/i;
 
 const LAUNCH =
-  /\b(?:launch(?:es|ed|ing)?|unveil(?:s|ed|ing)?|show\s+hn|launch\s+hn)\b/i;
+  /\b(?:launch(?:es|ed|ing)?|unveil(?:s|ed|ing)?|releas(?:es|ed|ing)|debut(?:s|ed|ing)?|introduc(?:es|ed|ing)|roll(?:s|ed|ing)\s+out|open(?:s|ed|ing)\s+(?:its|their|a|an|first|new)|show\s+hn|launch\s+hn)\b/i;
 
 const AMOUNT = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?`;
 const SCALE = String.raw`(?:billion|million|bn|k|m|b)`;

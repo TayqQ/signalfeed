@@ -17,6 +17,16 @@ export const pipelineEnvSchema = z.object({
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 
+/**
+ * The same settings with no LLM key. Collecting costs nothing, and history can
+ * only accumulate from the day collection starts, so a run without a key still
+ * stores new items and leaves them pending for extraction later.
+ */
+export const noLlmPipelineEnvSchema = pipelineEnvSchema.extend({
+  OPENAI_API_KEY: z.string().min(1).optional(),
+});
+export type NoLlmPipelineEnv = z.infer<typeof noLlmPipelineEnvSchema>;
+
 export type EnvSource = Record<string, string | undefined>;
 
 function parseEnv<T extends z.ZodObject>(
@@ -49,4 +59,8 @@ export function parseWebEnv(env: EnvSource): WebEnv {
 
 export function parsePipelineEnv(env: EnvSource): PipelineEnv {
   return parseEnv(pipelineEnvSchema, env);
+}
+
+export function parseNoLlmPipelineEnv(env: EnvSource): NoLlmPipelineEnv {
+  return parseEnv(noLlmPipelineEnvSchema, env);
 }

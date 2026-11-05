@@ -86,6 +86,10 @@ export interface ExtractStats {
   itemsErrored: number;
   /** Items that reached the attempt limit and became `failed`. */
   itemsFailed: number;
+  /** True when no LLM key is configured: items are kept for a later run. */
+  skipped?: boolean;
+  /** Set when the provider itself refused (bad key, no credit, outage). */
+  providerError?: string;
 }
 
 export interface ResolveStats {
@@ -95,6 +99,8 @@ export interface ResolveStats {
   eventsCreated: number;
   eventsUpdated: number;
   mergeCandidatesCreated: number;
+  /** Extractions that threw while resolving; retried on the next run. */
+  extractionsFailed?: number;
 }
 
 export interface FxStats {

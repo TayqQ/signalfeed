@@ -58,6 +58,16 @@ const pipelineItemFields = {
 
 const reextractTarget = alias(extractions, "reextract_target");
 
+/** Null for anything but a parseable http(s) URL, so one bad link cannot fail a feed. */
+function safeCanonicalUrl(url: string): string | null {
+  try {
+    const canonical = canonicaliseUrl(url);
+    return /^https?:/i.test(canonical) ? canonical : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Keep the first item for each canonical URL and external id in this batch. */
 function prepareItems(items: readonly CollectedItem[]): PreparedItem[] {
   const seenUrls = new Set<string>();
@@ -65,7 +75,8 @@ function prepareItems(items: readonly CollectedItem[]): PreparedItem[] {
   const prepared: PreparedItem[] = [];
 
   for (const item of items) {
-    const canonicalUrl = canonicaliseUrl(item.url);
+    const canonicalUrl = safeCanonicalUrl(item.url);
+    if (!canonicalUrl) continue;
     if (seenUrls.has(canonicalUrl) || seenExternalIds.has(item.externalId)) {
       continue;
     }
@@ -96,6 +107,7 @@ export async function insertCollectedItems(
   if (items.length === 0) return { inserted: 0, skipped: 0 };
 
   const prepared = prepareItems(items);
+  if (prepared.length === 0) return { inserted: 0, skipped: items.length };
   const summaryByUrl = new Map(
     prepared.map((item) => [item.canonicalUrl, item.summary]),
   );

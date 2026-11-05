@@ -4,6 +4,7 @@ import {
   type ExtractionV1,
 } from "@/core/extraction-schema";
 import { ExtractionValidationError } from "@/core/errors";
+import type { LlmPurpose } from "@/core/enums";
 import type { BudgetGuard, LlmClient, LlmTokenUsage } from "@/core/ports";
 import { costUsdMicros, estimateCost } from "./pricing";
 import {
@@ -19,6 +20,10 @@ export interface ExtractItemArgs {
   budget: BudgetGuard;
   model: string;
   maxOutputTokens?: number;
+  /** Stored on the usage row so spend can be traced to an item and a run. */
+  sourceItemId?: number;
+  ingestRunId?: number;
+  purpose?: LlmPurpose;
 }
 
 export interface ExtractItemResult {
@@ -54,6 +59,9 @@ export async function extractItem({
   budget,
   model,
   maxOutputTokens = 1200,
+  sourceItemId,
+  ingestRunId,
+  purpose = "extraction",
 }: ExtractItemArgs): Promise<ExtractItemResult> {
   const system = buildSystemPrompt();
   const user = buildUserPrompt(item);
@@ -63,8 +71,10 @@ export async function extractItem({
   const record = async (usage: LlmTokenUsage): Promise<number> => {
     const actualCostUsdMicros = costUsdMicros(model, usage);
     await budget.record({
-      purpose: "extraction",
+      purpose,
       model,
+      sourceItemId,
+      ingestRunId,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       costUsdMicros: actualCostUsdMicros,
