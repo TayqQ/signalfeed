@@ -1,1 +1,49 @@
 @import "tailwindcss";
+
+/*
+ * SignalFeed's palette. The utility names stay Tailwind's so every page shares
+ * one set of tokens: zinc is the cool ink-and-paper scale, blue is the cobalt.
+ */
+@theme {
+  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f3f5f8;
+  --color-ink: #0e1b33;
+  --color-quiet: #55627a;
+  --color-rule: #d4dae5;
+  --color-signal: #1f3fd1;
+
+  --color-zinc-50: #eef1f6;
+  --color-zinc-100: #e3e8f0;
+  --color-zinc-200: #d4dae5;
+  --color-zinc-300: #b8c1d1;
+  --color-zinc-400: #8d98ac;
+  --color-zinc-500: #6a768c;
+  --color-zinc-600: #55627a;
+  --color-zinc-700: #3a4760;
+  --color-zinc-800: #1f2c46;
+  --color-zinc-900: #0e1b33;
+  --color-blue-600: #1f3fd1;
+  --color-blue-700: #1a35b0;
+
+  /* Later funding stages read darker, so a column of bars shows a stage at a glance. */
+  --color-stage-early: #86a8f2;
+  --color-stage-seed: #5a82ea;
+  --color-stage-venture: #1f3fd1;
+  --color-stage-late: #142a8f;
+  --color-stage-other: #8d98ac;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}

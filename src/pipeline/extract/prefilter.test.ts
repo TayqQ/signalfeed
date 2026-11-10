@@ -77,3 +77,20 @@ describe("isCandidate", () => {
     expect(isCandidate({ title: "Hello", summary: "" })).toBe(false);
   });
 });
+
+describe("launch wording", () => {
+  it.each([
+    "Acme releases its first model",
+    "Acme debuts a robot",
+    "Acme rolled out an API",
+    "Acme opened its first US clinics",
+  ])("keeps %j", (title) => {
+    expect(isCandidate({ title, summary: null })).toBe(true);
+  });
+
+  it("does not treat every use of open as a launch", () => {
+    expect(
+      isCandidate({ title: "Why open standards matter", summary: null }),
+    ).toBe(false);
+  });
+});

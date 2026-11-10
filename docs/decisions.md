@@ -105,3 +105,26 @@ Each entry records the decision, the alternatives considered, and why. New decis
 ## D26. Which feeds are on in Phase 1
 - **Chosen:** TechCrunch Venture, Crunchbase News, Tech.eu, EU-Startups and UKTN. Sifted is off. Ingest runs hourly.
 - **Why:** Sifted's RSS feed has no article summary, and its terms ban using the content to develop or validate AI. Crunchbase's terms ban training models on its content; the maintainer decided on 8 October 2026 that fact extraction is not training, so that feed stays on. Commercial reuse is still a Phase 4 question for every publisher. Hourly polling is required because EU-Startups only keeps about a day of items.
+
+## D27. Collect without an LLM key, and start early
+- **Chosen:** `pnpm ingest run` works with no `OPENAI_API_KEY`. It collects, prefilters and keeps items pending, and `/status` says extraction is off.
+- **Why:** RSS has no backfill, so each day without collecting is history lost for good. Collecting is free and items can be extracted later, so spending and collecting should not have to start together.
+
+## D28. Country is scored only where the model states one
+- **Chosen:** in the extraction eval, a model that returns null for a country counts as abstaining, reported as coverage. A stated country is right or wrong.
+- **Why:** 7 of the 22 expected countries are not in the fixture text, and the prompt says not to guess. Scoring null as wrong would cap an obedient model at 68% against an 80% target, and reward guessing. Guessed countries also cause harm downstream, because a country conflict can split a company.
+
+## D29. Fuzzy company matches need amounts that agree
+- **Chosen:** this narrows spec section 7. A fuzzy name is confirmed only by agreeing amounts, not by a shared round type alone. Separately, an exact name with a differing country still matches if the event agrees. Differing domains never match.
+- **Why:** seed is the most common round, so a shared round type within 45 days is weak evidence. A wrong merge corrupts two companies and is hard to spot, while a missed one waits in the review queue (D11). Countries are often inferred, so they should not outweigh matching event facts.
+
+## D30. The run lock has its own direct connection
+- **Chosen:** the lock lives on a dedicated connection, separate from the query pool. The pipeline refuses a Neon `-pooler` URL.
+- **Why:** session advisory locks belong to one connection. Through a pool the unlock can reach another backend, and an idle-connection close can drop the lock mid-run. The in-process test database has a single connection and would hide this, so it was also tested against real Postgres with a competing session.
+
+## D31. The script is `pnpm ingest`, not `pnpm pipeline`
+- **Why:** pnpm 12 has a built-in `pipeline` command that takes priority over the script, so `pnpm pipeline run` fails. Task files written earlier still say `pnpm pipeline`.
+
+## D32. Roundups count as events, with an approximate date
+- **Chosen:** a roundup that names completed raises gives one event per raise. With no stated date, those events are marked `month` precision.
+- **Why:** this matches the fixtures. A roundup can recap older rounds, so its publish date is only approximate, and the company page says "Around".

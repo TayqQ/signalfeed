@@ -1,0 +1,28 @@
+name: Migrate
+
+on:
+  push:
+    branches: [main]
+    paths: ["drizzle/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: migrate
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: vars.INGEST_ENABLED == 'true'
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_OWNER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate

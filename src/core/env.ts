@@ -9,13 +9,23 @@ export type WebEnv = z.infer<typeof webEnvSchema>;
 export const pipelineEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
-  EXTRACTION_MODEL: z.string().min(1).default("gpt-4.1-nano"),
+  EXTRACTION_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   LLM_MONTHLY_CAP_GBP: z.coerce.number().positive().default(3),
   MAX_EXTRACTIONS_PER_RUN: z.coerce.number().int().positive().default(150),
   /** Contact URL or email sent in the User-Agent of outgoing requests. */
   HTTP_CONTACT: z.string().min(1),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
+
+/**
+ * The same settings with no LLM key. Collecting costs nothing, and history can
+ * only accumulate from the day collection starts, so a run without a key still
+ * stores new items and leaves them pending for extraction later.
+ */
+export const noLlmPipelineEnvSchema = pipelineEnvSchema.extend({
+  OPENAI_API_KEY: z.string().min(1).optional(),
+});
+export type NoLlmPipelineEnv = z.infer<typeof noLlmPipelineEnvSchema>;
 
 export type EnvSource = Record<string, string | undefined>;
 
@@ -49,4 +59,8 @@ export function parseWebEnv(env: EnvSource): WebEnv {
 
 export function parsePipelineEnv(env: EnvSource): PipelineEnv {
   return parseEnv(pipelineEnvSchema, env);
+}
+
+export function parseNoLlmPipelineEnv(env: EnvSource): NoLlmPipelineEnv {
+  return parseEnv(noLlmPipelineEnvSchema, env);
 }

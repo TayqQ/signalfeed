@@ -55,6 +55,9 @@ export class OpenAiExtractionValidationError extends ExtractionValidationError {
   }
 }
 
+/** One slow call must not use up the 20-minute ingest job. */
+const LLM_TIMEOUT_MS = 60_000;
+
 function sdkClient(sdk: OpenAI): OpenAiChatClient {
   return {
     chat: {
@@ -84,7 +87,9 @@ export function createOpenAiClient({
   model,
   client,
 }: OpenAiClientOptions): LlmClient {
-  const sdk = client ?? sdkClient(new OpenAI({ apiKey }));
+  const sdk =
+    client ??
+    sdkClient(new OpenAI({ apiKey, timeout: LLM_TIMEOUT_MS, maxRetries: 1 }));
 
   return {
     async complete<T>(

@@ -137,3 +137,14 @@ describe("domainAppearsIn", () => {
     expect(domainAppearsIn("", ["acme.com"])).toBe(false);
   });
 });
+
+describe("normaliseCompanyName, position and descriptors", () => {
+  it("only strips legal words from the end of a name", () => {
+    expect(normaliseCompanyName("AB InBev")).toBe("ab inbev");
+    expect(normaliseCompanyName("Acme Co Ltd")).toBe("acme");
+  });
+
+  it("treats a trailing Technologies as a descriptor", () => {
+    expect(normaliseCompanyName("Wayve Technologies")).toBe("wayve");
+  });
+});

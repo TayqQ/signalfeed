@@ -1,9 +1,9 @@
-import { and, desc, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { IngestStats } from "@/core/domain";
 import { EVENT_TYPES, SOURCE_ITEM_STATUSES } from "@/core/enums";
 import type { IngestRunSummary, StatusSummary } from "@/core/read-models";
 import type { Db } from "../client";
-import { events, ingestRuns, llmUsage, sourceItems } from "../schema";
+import { events, fxRates, ingestRuns, llmUsage, sourceItems } from "../schema";
 
 const RECENT_RUN_LIMIT = 10;
 
@@ -81,30 +81,43 @@ async function monthToDateUsdMicros(db: Db, now: Date): Promise<number> {
   return asCount(row?.total);
 }
 
+async function latestPerEur(db: Db, currency: string): Promise<number | null> {
+  const [row] = await db
+    .select({ perEur: fxRates.perEur })
+    .from(fxRates)
+    .where(eq(fxRates.currency, currency))
+    .orderBy(desc(fxRates.rateDate))
+    .limit(1);
+  return row?.perEur ?? null;
+}
+
 export async function getStatusSummary(db: Db): Promise<StatusSummary> {
   const now = new Date();
-  const [runs, itemRows, eventRows, monthToDate] = await Promise.all([
-    db
-      .select()
-      .from(ingestRuns)
-      .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
-      .limit(RECENT_RUN_LIMIT),
-    db
-      .select({
-        status: sourceItems.status,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(sourceItems)
-      .groupBy(sourceItems.status),
-    db
-      .select({
-        type: events.type,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(events)
-      .groupBy(events.type),
-    monthToDateUsdMicros(db, now),
-  ]);
+  const [runs, itemRows, eventRows, monthToDate, usdPerEur, gbpPerEur] =
+    await Promise.all([
+      db
+        .select()
+        .from(ingestRuns)
+        .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
+        .limit(RECENT_RUN_LIMIT),
+      db
+        .select({
+          status: sourceItems.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(sourceItems)
+        .groupBy(sourceItems.status),
+      db
+        .select({
+          type: events.type,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(events)
+        .groupBy(events.type),
+      monthToDateUsdMicros(db, now),
+      latestPerEur(db, "USD"),
+      latestPerEur(db, "GBP"),
+    ]);
 
   const itemCountsByStatus = zeroCounts(SOURCE_ITEM_STATUSES);
   for (const row of itemRows) {
@@ -132,5 +145,6 @@ export async function getStatusSummary(db: Db): Promise<StatusSummary> {
     eventCountsByType,
     monthToDateUsdMicros: monthToDate,
     capGbp: capOf(recentRuns[0]?.stats ?? null),
+    usdPerGbp: usdPerEur && gbpPerEur ? usdPerEur / gbpPerEur : null,
   };
 }

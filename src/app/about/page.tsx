@@ -117,8 +117,9 @@ export default function AboutPage() {
           shown on the site.
         </p>
         <p className="mt-3 text-zinc-700">
-          We do not store names of individual people (founders, angels,
-          officers) or any personal contact details.
+          We do not keep records of individual people (founders, angels,
+          officers) or any personal contact details. Headlines are shown as the
+          publisher wrote them, so a headline may name someone.
         </p>
       </section>
 
@@ -138,6 +139,23 @@ export default function AboutPage() {
             backfill years of archives.
           </li>
         </ul>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">How quality is measured</h2>
+        <p className="mt-3 text-zinc-700">
+          Extraction is scored against hand-checked headlines, and merging
+          against a hand-written set of hard cases. The method and results are
+          in the{" "}
+          <a
+            href="https://github.com/TayqQ/signalfeed/tree/main/docs"
+            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            rel="noopener noreferrer"
+          >
+            project docs
+          </a>
+          .
+        </p>
       </section>
 
       <section className="mt-10">

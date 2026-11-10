@@ -383,6 +383,17 @@ export async function resolveCompany(
       return applyMatch(db, exact.company, facts, "exact_name", now);
     }
     if (exact.kind === "ambiguous") {
+      // Countries are often inferred, so a differing country alone should not
+      // split a company when the event itself agrees. Domains are never guessed.
+      for (const { company } of exact.candidates) {
+        const domainsDiffer =
+          company.websiteDomain &&
+          facts.websiteDomain &&
+          company.websiteDomain !== facts.websiteDomain;
+        if (!domainsDiffer && (await options.corroborates(company.id))) {
+          return applyMatch(db, company, facts, "exact_name", now);
+        }
+      }
       review = { candidates: exact.candidates, reason: exact.reason };
     } else {
       const fuzzy = await fuzzyCandidates(db, facts.normalisedName);

@@ -167,15 +167,18 @@ Secondary limits (concurrency, abuse) also apply.
 
 ## A10 — OpenAI API
 
-**Status: confirmed** (model IDs and prices move — snapshot below from OpenAI docs, 8 Oct 2026)
+**Status: confirmed** (model IDs and prices move — snapshot below from OpenAI docs, 10 Nov 2026; first checked 8 Oct 2026)
 
 ### Cheap / mid extraction models (per 1M tokens, standard API)
 
 | Model | Input | Output | Notes |
 |-------|-------|--------|--------|
-| `gpt-4.1-nano` | $0.10 | $0.40 | Matches spec “cheap tier” |
-| `gpt-4.1-mini` | $0.40 | $1.60 | Matches spec “mid tier” |
-| `gpt-4o-mini` | $0.15 | $0.60 | Alternative cheap option |
+| `gpt-5.6-luna` | $0.20 | $1.20 | **Default.** Best score in the 10 Nov 2026 eval; OpenAI's named replacement for the retired small models |
+| `gpt-5.4-nano` | $0.20 | $1.25 | Shuts down 1 Apr 2027 |
+| `gpt-5.4-mini` | $0.75 | $4.50 | Mid tier; no accuracy gain over luna in the eval |
+| `gpt-4o-mini` | $0.15 | $0.60 | Snapshot shuts down 14 Jan 2027 |
+| `gpt-4.1-mini` | $0.40 | $1.60 | Snapshot shuts down 14 Jan 2027 |
+| `gpt-4.1-nano` | $0.10 | $0.40 | **Shut down 23 Oct 2026** (the API returns 404) |
 | `o4-mini` | $1.10 | $4.40 | Reasoning-class; higher cost |
 
 Source: [API pricing](https://developers.openai.com/api/docs/pricing) (embedded price table in page JSON).

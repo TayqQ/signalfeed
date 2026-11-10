@@ -45,6 +45,16 @@ The Phase 1 data model already covers acquisitions, launches, investors, company
 - A public API, semantic search, or a mobile app.
 - Deleting old history. All data is retained.
 
+### Planned signals beyond Phase 1 (decided 10 November 2026)
+
+Round type is only ever what the source states, otherwise `unknown`. It is never inferred from the amount, because stage labels overlap heavily by size (the eval set has a $38M seed and a $100M Series A). Three derived signals cover what users want to infer instead. None of them needs an LLM call.
+
+- **Deal size band (Phase 1, done).** Under £1M, £1M-£5M, £5M-£20M, £20M-£100M and £100M+, computed from the GBP amount (`src/lib/size-bands.ts`) and offered as the `size` filter.
+- **Company age (Phase 1 display; Phase 3 data).** Phase 1 shows the founded year with an approximate age on company pages and at each event, including at acquisition. News rarely states a founded year, so coverage stays thin until Phase 3 fills `founded_year` from the Companies House incorporation date for UK companies (`founded_year_source = companies_house`).
+- **Momentum (Phase 2).** Worked out from each company's own timeline: months since the previous round, the size step-up from the previous round, and rounds in the last 24 months. It needs history, so most companies will have one recorded round at first, and the signal fills in over months. Real growth figures (headcount, revenue, traffic) need paid data and stay out of scope.
+
+Before building the Phase 4 leads view, interview 5-10 agency owners, recruiters or B2B sellers about what they would pay for. For them the likely order of importance is recency, deal size, sector, location and company website; age and momentum come second.
+
 ## 4. Architecture
 
 ```mermaid
@@ -60,7 +70,7 @@ flowchart LR
   U[Visitors] --> W
 ```
 
-- One TypeScript package. The Next.js app lives in `src/app`. The pipeline lives in `src/pipeline` and runs only as a CLI (`pnpm pipeline run`).
+- One TypeScript package. The Next.js app lives in `src/app`. The pipeline lives in `src/pipeline` and runs only as a CLI (`pnpm ingest run`).
 - `src/core` holds shared types, Zod schemas and port interfaces, and has no I/O.
 - Lint rules stop `src/app` importing `src/pipeline` and vice versa. This keeps the OpenAI client out of the web bundle.
 - The web app connects with a read-only Postgres role. Its environment contains no LLM key.
@@ -184,11 +194,11 @@ Rumours ("in talks to raise"), valuations without a raise, and layoffs are not e
 
 ## 7. Pipeline
 
-Run with `pnpm pipeline run` (GitHub Actions hourly) or one step at a time with `pnpm pipeline <step>`. Each step is idempotent, and nothing runs on server start.
+Run with `pnpm ingest run` (GitHub Actions hourly) or one step at a time with `pnpm ingest <step>`. Each step is idempotent, and nothing runs on server start.
 
 1. **Lock.** Take a Postgres advisory lock (constant key). If another run holds it, exit 0. The workflow also uses a concurrency group.
 2. **Collect.** For each enabled RSS source, make a conditional GET (ETag / Last-Modified), parse RSS 2.0 or Atom, and insert new `source_items` plus `source_item_texts`. Existing URLs are ignored (`ON CONFLICT DO NOTHING` on `canonical_url`). Canonical URL means lowercase host, no tracking parameters, no fragment and no trailing slash.
-3. **Prefilter.** A deterministic keyword and money-pattern check on title and summary. Non-matching items become `filtered_out`. The eval measures recall to make sure relevant fixtures always pass.
+3. **Prefilter.** A deterministic keyword and money-pattern check on title and summary. Non-matching items become `filtered_out`. The eval measures recall to make sure relevant fixtures always pass. On 5 November 2026 it passed 49 of 70 live items (70%), well above the 40% assumed in section 12.
 4. **Extract.** Take up to `MAX_EXTRACTIONS_PER_RUN` (default 150) pending items, oldest first. For each:
    - ask the budget guard whether the worst-case cost fits the cap;
    - call the LLM;
@@ -200,7 +210,7 @@ Run with `pnpm pipeline run` (GitHub Actions hourly) or one step at a time with 
 6. **FX.** Fetch any missing ECB rates for dates referenced by events, then fill the `*_usd_minor` and `*_gbp_minor` columns. If there is no rate for a date, use the nearest earlier rate within 7 days.
 7. **Record.** Write `ingest_runs.stats` (counts per step, spend this run, month-to-date spend, cap) and release the lock.
 
-Re-extraction after a prompt change is explicit: `pnpm pipeline reextract --prompt-version v2 [--limit N] [--dry-run]`. A dry run prints the estimated cost. A real run requires `--yes`, stays subject to the cap, marks the new extraction current, and re-resolves the item. Events left with no sources are deleted, because they are derived data.
+Re-extraction after a prompt change is explicit: `pnpm ingest reextract --prompt-version v2 [--limit N] [--dry-run]`. A dry run prints the estimated cost. A real run requires `--yes`, stays subject to the cap, marks the new extraction current, and re-resolves the item. Events left with no sources are deleted, because they are derived data.
 
 ### Entity resolution rules
 
@@ -214,7 +224,7 @@ Company name normalisation (`src/lib/normalise.ts`):
 Company matching is applied in order, and the first match wins:
 1. **Domain.** The validated domain equals `companies.website_domain`. Match.
 2. **Exact name.** The normalised name equals a company's `normalised_name` or one of its aliases, and nothing conflicts. A conflict means both countries are known and differ, or both domains are known and differ. One candidate: match. Several: prefer one with no conflict and the most recent activity. If it is still ambiguous, create a new company and a merge candidate.
-3. **Fuzzy with corroboration.** Trigram similarity is at least 0.6 and the incoming event corroborates an existing event of that candidate. Corroboration means the same round type, or amounts within 15%, within ±45 days. Then match and add an alias.
+3. **Fuzzy with corroboration.** Trigram similarity is at least 0.6 and the incoming event corroborates an existing event of that candidate. For funding, corroboration means amounts within 15%, within ±45 days (D29). Then match and add an alias.
 4. Otherwise create a new company. If the best fuzzy score is at least 0.6, also add a merge candidate.
 
 Investors: a domain match or an exact normalised name/alias match. Anything else creates a new investor. Similar names (trigram ≥ 0.7) become merge candidates. Investor names are never merged automatically on fuzzy evidence.
@@ -250,8 +260,8 @@ All pages are server-rendered and read-only. Database reads go through `src/lib/
 
 | Route | Content |
 |---|---|
-| `/` | Funding table. Filters in the URL: `q` (company name), `round` (multi), `region`, `country`, `tag`, `investor`, `from`, `to`, `min`, `max` (GBP), `sort` (`announced` / `amount` / `relevance`), `dir`, `page`. Columns: company, location, round, amount (GBP, with the original underneath if different), lead investors, date, number of sources. |
-| `/companies/[slug]` | Name, location, founded year, status, tags, description. A timeline of funding rounds, acquisitions and launches, each with source headlines linked to the original articles. Merged slugs redirect to the surviving company. |
+| `/` | Funding table. Filters in the URL: `q` (company name), `round` (multi), `region`, `country`, `tag`, `investor`, `from`, `to`, `min`, `max` (GBP), `size` (multi: `under-1m`, `1m-5m`, `5m-20m`, `20m-100m`, `100m-plus`), `sort` (`announced` / `amount` / `relevance`), `dir`, `page`. Columns: company, location, round, amount (GBP, with the original underneath if different), lead investors, date, number of sources. |
+| `/companies/[slug]` | Name, location, founded year with approximate age, status, tags, description. A timeline of funding rounds, acquisitions and launches, each with source headlines linked to the original articles. Merged slugs redirect to the surviving company. |
 | `/investors/[slug]` | Investor name, kind, and the rounds it took part in (lead/participant), with a count by round type. |
 | `/about` | Methodology, sources with attribution, what is and isn't stored, limitations, licence. |
 | `/status` | Last ingest runs, item counts by status, events by type, month-to-date LLM spend against the cap. |
@@ -265,6 +275,7 @@ Sort semantics: when `q` is present and `sort` is not set, results are ordered b
 - **Migrations:** a CI job applies migrations to a real `pgvector/pgvector` Postgres service container.
 - **No network in tests:** `vitest.setup.ts` makes `fetch` throw. Collectors and LLM clients are tested through fakes of the port interfaces.
 - **Extraction eval:** `pnpm eval --live` runs the fixture set against a real model and writes `docs/eval-results.md`. It costs pennies, needs a key, and is not run in CI. `pnpm eval --replay` scores recorded responses, which CI runs through a test so scorer and parser regressions are caught. Initial targets are below.
+- **Resolution eval:** `pnpm eval --resolution` runs hand-written reports through the real resolver and scores pairs of reports (D29). It needs no key. A test holds it above fixed floors.
 - **CI** (`.github/workflows/ci.yml`, on every push and PR): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, plus the migrations job.
 
 Initial extraction accuracy targets (`pnpm eval --live`):
@@ -295,16 +306,16 @@ Secrets: Vercel has `DATABASE_URL` (web role). GitHub Actions has `DATABASE_URL`
 
 ## 12. Monthly running-cost estimate
 
-Assumptions, measured on 8 October 2026 (`docs/sources.md`): five enabled feeds and about 33 new items/day, so about 1,000/month. About 40% pass the prefilter, giving about 400 LLM calls. Each call uses about 1,500 input and 300 output tokens, so about 0.6M input and 0.12M output tokens/month. Conversion is $1.30 = £1. Prices are the confirmed OpenAI rates for `gpt-4.1-nano` (cheap) and `gpt-4.1-mini` (mid).
+Assumptions, measured on 8 October 2026 (`docs/sources.md`): five enabled feeds and about 33 new items/day, so about 1,000/month. About 40% pass the prefilter, giving about 400 LLM calls. A later sample passed 70%, which would raise calls and LLM cost by about 70% and stays well under the cap. Each call uses about 1,500 input and 300 output tokens, so about 0.6M input and 0.12M output tokens/month. Conversion is $1.30 = £1. Prices are the OpenAI rates checked on 10 November 2026 for `gpt-5.6-luna` (default) and `gpt-5.4-mini` (mid). The 10 November eval measured about 1,400 input and 110-215 output tokens per call.
 
 | Item | Estimate / month |
 |---|---|
-| LLM extraction, cheap tier ($0.10 / $0.40 per M tokens) | ≈ £0.08 |
-| LLM extraction, mid tier ($0.40 / $1.60 per M tokens) | ≈ £0.35 |
-| Same, if the prefilter were removed | ≈ £0.20-£0.90 |
+| LLM extraction, `gpt-5.6-luna` ($0.20 / $1.20 per M tokens) | ≈ £0.17-£0.30 |
+| LLM extraction, `gpt-5.4-mini` ($0.75 / $4.50 per M tokens) | ≈ £0.48-£0.85 |
+| Same on luna, if the prefilter were removed | ≈ £0.40 |
 | Eval runs | < £0.05 |
 | Vercel, Neon, GitHub Actions, domain | £0 |
-| **Total** | **≈ £0.10-£0.80** |
+| **Total** | **≈ £0.20-£0.90** |
 
 The £3 cap is well above normal ingestion. A run still pauses with status `budget_paused` if spend hits the cap, and remaining items stay `pending`. Re-extracting a year of prefiltered items on the cheap model stays under the cap. Re-extracting every stored item on the mid-tier model can approach or exceed it, so use `--limit` or raise the cap for that run. OpenAI's minimum prepaid top-up (about $5, A10) is a one-off payment that should last many months.
 
@@ -325,7 +336,7 @@ Verified on 8 October 2026. Outcomes and links are in `docs/sources.md`. The row
 | A7 | Companies House API: free key, 600 requests per 5 minutes. Filing history exposes SH01 under the capital category. The Document API serves PDFs. A streaming API exists. Reuse is permitted under its licence. | 3 |
 | A8 | SEC EDGAR requires a User-Agent with contact details and allows at most 10 requests/second. Form D is available as XML via daily indexes. | 3 |
 | A9 | Frankfurter v2 (`https://api.frankfurter.dev/v2/providers/ecb/rates`) serves free ECB daily rates, including GBP and USD, with no key. v1 still responds. | 1 |
-| A10 | Confirmed 8 Oct 2026: `gpt-4.1-nano` $0.10/$0.40 per M tokens (default candidate), `gpt-4o-mini` $0.15/$0.60, `gpt-4.1-mini` $0.40/$1.60. Strict JSON-schema output works. Prepaid credits, auto-recharge off, $5 minimum top-up. `text-embedding-3-small` supports `dimensions: 512`. | 1 |
+| A10 | Rechecked 10 Nov 2026: `gpt-5.6-luna` $0.20/$1.20 per M tokens (default, chosen by the eval), `gpt-5.4-mini` $0.75/$4.50. `gpt-4.1-nano` shut down 23 Oct 2026; `gpt-4o-mini` and `gpt-4.1-mini` snapshots shut down 14 Jan 2027. Strict JSON-schema output works. Prepaid credits, auto-recharge off, $5 minimum top-up. `text-embedding-3-small` supports `dimensions: 512`. | 1 |
 | A11 | Neon Free: 1 GB storage per project, 100 CU-hours/month, scale to zero after 5 minutes idle, `vector` and `pg_trgm` available, custom roles via SQL | 1 |
 | A12 | Vercel Hobby: free, non-commercial only; limits relevant to server rendering | 1, 4 |
 | A13 | GitHub Actions: free minutes for public repos; scheduled runs may be delayed; schedules are disabled after 60 days without repository activity | 1 |

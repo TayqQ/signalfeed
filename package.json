@@ -16,11 +16,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "pipeline": "tsx src/cli/pipeline.ts",
+    "ingest": "tsx src/cli/pipeline.ts",
     "entities": "tsx src/cli/entities.ts",
     "eval": "tsx src/eval/cli.ts",
     "screenshots": "tsx scripts/screenshots.ts"
@@ -29,13 +29,13 @@
     "@neondatabase/serverless": "^1.0.2",
     "drizzle-orm": "^0.45.4",
     "fast-xml-parser": "^5.3.3",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "openai": "^6.16.0",
     "pg": "^8.16.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
-    "zod": "^4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",
@@ -50,7 +50,7 @@
     "@vitejs/plugin-react": "^5.1.2",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.5",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.3",
     "jsdom": "^27.0.1",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.3.3",
