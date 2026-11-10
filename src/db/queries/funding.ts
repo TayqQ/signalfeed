@@ -1,4 +1,15 @@
-import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { RoundType } from "@/core/enums";
 import { ROUND_TYPES } from "@/core/enums";
 import type { Money } from "@/core/domain";
@@ -12,6 +23,7 @@ import type {
 } from "@/core/read-models";
 import { normaliseCompanyName } from "@/lib/normalise";
 import { countriesInRegion, REGIONS, type Region } from "@/lib/regions";
+import { SIZE_BAND_RANGES, SIZE_BANDS } from "@/lib/size-bands";
 import type { Db } from "../client";
 import {
   companies,
@@ -163,6 +175,21 @@ function fundingWhere(filters: FundingFilters, query: string | null): SQL {
     Number.isFinite(filters.maxGbpMinor)
   ) {
     conditions.push(lte(fundingRounds.amountGbpMinor, filters.maxGbpMinor));
+  }
+  if (filters.sizeBands && filters.sizeBands.length > 0) {
+    const ranges = SIZE_BANDS.filter((band) =>
+      filters.sizeBands?.includes(band),
+    ).map((band) => {
+      const { minGbpMinor, maxGbpMinor } = SIZE_BAND_RANGES[band];
+      const lower = gte(fundingRounds.amountGbpMinor, minGbpMinor);
+      return maxGbpMinor === null
+        ? lower
+        : and(lower, lt(fundingRounds.amountGbpMinor, maxGbpMinor));
+    });
+    // Rounds with no reported amount have no band, so they drop out here.
+    conditions.push(
+      ranges.length === 0 ? sql`false` : (or(...ranges) ?? sql`false`),
+    );
   }
 
   const where = and(...conditions);

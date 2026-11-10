@@ -73,6 +73,16 @@ const launch: LaunchEvent = {
 };
 
 describe("EventTimeline", () => {
+  it("shows the company's age at each event when the founded year is known", () => {
+    render(<EventTimeline events={[launch]} foundedYear={2023} />);
+    expect(screen.getByText(/company age 3 years/)).toBeInTheDocument();
+  });
+
+  it("leaves the age out when the founded year is unknown", () => {
+    render(<EventTimeline events={[launch]} />);
+    expect(screen.queryByText(/company age/)).not.toBeInTheDocument();
+  });
+
   it("marks the lead and lists it first, with every source linked", () => {
     render(<EventTimeline events={[funding]} />);
     expect(screen.getByText("(lead)")).toBeInTheDocument();

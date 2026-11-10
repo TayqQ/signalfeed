@@ -4,13 +4,19 @@ import type { LlmTokenUsage } from "@/core/ports";
 
 /**
  * USD per 1M tokens for the extraction models in docs/sources.md A10
- * (OpenAI docs snapshot, 8 Oct 2026).
+ * (OpenAI docs snapshots, 8 Oct and 10 Nov 2026). Retired models stay listed so
+ * stored usage rows can still be priced.
  */
 export const MODEL_PRICES: ModelPrice[] = [
   { model: "gpt-4.1-nano", inputUsdPerMillion: 0.1, outputUsdPerMillion: 0.4 },
   { model: "gpt-4.1-mini", inputUsdPerMillion: 0.4, outputUsdPerMillion: 1.6 },
   { model: "gpt-4o-mini", inputUsdPerMillion: 0.15, outputUsdPerMillion: 0.6 },
   { model: "o4-mini", inputUsdPerMillion: 1.1, outputUsdPerMillion: 4.4 },
+  // OpenAI pricing page, 10 Nov 2026. gpt-4.1-nano shut down 23 Oct 2026;
+  // gpt-4o-mini and gpt-4.1-mini snapshots shut down 14 Jan 2027.
+  { model: "gpt-5.6-luna", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.2 },
+  { model: "gpt-5.4-nano", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.25 },
+  { model: "gpt-5.4-mini", inputUsdPerMillion: 0.75, outputUsdPerMillion: 4.5 },
 ];
 
 export interface EstimateCostInput {

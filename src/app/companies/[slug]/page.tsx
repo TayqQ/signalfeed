@@ -5,6 +5,7 @@ import { TagList } from "@/components/tag-list";
 import { getCompanyDetail } from "@/db/queries/companies";
 import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
+import { formatCompanyAge } from "@/lib/format";
 import { formatLocation } from "@/lib/location";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
+function foundedFact(foundedYear: number | null): string | null {
+  if (!foundedYear) return null;
+  const age = formatCompanyAge(foundedYear, new Date().toISOString());
+  if (!age) return `Founded ${foundedYear}`;
+  const prefix = age === "under 1 year" ? "" : "about ";
+  return `Founded ${foundedYear} (${prefix}${age} old)`;
+}
+
 export default async function CompanyPage({ params }: Params) {
   const company = await load((await params).slug);
   if (!company) notFound();
@@ -36,7 +45,7 @@ export default async function CompanyPage({ params }: Params) {
   const location = formatLocation(company.city, company.countryCode);
   const facts = [
     location,
-    company.foundedYear ? `Founded ${company.foundedYear}` : null,
+    foundedFact(company.foundedYear),
     company.status === "acquired" ? "Acquired" : null,
     company.status === "closed" ? "Closed" : null,
   ].filter((fact): fact is string => Boolean(fact));
@@ -71,7 +80,10 @@ export default async function CompanyPage({ params }: Params) {
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">History</h2>
-        <EventTimeline events={company.events} />
+        <EventTimeline
+          events={company.events}
+          foundedYear={company.foundedYear}
+        />
       </section>
     </main>
   );

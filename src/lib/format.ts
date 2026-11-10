@@ -109,6 +109,25 @@ export function formatDate(isoDate: string): string {
   return `${day} ${monthLabel} ${year}`;
 }
 
+/**
+ * Company age from a founded year, as "under 1 year", "1 year" or "5 years".
+ * Only the year is known, so this is the calendar-year difference: an
+ * approximation that is never more than a year out. Returns null when the
+ * founded year is unknown or later than the given date.
+ */
+export function formatCompanyAge(
+  foundedYear: number | null,
+  onIsoDate: string,
+): string | null {
+  if (foundedYear === null) return null;
+  const match = /^(\d{4})/.exec(onIsoDate.trim());
+  if (!match) return null;
+  const years = Number(match[1]) - foundedYear;
+  if (years < 0) return null;
+  if (years === 0) return "under 1 year";
+  return years === 1 ? "1 year" : `${years} years`;
+}
+
 /** "series_a" becomes "Series A", and "pre_seed" becomes "Pre-seed". */
 export function formatRoundType(roundType: RoundType): string {
   switch (roundType) {

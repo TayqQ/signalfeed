@@ -20,6 +20,7 @@ import { getCompanyDetail } from "./companies";
 import { listFundingRounds } from "./funding";
 import { getInvestorDetail } from "./investors";
 import { getStatusSummary } from "./status";
+import { sizeBandFor } from "@/lib/size-bands";
 
 function filters(overrides: Partial<FundingFilters> = {}): FundingFilters {
   return { page: 1, pageSize: 100, ...overrides };
@@ -235,6 +236,22 @@ describe("read queries", () => {
       maxFiltered.items.every(
         (row) => row.amountGbpMinor != null && row.amountGbpMinor <= mid,
       ),
+    ).toBe(true);
+
+    const banded = await listFundingRounds(
+      db,
+      filters({ sizeBands: ["under-1m", "100m-plus"] }),
+    );
+    const expectedBanded = all.items.filter((row) => {
+      const band = sizeBandFor(row.amountGbpMinor);
+      return band === "under-1m" || band === "100m-plus";
+    });
+    expect(banded.total).toBe(expectedBanded.length);
+    expect(
+      banded.items.every((row) => {
+        const band = sizeBandFor(row.amountGbpMinor);
+        return band === "under-1m" || band === "100m-plus";
+      }),
     ).toBe(true);
 
     const searched = await listFundingRounds(

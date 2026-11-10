@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { CompanyEvent } from "@/core/read-models";
-import { formatDate, formatMoneyCompact, formatRoundType } from "@/lib/format";
+import {
+  formatCompanyAge,
+  formatDate,
+  formatMoneyCompact,
+  formatRoundType,
+} from "@/lib/format";
 import { InvestorList } from "./investor-list";
 import { RoundAmount } from "./round-amount";
 import { SourceList } from "./source-list";
@@ -79,7 +84,14 @@ function EventBody({ event }: { event: CompanyEvent }) {
   }
 }
 
-export function EventTimeline({ events }: { events: CompanyEvent[] }) {
+export function EventTimeline({
+  events,
+  foundedYear = null,
+}: {
+  events: CompanyEvent[];
+  /** When known, each event shows roughly how old the company was. */
+  foundedYear?: number | null;
+}) {
   if (events.length === 0) {
     return <p className="mt-4 text-quiet">No events recorded yet.</p>;
   }
@@ -94,7 +106,13 @@ export function EventTimeline({ events }: { events: CompanyEvent[] }) {
             className="absolute -left-[5px] top-1.5 h-2 w-2 bg-ink"
             aria-hidden="true"
           />
-          <p className="text-sm tabular-nums text-quiet">{eventDate(event)}</p>
+          <p className="text-sm tabular-nums text-quiet">
+            {eventDate(event)}
+            {(() => {
+              const age = formatCompanyAge(foundedYear, event.announcedOn);
+              return age ? ` · company age ${age}` : null;
+            })()}
+          </p>
           <div className="mt-1">
             <EventBody event={event} />
           </div>

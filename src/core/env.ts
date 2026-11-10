@@ -9,7 +9,7 @@ export type WebEnv = z.infer<typeof webEnvSchema>;
 export const pipelineEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
-  EXTRACTION_MODEL: z.string().min(1).default("gpt-4.1-nano"),
+  EXTRACTION_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   LLM_MONTHLY_CAP_GBP: z.coerce.number().positive().default(3),
   MAX_EXTRACTIONS_PER_RUN: z.coerce.number().int().positive().default(150),
   /** Contact URL or email sent in the User-Agent of outgoing requests. */

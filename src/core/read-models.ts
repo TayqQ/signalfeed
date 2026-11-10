@@ -1,3 +1,4 @@
+import type { SizeBand } from "@/lib/size-bands";
 import type { IngestStats, Money } from "./domain";
 import type {
   CompanyStatus,
@@ -40,6 +41,8 @@ export interface FundingFilters {
   to?: string;
   minGbpMinor?: number;
   maxGbpMinor?: number;
+  /** Deal size bands from `src/lib/size-bands.ts`; a round matches any of them. */
+  sizeBands?: SizeBand[];
   /** When unset: `relevance` if `q` is present, otherwise `announced`. */
   sort?: FundingSort;
   direction?: SortDirection;

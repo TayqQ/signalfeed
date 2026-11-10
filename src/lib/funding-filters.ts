@@ -9,6 +9,7 @@ import { ROUND_TYPES } from "@/core/enums";
 import type { RoundType } from "@/core/enums";
 import { fromMinorUnits, toMinorUnits } from "@/lib/money";
 import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
+import { SIZE_BANDS, type SizeBand } from "@/lib/size-bands";
 import type { Region } from "@/lib/regions";
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -18,6 +19,7 @@ const roundSchema = z.enum(ROUND_TYPES);
 const sortSchema = z.enum(FUNDING_SORTS);
 const directionSchema = z.enum(SORT_DIRECTIONS);
 const regionSchema = z.enum(REGIONS);
+const sizeBandSchema = z.enum(SIZE_BANDS);
 const positiveIntSchema = z.coerce.number().int().positive();
 const gbpMajorSchema = z.coerce.number().finite().nonnegative();
 const querySchema = z.string().min(1).max(200);
@@ -91,6 +93,11 @@ function isCalendarDate(value: string): boolean {
 
 function parseRound(value: string): RoundType | undefined {
   const parsed = roundSchema.safeParse(value.trim());
+  return parsed.success ? parsed.data : undefined;
+}
+
+function parseSizeBand(value: string): SizeBand | undefined {
+  const parsed = sizeBandSchema.safeParse(value.trim().toLowerCase());
   return parsed.success ? parsed.data : undefined;
 }
 
@@ -216,6 +223,9 @@ export function parseFundingFilters(
   const maxGbpMinor = parseGbpMinor(readFirst(searchParams, "max"));
   if (maxGbpMinor != null) filters.maxGbpMinor = maxGbpMinor;
 
+  const sizeBands = uniqueParsed(readMany(searchParams, "size"), parseSizeBand);
+  if (sizeBands) filters.sizeBands = sizeBands;
+
   const sort = parseSort(readFirst(searchParams, "sort"));
   if (sort) filters.sort = sort;
 
@@ -244,6 +254,7 @@ export function serialiseFundingFilters(filters: FundingFilters): string {
   if (filters.maxGbpMinor != null) {
     params.set("max", formatGbpMajor(filters.maxGbpMinor));
   }
+  for (const band of filters.sizeBands ?? []) params.append("size", band);
   if (filters.sort) params.set("sort", filters.sort);
   if (filters.direction) params.set("dir", filters.direction);
   if (filters.page > 1) params.set("page", String(filters.page));

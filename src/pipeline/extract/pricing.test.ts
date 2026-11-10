@@ -30,6 +30,21 @@ describe("MODEL_PRICES", () => {
         inputUsdPerMillion: 1.1,
         outputUsdPerMillion: 4.4,
       },
+      {
+        model: "gpt-5.6-luna",
+        inputUsdPerMillion: 0.2,
+        outputUsdPerMillion: 1.2,
+      },
+      {
+        model: "gpt-5.4-nano",
+        inputUsdPerMillion: 0.2,
+        outputUsdPerMillion: 1.25,
+      },
+      {
+        model: "gpt-5.4-mini",
+        inputUsdPerMillion: 0.75,
+        outputUsdPerMillion: 4.5,
+      },
     ]);
   });
 });

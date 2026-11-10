@@ -25,6 +25,6 @@ Summaries are paraphrased on purpose ([D20](../../docs/decisions.md)): the eval 
 
 1. Pick a **real** headline and URL from an enabled feed in `docs/sources.md`. Do not use Sifted or Crunchbase News.
 2. Write the `summary` yourself in 1–3 sentences; do not paste article body or feed `<description>` text.
-3. Fill `expected` after reading the full article and confirming facts. `amountText` must match how the amount appears in the headline or your summary.
+3. Fill `expected` after reading the full article and confirming facts. `amountText` must match how the amount appears in the headline or your summary. Label only what the headline or summary states, because that is all the model sees: if neither names the round (seed, Series A, and so on), `roundType` is `unknown`, even when the article or the amount suggests a stage.
 4. Run `pnpm test src/eval/fixtures.test.ts` and fix schema or mix errors.
 5. Open a PR and tick **“All expected outputs verified by hand”** only after a maintainer has checked every field against the source article.

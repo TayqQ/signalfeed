@@ -3,6 +3,7 @@ import { ROUND_TYPES } from "@/core/enums";
 import type { FundingFilters } from "@/core/read-models";
 import { formatRoundType } from "@/lib/format";
 import { REGIONS } from "@/lib/regions";
+import { SIZE_BAND_RANGES, SIZE_BANDS } from "@/lib/size-bands";
 
 const inputClass =
   "mt-1 w-full border border-zinc-300 bg-white px-2 py-1.5 text-sm text-ink";
@@ -41,6 +42,23 @@ export function FundingFiltersForm({ filters }: { filters: FundingFilters }) {
                 defaultChecked={filters.roundTypes?.includes(round)}
               />
               {formatRoundType(round)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className={labelClass}>Deal size</legend>
+        <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-sm lg:grid-cols-1">
+          {SIZE_BANDS.map((band) => (
+            <label key={band} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="size"
+                value={band}
+                defaultChecked={filters.sizeBands?.includes(band)}
+              />
+              {SIZE_BAND_RANGES[band].label}
             </label>
           ))}
         </div>

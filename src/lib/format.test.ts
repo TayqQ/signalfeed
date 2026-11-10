@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ROUND_TYPES } from "@/core/enums";
-import { formatDate, formatMoneyCompact, formatRoundType } from "./format";
+import {
+  formatCompanyAge,
+  formatDate,
+  formatMoneyCompact,
+  formatRoundType,
+} from "./format";
 
 describe("formatMoneyCompact", () => {
   it("formats en-GB compact amounts", () => {
@@ -39,5 +44,19 @@ describe("formatRoundType", () => {
     for (const roundType of ROUND_TYPES) {
       expect(formatRoundType(roundType).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("formatCompanyAge", () => {
+  it("gives the calendar-year age at a date", () => {
+    expect(formatCompanyAge(2021, "2026-10-08")).toBe("5 years");
+    expect(formatCompanyAge(2025, "2026-01-02")).toBe("1 year");
+    expect(formatCompanyAge(2026, "2026-10-08")).toBe("under 1 year");
+  });
+
+  it("returns null when the year is unknown or after the date", () => {
+    expect(formatCompanyAge(null, "2026-10-08")).toBeNull();
+    expect(formatCompanyAge(2027, "2026-10-08")).toBeNull();
+    expect(formatCompanyAge(2020, "not a date")).toBeNull();
   });
 });

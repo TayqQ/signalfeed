@@ -1,0 +1,919 @@
+{
+  "model": "gpt-5.4-mini",
+  "promptVersion": "v1",
+  "recordedOn": "2026-11-10",
+  "cases": [
+    {
+      "id": "tc-vesta-30m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Vesta",
+              "websiteDomain": "vesta.com",
+              "description": "Mortgage software maker that closed a $30 million round to expand AI agents for lender underwriting workflows.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["mortgage software", "ai agents", "underwriting"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "$30 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1398,
+      "outputTokens": 144,
+      "costUsdMicros": 1697
+    },
+    {
+      "id": "tc-mecka-60m-sequoia-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Mecka AI",
+              "websiteDomain": null,
+              "description": "Robot data startup that collects training data for robotics models and is scaling its data platform.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["robotics", "data platform", "ai"]
+            },
+            "announcedOn": "2026-10-07",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "$60 million",
+              "currencyHint": "USD",
+              "investors": [
+                {
+                  "name": "Sequoia Capital",
+                  "kind": "vc",
+                  "isLead": true
+                }
+              ],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1405,
+      "outputTokens": 156,
+      "costUsdMicros": 1756
+    },
+    {
+      "id": "tc-ghost-11m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Ghost",
+              "websiteDomain": null,
+              "description": "Personal AI hardware startup shipping a $3,499 desktop device for local AI assistants.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["ai hardware", "personal ai", "desktop device"]
+            },
+            "announcedOn": "2026-10-05",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "$11 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1417,
+      "outputTokens": 138,
+      "costUsdMicros": 1684
+    },
+    {
+      "id": "tc-eliseai-350m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "EliseAI",
+              "websiteDomain": null,
+              "description": "Property-management AI company.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["ai", "property management"]
+            },
+            "announcedOn": "2026-09-29",
+            "funding": {
+              "roundType": "growth",
+              "roundLabel": null,
+              "amountText": "$350 million",
+              "currencyHint": "USD",
+              "investors": [
+                {
+                  "name": "Andreessen Horowitz",
+                  "kind": "vc",
+                  "isLead": false
+                }
+              ],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1415,
+      "outputTokens": 141,
+      "costUsdMicros": 1696
+    },
+    {
+      "id": "te-truelayer-27m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "TrueLayer",
+              "websiteDomain": null,
+              "description": "Open banking platform expanding payments products into Italy and other European markets.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["open banking", "payments"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": "investment",
+              "amountText": "$27 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1395,
+      "outputTokens": 131,
+      "costUsdMicros": 1636
+    },
+    {
+      "id": "te-universal-quantum-100m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Universal Quantum",
+              "websiteDomain": null,
+              "description": "British quantum computing startup developing modular quantum hardware from Sussex research.",
+              "countryCode": "GB",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["quantum computing", "hardware"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "series_a",
+              "roundLabel": "Series A",
+              "amountText": "$100 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1401,
+      "outputTokens": 133,
+      "costUsdMicros": 1650
+    },
+    {
+      "id": "te-innercrowd-750k-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Innercrowd",
+              "websiteDomain": null,
+              "description": "Netherlands-based software for event promoters that turns festival attendees into brand advocates.",
+              "countryCode": "NL",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["event marketing", "software", "consumer engagement"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "€750K",
+              "currencyHint": "EUR",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1402,
+      "outputTokens": 137,
+      "costUsdMicros": 1668
+    },
+    {
+      "id": "te-today-28m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "TODAY",
+              "websiteDomain": null,
+              "description": "Copenhagen fintech building compliant AI assistants for financial and insurance advisers across Europe.",
+              "countryCode": "DK",
+              "city": "Copenhagen",
+              "foundedYear": null,
+              "tags": ["fintech", "ai assistants", "financial advisors"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "€2.8 million",
+              "currencyHint": "EUR",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1399,
+      "outputTokens": 140,
+      "costUsdMicros": 1680
+    },
+    {
+      "id": "te-verso-6m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Verso",
+              "websiteDomain": null,
+              "description": "Analytics company expanding consumer research data into corporate planning tools.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": [
+                "analytics",
+                "consumer intelligence",
+                "business software"
+              ]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "$6 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1397,
+      "outputTokens": 132,
+      "costUsdMicros": 1642
+    },
+    {
+      "id": "te-golbriak-4m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Golbriak Space",
+              "websiteDomain": null,
+              "description": "Raises €4 million to deploy laser links for low-Earth-orbit satellite constellations.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": [
+                "space",
+                "satellite communications",
+                "laser communications"
+              ]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "€4 million",
+              "currencyHint": "EUR",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1410,
+      "outputTokens": 143,
+      "costUsdMicros": 1701
+    },
+    {
+      "id": "te-noah-38m-seed-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Noah",
+              "websiteDomain": null,
+              "description": "London stablecoin payments startup building infrastructure for stablecoin payments.",
+              "countryCode": "GB",
+              "city": "London",
+              "foundedYear": null,
+              "tags": ["stablecoin", "payments", "infrastructure"]
+            },
+            "announcedOn": "2026-10-07",
+            "funding": {
+              "roundType": "seed",
+              "roundLabel": "seed round",
+              "amountText": "$38 million",
+              "currencyHint": "USD",
+              "investors": [
+                {
+                  "name": "Endeit Capital",
+                  "kind": "vc",
+                  "isLead": true
+                },
+                {
+                  "name": "FJ Labs",
+                  "kind": "vc",
+                  "isLead": false
+                },
+                {
+                  "name": "LocalGlobe",
+                  "kind": "vc",
+                  "isLead": false
+                },
+                {
+                  "name": "Felix Capital",
+                  "kind": "vc",
+                  "isLead": false
+                }
+              ],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1409,
+      "outputTokens": 195,
+      "costUsdMicros": 1935
+    },
+    {
+      "id": "te-mintneuro-5m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "MintNeuro",
+              "websiteDomain": null,
+              "description": "UK semiconductor startup making chips tailored for implantable neural interfaces.",
+              "countryCode": "GB",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["semiconductors", "neural devices", "healthtech"]
+            },
+            "announcedOn": "2026-10-07",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "$5 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1396,
+      "outputTokens": 137,
+      "costUsdMicros": 1664
+    },
+    {
+      "id": "uk-neela-21m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Neela",
+              "websiteDomain": null,
+              "description": "Cambridge biotech secured funding to pilot technology that converts agricultural waste into sustainable aviation fuel.",
+              "countryCode": "GB",
+              "city": "Cambridge",
+              "foundedYear": null,
+              "tags": ["biotech", "sustainable aviation fuel", "waste to fuel"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "£2.1 million",
+              "currencyHint": "GBP",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1409,
+      "outputTokens": 146,
+      "costUsdMicros": 1714
+    },
+    {
+      "id": "es-immix-312m-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "IMMIX",
+              "websiteDomain": "eu-startups.com",
+              "description": "London fintech building FX infrastructure for stablecoin payments outside dollar-centric corridors.",
+              "countryCode": "GB",
+              "city": "London",
+              "foundedYear": null,
+              "tags": ["fintech", "stablecoin payments", "fx infrastructure"]
+            },
+            "announcedOn": "2026-10-08",
+            "funding": {
+              "roundType": "unknown",
+              "roundLabel": null,
+              "amountText": "€3.12 million",
+              "currencyHint": "EUR",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1421,
+      "outputTokens": 142,
+      "costUsdMicros": 1705
+    },
+    {
+      "id": "te-delfos-seed-extension-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Delfos Energy",
+              "websiteDomain": "delfos.energy",
+              "description": "AI virtual engineer for energy infrastructure deployment across European energy sites.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["ai", "energy infrastructure"]
+            },
+            "announcedOn": "2026-03-12",
+            "funding": {
+              "roundType": "seed",
+              "roundLabel": "Seed extension",
+              "amountText": "€3 million",
+              "currencyHint": "EUR",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1412,
+      "outputTokens": 136,
+      "costUsdMicros": 1671
+    },
+    {
+      "id": "es-elvy-investment-no-amount-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1409,
+      "outputTokens": 18,
+      "costUsdMicros": 1138
+    },
+    {
+      "id": "te-sap-techwolf-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "acquisition",
+            "company": {
+              "name": "TechWolf",
+              "websiteDomain": null,
+              "description": "Belgian HR analytics startup acquired by SAP in one of Belgium's largest venture-backed exits.",
+              "countryCode": "BE",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["hr analytics", "enterprise software"]
+            },
+            "announcedOn": "2026-10-06",
+            "funding": null,
+            "acquisition": {
+              "acquirerName": "SAP",
+              "acquirerDomain": null,
+              "acquirerCountryCode": null,
+              "priceText": null,
+              "currencyHint": null
+            },
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1390,
+      "outputTokens": 132,
+      "costUsdMicros": 1637
+    },
+    {
+      "id": "te-salesforce-convergence-2025",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "acquisition",
+            "company": {
+              "name": "Convergence",
+              "websiteDomain": null,
+              "description": "London AI agent startup acquired by Salesforce about a year after launch.",
+              "countryCode": "GB",
+              "city": "London",
+              "foundedYear": null,
+              "tags": ["ai agents"]
+            },
+            "announcedOn": "2025-05-15",
+            "funding": null,
+            "acquisition": {
+              "acquirerName": "Salesforce",
+              "acquirerDomain": null,
+              "acquirerCountryCode": null,
+              "priceText": null,
+              "currencyHint": null
+            },
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1390,
+      "outputTokens": 125,
+      "costUsdMicros": 1605
+    },
+    {
+      "id": "te-wayve-quality-match-2025",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "acquisition",
+            "company": {
+              "name": "Quality Match",
+              "websiteDomain": null,
+              "description": "German training-data specialist acquired to support Wayve's Germany hub.",
+              "countryCode": "DE",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["training data", "autonomous driving", "ai"]
+            },
+            "announcedOn": "2025-12-01",
+            "funding": null,
+            "acquisition": {
+              "acquirerName": "Wayve",
+              "acquirerDomain": null,
+              "acquirerCountryCode": null,
+              "priceText": "undisclosed",
+              "currencyHint": null
+            },
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1383,
+      "outputTokens": 133,
+      "costUsdMicros": 1636
+    },
+    {
+      "id": "tc-anthropic-vercept-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "acquisition",
+            "company": {
+              "name": "Vercept",
+              "websiteDomain": null,
+              "description": "Seattle computer-use agent startup.",
+              "countryCode": "US",
+              "city": "Seattle",
+              "foundedYear": null,
+              "tags": ["ai agents", "computer use"]
+            },
+            "announcedOn": "2026-02-25",
+            "funding": null,
+            "acquisition": {
+              "acquirerName": "Anthropic",
+              "acquirerDomain": null,
+              "acquirerCountryCode": null,
+              "priceText": null,
+              "currencyHint": null
+            },
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1405,
+      "outputTokens": 121,
+      "costUsdMicros": 1599
+    },
+    {
+      "id": "te-mistral-le-chonk-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "launch",
+            "company": {
+              "name": "Mistral",
+              "websiteDomain": null,
+              "description": "French AI lab launched le Chonk, a new open-weight model family.",
+              "countryCode": "FR",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["ai", "open-weight models"]
+            },
+            "announcedOn": "2026-10-06",
+            "funding": null,
+            "acquisition": null,
+            "launch": {
+              "kind": "product",
+              "productName": "le Chonk",
+              "url": null
+            }
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1420,
+      "outputTokens": 115,
+      "costUsdMicros": 1583
+    },
+    {
+      "id": "tc-neko-health-america-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "launch",
+            "company": {
+              "name": "Neko Health",
+              "websiteDomain": null,
+              "description": "Preventative health startup opened its first US clinics, expanding its body-scanning screening service from Europe to the US.",
+              "countryCode": null,
+              "city": null,
+              "foundedYear": null,
+              "tags": ["healthtech", "preventative care", "body scanning"]
+            },
+            "announcedOn": "2026-10-03",
+            "funding": null,
+            "acquisition": null,
+            "launch": {
+              "kind": "product",
+              "productName": "preventative screening service",
+              "url": null
+            }
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1398,
+      "outputTokens": 128,
+      "costUsdMicros": 1625
+    },
+    {
+      "id": "te-ireland-top-funded-h1-2026",
+      "result": {
+        "isRelevant": true,
+        "events": [
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Fonoa",
+              "websiteDomain": null,
+              "description": "Raised a $110 million Series C in H1 2026.",
+              "countryCode": "IE",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["tax software"]
+            },
+            "announcedOn": null,
+            "funding": {
+              "roundType": "series_c",
+              "roundLabel": "Series C",
+              "amountText": "$110 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          },
+          {
+            "type": "funding_round",
+            "company": {
+              "name": "Manna",
+              "websiteDomain": null,
+              "description": "Raised a $50 million Series B in H1 2026.",
+              "countryCode": "IE",
+              "city": null,
+              "foundedYear": null,
+              "tags": ["drone delivery"]
+            },
+            "announcedOn": null,
+            "funding": {
+              "roundType": "series_b",
+              "roundLabel": "Series B",
+              "amountText": "$50 million",
+              "currencyHint": "USD",
+              "investors": [],
+              "includesIndividualAngels": false
+            },
+            "acquisition": null,
+            "launch": null
+          }
+        ]
+      },
+      "error": null,
+      "inputTokens": 1408,
+      "outputTokens": 237,
+      "costUsdMicros": 2123
+    },
+    {
+      "id": "uk-opinion-golden-triangle-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1383,
+      "outputTokens": 18,
+      "costUsdMicros": 1119
+    },
+    {
+      "id": "te-digitaleurope-opinion-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1401,
+      "outputTokens": 18,
+      "costUsdMicros": 1132
+    },
+    {
+      "id": "eu-a5x-conference-recap-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1418,
+      "outputTokens": 18,
+      "costUsdMicros": 1145
+    },
+    {
+      "id": "tc-layoffs-disrupt-promo-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1413,
+      "outputTokens": 18,
+      "costUsdMicros": 1141
+    },
+    {
+      "id": "tc-apple-earnings-macs-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1396,
+      "outputTokens": 18,
+      "costUsdMicros": 1128
+    },
+    {
+      "id": "tc-openai-in-talks-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1410,
+      "outputTokens": 18,
+      "costUsdMicros": 1139
+    },
+    {
+      "id": "tc-ramp-valuation-talks-2026",
+      "result": {
+        "isRelevant": false,
+        "events": []
+      },
+      "error": null,
+      "inputTokens": 1414,
+      "outputTokens": 18,
+      "costUsdMicros": 1142
+    }
+  ]
+}

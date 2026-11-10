@@ -4,7 +4,7 @@ import { scoreRecording } from "./report";
 import { missedTargets } from "./score";
 
 const recordings = loadRecordings();
-const defaultModel = process.env.EXTRACTION_MODEL ?? "gpt-4.1-nano";
+const defaultModel = process.env.EXTRACTION_MODEL ?? "gpt-5.6-luna";
 
 describe("recorded extraction runs", () => {
   it.skipIf(recordings.length === 0)(
