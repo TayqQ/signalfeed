@@ -4,6 +4,7 @@ import {
   MODEL_PRICES,
   costUsdMicros,
   estimateCost,
+  estimateEmbeddingCost,
   estimateInputTokens,
 } from "./pricing";
 
@@ -44,6 +45,16 @@ describe("MODEL_PRICES", () => {
         model: "gpt-5.4-mini",
         inputUsdPerMillion: 0.75,
         outputUsdPerMillion: 4.5,
+      },
+      {
+        model: "text-embedding-3-small",
+        inputUsdPerMillion: 0.02,
+        outputUsdPerMillion: 0,
+      },
+      {
+        model: "text-embedding-3-large",
+        inputUsdPerMillion: 0.13,
+        outputUsdPerMillion: 0,
       },
     ]);
   });
@@ -130,5 +141,50 @@ describe("costUsdMicros", () => {
     }
     expect(caught).toBeInstanceOf(UnknownModelPriceError);
     expect((caught as UnknownModelPriceError).model).toBe("not-a-model");
+  });
+});
+
+describe("embedding prices", () => {
+  it("prices input only", () => {
+    expect(
+      costUsdMicros("text-embedding-3-small", {
+        inputTokens: 1_000_000,
+        outputTokens: 5_000_000,
+      }),
+    ).toBe(20_000);
+  });
+
+  it("prices text-embedding-3-large at $0.13 per million input tokens", () => {
+    expect(
+      costUsdMicros("text-embedding-3-large", {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+      }),
+    ).toBe(130_000);
+    expect(
+      estimateEmbeddingCost("text-embedding-3-large", ["x".repeat(10)]),
+    ).toMatchObject({ model: "text-embedding-3-large", usdMicros: 1 });
+  });
+
+  it("estimates from characters × 0.3, rounded up", () => {
+    const estimate = estimateEmbeddingCost("text-embedding-3-small", [
+      "a".repeat(10),
+      "bcd",
+    ]);
+    expect(estimate).toEqual({
+      model: "text-embedding-3-small",
+      estimatedInputTokens: 4,
+      maxOutputTokens: 0,
+      usdMicros: 1,
+    });
+    expect(estimateEmbeddingCost("text-embedding-3-small", []).usdMicros).toBe(
+      0,
+    );
+  });
+
+  it("refuses an unknown embedding model", () => {
+    expect(() => estimateEmbeddingCost("text-embedding-9", ["x"])).toThrow(
+      UnknownModelPriceError,
+    );
   });
 });

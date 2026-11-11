@@ -174,6 +174,7 @@
           "type": "funding_round",
           "companyName": "TODAY",
           "countryCode": "DK",
+          "city": "Copenhagen",
           "roundType": "unknown",
           "amountText": "€2.8M",
           "leadInvestors": [],
@@ -243,6 +244,7 @@
           "type": "funding_round",
           "companyName": "Noah",
           "countryCode": "GB",
+          "city": "London",
           "roundType": "seed",
           "amountText": "$38M",
           "leadInvestors": ["Endeit Capital"],
@@ -294,6 +296,7 @@
           "type": "funding_round",
           "companyName": "Neela",
           "countryCode": "GB",
+          "city": "Cambridge",
           "roundType": "unknown",
           "amountText": "£2.1m",
           "leadInvestors": [],
@@ -317,6 +320,7 @@
           "type": "funding_round",
           "companyName": "IMMIX",
           "countryCode": "GB",
+          "city": "London",
           "roundType": "unknown",
           "amountText": "€3.12 million",
           "leadInvestors": [],
@@ -409,6 +413,7 @@
           "type": "acquisition",
           "companyName": "Convergence",
           "countryCode": "GB",
+          "city": "London",
           "roundType": null,
           "amountText": null,
           "leadInvestors": [],
@@ -455,6 +460,7 @@
           "type": "acquisition",
           "companyName": "Vercept",
           "countryCode": "US",
+          "city": "Seattle",
           "roundType": null,
           "amountText": null,
           "leadInvestors": [],
@@ -538,6 +544,151 @@
           "amountText": "$50 million",
           "leadInvestors": [],
           "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-kelpie-ledger-seed-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-kelpie-ledger-seed-2026",
+    "headline": "Scottish fintech Kelpie Ledger raises £3.5M seed to automate small-business bookkeeping",
+    "summary": "Kelpie Ledger, a Scottish fintech, closed a £3.5 million seed round led by Thistle Ventures to automate bookkeeping for small businesses.",
+    "publishedAt": "2026-10-12T09:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Kelpie Ledger",
+          "countryCode": "GB",
+          "regionText": "Scottish",
+          "roundType": "seed",
+          "amountText": "£3.5M",
+          "leadInvestors": ["Thistle Ventures"],
+          "investors": ["Thistle Ventures"],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-dyfi-diagnostics-pre-seed-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-dyfi-diagnostics-pre-seed-2026",
+    "headline": "Welsh medtech Dyfi Diagnostics lands £1.2M pre-seed for a rapid sepsis test",
+    "summary": "Swansea-based Dyfi Diagnostics, a Welsh medtech company, raised £1.2 million in pre-seed funding to run clinical trials of its rapid sepsis test.",
+    "publishedAt": "2026-10-13T10:30:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Dyfi Diagnostics",
+          "countryCode": "GB",
+          "city": "Swansea",
+          "regionText": "Welsh",
+          "roundType": "pre_seed",
+          "amountText": "£1.2M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-moorland-heat-series-a-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-moorland-heat-series-a-2026",
+    "headline": "Yorkshire-based Moorland Heat secures £6M Series A to scale heat pump installs",
+    "summary": "Moorland Heat, a Yorkshire-based installer of heat pumps for older homes, raised a £6 million Series A from Fellside Capital and existing backers.",
+    "publishedAt": "2026-10-14T08:15:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Moorland Heat",
+          "countryCode": "GB",
+          "regionText": "Yorkshire",
+          "roundType": "series_a",
+          "amountText": "£6M",
+          "leadInvestors": [],
+          "investors": ["Fellside Capital"],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-lough-shield-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-lough-shield-2026",
+    "headline": "Belfast-based cybersecurity startup Lough Shield raises £2.4M",
+    "summary": "Lough Shield, a Belfast-based startup that detects phishing attacks aimed at small firms, raised £2.4 million to grow its engineering team.",
+    "publishedAt": "2026-10-15T11:00:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Lough Shield",
+          "countryCode": "GB",
+          "city": "Belfast",
+          "roundType": "unknown",
+          "amountText": "£2.4M",
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-harvestline-drumlin-data-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-harvestline-drumlin-data-2026",
+    "headline": "Harvestline acquires Northern Irish agritech firm Drumlin Data",
+    "summary": "Farm software group Harvestline bought Drumlin Data, a Northern Irish agritech company that maps soil health from satellite images. Terms were not disclosed.",
+    "publishedAt": "2026-10-16T14:45:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "acquisition",
+          "companyName": "Drumlin Data",
+          "countryCode": "GB",
+          "regionText": "Northern Irish",
+          "roundType": null,
+          "amountText": null,
+          "leadInvestors": [],
+          "investors": [],
+          "acquirerName": "Harvestline"
+        }
+      ]
+    }
+  },
+  {
+    "id": "syn-tamar-orbital-seed-2026",
+    "sourceSlug": "uktech-news",
+    "url": "https://example.com/synthetic/syn-tamar-orbital-seed-2026",
+    "headline": "Cornwall-based Tamar Orbital raises £5M to build satellite ground stations",
+    "summary": "Tamar Orbital, a Cornwall-based space startup, raised £5 million in seed funding led by Kernow Capital to build more satellite ground stations.",
+    "publishedAt": "2026-10-19T07:30:00+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Tamar Orbital",
+          "countryCode": "GB",
+          "regionText": "Cornwall",
+          "roundType": "seed",
+          "amountText": "£5M",
+          "leadInvestors": ["Kernow Capital"],
+          "investors": ["Kernow Capital"],
           "acquirerName": null
         }
       ]

@@ -1,6 +1,6 @@
 import type { Money } from "@/core/domain";
 import type { EvalCase, EvalExpectedEvent } from "@/core/eval-fixture";
-import type { ExtractedEventV1, ExtractionV1 } from "@/core/extraction-schema";
+import type { ExtractedEventV2, ExtractionV2 } from "@/core/extraction-schema";
 import { parseAmountText } from "@/lib/money";
 import { normaliseCompanyName, normaliseInvestorName } from "@/lib/normalise";
 import { isCandidate } from "@/pipeline/extract/prefilter";
@@ -21,6 +21,16 @@ export interface CaseScore {
   country: Tally;
   /** Expected a country the fixture text does not have to state; model returned null. */
   countryAbstained: number;
+  city: Tally;
+  /** The fixture text states a city; model returned null. */
+  cityAbstained: number;
+  ukRegion: Tally;
+  /** The fixture text states a UK region; model returned null. */
+  ukRegionAbstained: number;
+  /** Every event the model returned, matched or not. */
+  returnedEvents: number;
+  /** Returned events with any city at all. Phase 1 baseline: 6 of 24 (A28). */
+  returnedEventsWithCity: number;
   leadTruePositives: number;
   leadFalsePositives: number;
   leadFalseNegatives: number;
@@ -40,6 +50,16 @@ export interface EvalMetrics {
   country: number | null;
   /** Share of expected countries the model stated at all. */
   countryCoverage: number | null;
+  /** Accuracy over the stated cities, after normalising case, accents and spaces. */
+  city: number | null;
+  /** Share of cities in the fixture text that the model stated at all. */
+  cityCoverage: number | null;
+  /** Accuracy over the stated UK regions, compared as ITL1 regions. */
+  ukRegion: number | null;
+  /** Share of UK regions in the fixture text that the model stated at all. */
+  ukRegionCoverage: number | null;
+  returnedEvents: number;
+  returnedEventsWithCity: number;
   leadF1: number | null;
   /** Sample behind `leadF1`, because a score over a handful of names means little. */
   leadSupport: number;
@@ -53,7 +73,7 @@ export interface MetricTarget {
   target: number;
 }
 
-/** Spec section 10. */
+/** Spec section 10, plus city and UK region from spec-phase2 section 4.3. */
 export const TARGETS: readonly MetricTarget[] = [
   { key: "relevance", label: "Relevance", target: 0.95 },
   { key: "eventType", label: "Event type", target: 0.95 },
@@ -62,8 +82,47 @@ export const TARGETS: readonly MetricTarget[] = [
   { key: "amount", label: "Amount and currency", target: 0.9 },
   { key: "leadF1", label: "Lead investors (F1)", target: 0.8 },
   { key: "country", label: "Country, when stated", target: 0.8 },
+  { key: "city", label: "City, when stated", target: 0.9 },
+  { key: "ukRegion", label: "UK region, when stated", target: 0.9 },
   { key: "prefilterRecall", label: "Prefilter recall", target: 1 },
 ];
+
+/**
+ * Region words in the fixtures, and their other common form, to ITL1 slugs.
+ * Only for scoring. Task 026 brings the full mapping in `src/lib/geo`.
+ */
+const UK_REGION_WORDS: Readonly<Record<string, string>> = {
+  scotland: "scotland",
+  scottish: "scotland",
+  wales: "wales",
+  welsh: "wales",
+  yorkshire: "yorkshire-and-the-humber",
+  "yorkshire and the humber": "yorkshire-and-the-humber",
+  "northern ireland": "northern-ireland",
+  "northern irish": "northern-ireland",
+  cornwall: "south-west",
+  cornish: "south-west",
+};
+
+/** Lower case, no accents, single spaces. */
+function normalisePlace(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The ITL1 slug for a region word, or null when the lookup does not know it. */
+export function ukRegionOf(regionText: string): string | null {
+  return UK_REGION_WORDS[normalisePlace(regionText)] ?? null;
+}
+
+function stated(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 function emptyTally(): Tally {
   return { hits: 0, total: 0 };
@@ -81,7 +140,7 @@ function sameMoney(left: Money | null, right: Money | null): boolean {
   );
 }
 
-function actualAmount(event: ExtractedEventV1): Money | null {
+function actualAmount(event: ExtractedEventV2): Money | null {
   if (event.funding) {
     return parseAmountText(
       event.funding.amountText,
@@ -104,7 +163,7 @@ function nameSet(names: readonly string[]): Set<string> {
 function scoreEvent(
   score: CaseScore,
   expected: EvalExpectedEvent,
-  actual: ExtractedEventV1,
+  actual: ExtractedEventV2,
 ): void {
   add(score.eventType, actual.type === expected.type);
 
@@ -120,9 +179,25 @@ function scoreEvent(
   }
 
   if (expected.countryCode !== null) {
-    const stated = actual.company.countryCode?.trim().toUpperCase() || null;
-    if (stated === null) score.countryAbstained += 1;
-    else add(score.country, stated === expected.countryCode);
+    const country = actual.company.countryCode?.trim().toUpperCase() || null;
+    if (country === null) score.countryAbstained += 1;
+    else add(score.country, country === expected.countryCode);
+  }
+
+  const expectedCity = stated(expected.city);
+  if (expectedCity !== null) {
+    const city = stated(actual.company.city);
+    if (city === null) score.cityAbstained += 1;
+    else add(score.city, normalisePlace(city) === normalisePlace(expectedCity));
+  }
+
+  const expectedRegionText = stated(expected.regionText);
+  const expectedRegion =
+    expectedRegionText === null ? null : ukRegionOf(expectedRegionText);
+  if (expectedRegion !== null) {
+    const regionText = stated(actual.company.regionText);
+    if (regionText === null) score.ukRegionAbstained += 1;
+    else add(score.ukRegion, ukRegionOf(regionText) === expectedRegion);
   }
 
   if (expected.type === "funding_round") {
@@ -146,10 +221,11 @@ function scoreEvent(
  * Scores one case. `actual` is null when the call failed, which counts as a
  * miss on everything the case expected. Events are paired by normalised
  * company name, so a wrong name also loses that event's other metrics.
+ * Upgrade V1 results with `upgradeExtraction` first; their regions are null.
  */
 export function scoreCase(
   testCase: EvalCase,
-  actual: ExtractionV1 | null,
+  actual: ExtractionV2 | null,
 ): CaseScore {
   const { expected } = testCase;
   const score: CaseScore = {
@@ -161,6 +237,14 @@ export function scoreCase(
     amount: emptyTally(),
     country: emptyTally(),
     countryAbstained: 0,
+    city: emptyTally(),
+    cityAbstained: 0,
+    ukRegion: emptyTally(),
+    ukRegionAbstained: 0,
+    returnedEvents: actual?.events.length ?? 0,
+    returnedEventsWithCity: (actual?.events ?? []).filter(
+      (event) => stated(event.company.city) !== null,
+    ).length,
     leadTruePositives: 0,
     leadFalsePositives: 0,
     leadFalseNegatives: 0,
@@ -194,6 +278,19 @@ function ratio(tally: Tally): number | null {
   return tally.total === 0 ? null : tally.hits / tally.total;
 }
 
+/** Share of expected values the model stated, right or wrong. */
+function coverage(tally: Tally, abstained: number): number | null {
+  const expected = tally.total + abstained;
+  return expected === 0 ? null : tally.total / expected;
+}
+
+function count(
+  scores: readonly CaseScore[],
+  pick: (s: CaseScore) => number,
+): number {
+  return scores.reduce((total, score) => total + pick(score), 0);
+}
+
 function sum(
   scores: readonly CaseScore[],
   pick: (s: CaseScore) => Tally,
@@ -208,23 +305,15 @@ function sum(
 }
 
 export function aggregate(scores: readonly CaseScore[]): EvalMetrics {
-  let truePositives = 0;
-  let falsePositives = 0;
-  let falseNegatives = 0;
-  let abstained = 0;
-  let extra = 0;
-  for (const score of scores) {
-    truePositives += score.leadTruePositives;
-    falsePositives += score.leadFalsePositives;
-    falseNegatives += score.leadFalseNegatives;
-    abstained += score.countryAbstained;
-    extra += score.extraEvents;
-  }
+  const truePositives = count(scores, (s) => s.leadTruePositives);
+  const falsePositives = count(scores, (s) => s.leadFalsePositives);
+  const falseNegatives = count(scores, (s) => s.leadFalseNegatives);
 
   const support = truePositives + falseNegatives;
   const denominator = 2 * truePositives + falsePositives + falseNegatives;
   const country = sum(scores, (s) => s.country);
-  const expectedCountries = country.total + abstained;
+  const city = sum(scores, (s) => s.city);
+  const ukRegion = sum(scores, (s) => s.ukRegion);
 
   return {
     cases: scores.length,
@@ -234,11 +323,25 @@ export function aggregate(scores: readonly CaseScore[]): EvalMetrics {
     roundType: ratio(sum(scores, (s) => s.roundType)),
     amount: ratio(sum(scores, (s) => s.amount)),
     country: ratio(country),
-    countryCoverage:
-      expectedCountries === 0 ? null : country.total / expectedCountries,
+    countryCoverage: coverage(
+      country,
+      count(scores, (s) => s.countryAbstained),
+    ),
+    city: ratio(city),
+    cityCoverage: coverage(
+      city,
+      count(scores, (s) => s.cityAbstained),
+    ),
+    ukRegion: ratio(ukRegion),
+    ukRegionCoverage: coverage(
+      ukRegion,
+      count(scores, (s) => s.ukRegionAbstained),
+    ),
+    returnedEvents: count(scores, (s) => s.returnedEvents),
+    returnedEventsWithCity: count(scores, (s) => s.returnedEventsWithCity),
     leadF1: denominator === 0 ? null : (2 * truePositives) / denominator,
     leadSupport: support,
-    extraEvents: extra,
+    extraEvents: count(scores, (s) => s.extraEvents),
     prefilterRecall: ratio(sum(scores, (s) => s.prefilterRecall)),
   };
 }

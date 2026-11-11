@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
-  EXTRACTION_SCHEMA_NAME,
-  EXTRACTION_SCHEMA_V1,
+  CURRENT_EXTRACTION_SCHEMA,
+  CURRENT_EXTRACTION_SCHEMA_NAME,
   extractionJsonSchema,
 } from "@/core/extraction-schema";
 import { ExtractionValidationError } from "@/core/errors";
@@ -16,8 +17,8 @@ import {
 const request: LlmCompleteRequest<unknown> = {
   system: "system rules",
   user: "headline",
-  schema: EXTRACTION_SCHEMA_V1,
-  schemaName: EXTRACTION_SCHEMA_NAME,
+  schema: CURRENT_EXTRACTION_SCHEMA,
+  schemaName: CURRENT_EXTRACTION_SCHEMA_NAME,
   maxOutputTokens: 1200,
 };
 
@@ -53,6 +54,9 @@ function completion(
 }
 
 describe("createOpenAiClient", () => {
+  // Before Task 024 the adapter always sent `extractionJsonSchema()` under the
+  // request's name. The body below is that body; only the schema and its name
+  // moved from V1 to V2.
   it("requests strict extraction JSON at temperature 0 and returns usage", async () => {
     let body:
       Parameters<OpenAiChatClient["chat"]["completions"]["create"]>[0] | null =
@@ -87,12 +91,71 @@ describe("createOpenAiClient", () => {
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: EXTRACTION_SCHEMA_NAME,
+          name: "extraction_v2",
           strict: true,
           schema: extractionJsonSchema(),
         },
       },
     });
+  });
+
+  it("sends the JSON schema of whatever schema it is given", async () => {
+    let body:
+      Parameters<OpenAiChatClient["chat"]["completions"]["create"]>[0] | null =
+      null;
+    const themeNames = z.strictObject({
+      names: z.array(z.strictObject({ id: z.number(), name: z.string() })),
+    });
+    const client = createOpenAiClient({
+      apiKey: "sk-test",
+      model: "gpt-4.1-nano",
+      client: fakeClient(
+        completion(JSON.stringify({ names: [{ id: 1, name: "Heat pumps" }] })),
+        (sent) => {
+          body = sent;
+        },
+      ),
+    });
+
+    const result = await client.complete({
+      system: "name the themes",
+      user: "tags",
+      schema: themeNames,
+      schemaName: "theme_names_v1",
+      maxOutputTokens: 300,
+    });
+
+    expect(result.data).toEqual({ names: [{ id: 1, name: "Heat pumps" }] });
+    expect(body).toMatchObject({ max_completion_tokens: 300 });
+    expect(
+      (body as unknown as { response_format: unknown }).response_format,
+    ).toEqual({
+      type: "json_schema",
+      json_schema: {
+        name: "theme_names_v1",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: {
+            names: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "number" },
+                  name: { type: "string" },
+                },
+                required: ["id", "name"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["names"],
+          additionalProperties: false,
+        },
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("isRelevant");
   });
 
   it("omits temperature for reasoning models that reject it", async () => {

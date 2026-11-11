@@ -17,6 +17,18 @@ export const MODEL_PRICES: ModelPrice[] = [
   { model: "gpt-5.6-luna", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.2 },
   { model: "gpt-5.4-nano", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.25 },
   { model: "gpt-5.4-mini", inputUsdPerMillion: 0.75, outputUsdPerMillion: 4.5 },
+  // Embeddings price input only. OpenAI pricing page, checked 11 Nov 2026 (A15).
+  {
+    model: "text-embedding-3-small",
+    inputUsdPerMillion: 0.02,
+    outputUsdPerMillion: 0,
+  },
+  // OpenAI pricing page, checked 11 Nov 2026. Evaluated for themes; not the default.
+  {
+    model: "text-embedding-3-large",
+    inputUsdPerMillion: 0.13,
+    outputUsdPerMillion: 0,
+  },
 ];
 
 export interface EstimateCostInput {
@@ -76,4 +88,23 @@ export function costUsdMicros(model: string, usage: LlmTokenUsage): number {
     usage.outputTokens,
     priceFor(model),
   );
+}
+
+/**
+ * Worst-case cost of one embedding call. Uses the same characters × 0.3 rule as
+ * `estimateInputTokens`, rounded up. Refuses a model with no price.
+ */
+export function estimateEmbeddingCost(
+  model: string,
+  inputs: readonly string[],
+): CostEstimate {
+  const price = priceFor(model);
+  const characters = inputs.reduce((total, text) => total + text.length, 0);
+  const estimatedInputTokens = Math.ceil((characters * 3) / 10);
+  return {
+    model,
+    estimatedInputTokens,
+    maxOutputTokens: 0,
+    usdMicros: usdMicrosForTokens(estimatedInputTokens, 0, price),
+  };
 }

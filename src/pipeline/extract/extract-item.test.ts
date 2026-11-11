@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CostEstimate, UsageRecord } from "@/core/domain";
-import { EXTRACTION_SCHEMA_NAME } from "@/core/extraction-schema";
+import { CURRENT_EXTRACTION_SCHEMA_NAME } from "@/core/extraction-schema";
 import {
   BudgetExceededError,
   ExtractionValidationError,
@@ -57,9 +57,9 @@ function trackingBudget(order: string[]): {
 }
 
 describe("extraction prompt", () => {
-  it("is version v1, states the contract, and stays under about 900 tokens", () => {
+  it("is version v2, states the contract, and stays under about 900 tokens", () => {
     const system = buildSystemPrompt();
-    expect(EXTRACTION_PROMPT_VERSION).toBe("v1");
+    expect(EXTRACTION_PROMPT_VERSION).toBe("v2");
     expect(system.length / 4).toBeLessThan(900);
     expect(system).toContain("verbatim");
     expect(system).toContain("includesIndividualAngels");
@@ -127,7 +127,8 @@ describe("extractItem", () => {
 
     expect(order).toEqual(["budget", "llm", "record"]);
     expect(estimates[0]?.maxOutputTokens).toBe(1200);
-    expect(seen.request?.schemaName).toBe(EXTRACTION_SCHEMA_NAME);
+    expect(seen.request?.schemaName).toBe(CURRENT_EXTRACTION_SCHEMA_NAME);
+    expect(seen.request?.schemaName).toBe("extraction_v2");
     expect(seen.request?.maxOutputTokens).toBe(1200);
     expect(seen.request?.system).toBe(buildSystemPrompt());
     expect(seen.request?.user).toBe(buildUserPrompt(item));
@@ -148,7 +149,7 @@ describe("extractItem", () => {
       result: validExtraction,
       usage: { inputTokens: 30, outputTokens: 8 },
       costUsdMicros: expectedCost,
-      promptVersion: "v1",
+      promptVersion: "v2",
       model: "gpt-4.1-nano",
     });
   });

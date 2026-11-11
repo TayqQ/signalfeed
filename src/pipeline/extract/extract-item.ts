@@ -1,7 +1,7 @@
 import {
-  EXTRACTION_SCHEMA_NAME,
-  EXTRACTION_SCHEMA_V1,
-  type ExtractionV1,
+  CURRENT_EXTRACTION_SCHEMA,
+  CURRENT_EXTRACTION_SCHEMA_NAME,
+  type ExtractionV2,
 } from "@/core/extraction-schema";
 import { ExtractionValidationError } from "@/core/errors";
 import type { LlmPurpose } from "@/core/enums";
@@ -27,7 +27,7 @@ export interface ExtractItemArgs {
 }
 
 export interface ExtractItemResult {
-  result: ExtractionV1;
+  result: ExtractionV2;
   usage: LlmTokenUsage;
   costUsdMicros: number;
   promptVersion: typeof EXTRACTION_PROMPT_VERSION;
@@ -86,8 +86,8 @@ export async function extractItem({
     const completion = await llm.complete({
       system,
       user,
-      schema: EXTRACTION_SCHEMA_V1,
-      schemaName: EXTRACTION_SCHEMA_NAME,
+      schema: CURRENT_EXTRACTION_SCHEMA,
+      schemaName: CURRENT_EXTRACTION_SCHEMA_NAME,
       maxOutputTokens,
     });
     const actualCostUsdMicros = await record(completion.usage);

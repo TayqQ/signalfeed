@@ -2,14 +2,23 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { EVAL_CASES_SCHEMA, type EvalCase } from "@/core/eval-fixture";
-import { EXTRACTION_SCHEMA_V1 } from "@/core/extraction-schema";
+import {
+  EXTRACTION_SCHEMA_V1,
+  EXTRACTION_SCHEMA_V2,
+  upgradeExtraction,
+} from "@/core/extraction-schema";
 
 export const CASES_PATH = "fixtures/extraction/cases.json";
 export const RECORDINGS_DIR = "fixtures/extraction/recorded";
 
+/** Prompt v1 recordings hold V1 results. Both are read as V2. */
+const recordedResultSchema = z
+  .union([EXTRACTION_SCHEMA_V2, EXTRACTION_SCHEMA_V1])
+  .transform(upgradeExtraction);
+
 const recordedCaseSchema = z.object({
   id: z.string(),
-  result: EXTRACTION_SCHEMA_V1.nullable(),
+  result: recordedResultSchema.nullable(),
   error: z.string().nullable(),
   inputTokens: z.number(),
   outputTokens: z.number(),

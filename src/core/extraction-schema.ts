@@ -5,14 +5,19 @@ import {
   LAUNCH_KINDS,
   ROUND_TYPES,
 } from "./enums";
+import { strictJsonSchema } from "./json-schema";
 
 // OpenAI strict structured outputs: every property is required, unknown values
 // are null rather than omitted, and objects allow no extra keys. Values are kept
 // as the text states them; code parses and validates them afterwards.
+//
+// V1 stays as it was so stored results and old recordings still parse. V2 adds
+// `company.regionText`. New calls use V2.
 
 export const EXTRACTION_SCHEMA_NAME = "extraction_v1";
+export const CURRENT_EXTRACTION_SCHEMA_NAME = "extraction_v2";
 
-const companySchema = z.strictObject({
+const companyFieldsBeforeRegion = {
   name: z.string(),
   websiteDomain: z
     .string()
@@ -27,6 +32,9 @@ const companySchema = z.strictObject({
     .nullable()
     .describe("ISO 3166-1 alpha-2 country code"),
   city: z.string().nullable(),
+};
+
+const companyFieldsAfterRegion = {
   foundedYear: z.number().int().nullable(),
   tags: z
     .array(z.string())
@@ -34,6 +42,22 @@ const companySchema = z.strictObject({
     .describe(
       'Up to 5 short lowercase theme phrases, e.g. "ai agents", "climate fintech"',
     ),
+};
+
+const companySchema = z.strictObject({
+  ...companyFieldsBeforeRegion,
+  ...companyFieldsAfterRegion,
+});
+
+const companySchemaV2 = z.strictObject({
+  ...companyFieldsBeforeRegion,
+  regionText: z
+    .string()
+    .nullable()
+    .describe(
+      'Region, nation or county the text states, copied as written, e.g. "Scotland", "Yorkshire", "Bavaria". Never derived from the city',
+    ),
+  ...companyFieldsAfterRegion,
 });
 
 const investorSchema = z.strictObject({
@@ -74,62 +98,59 @@ const launchSchema = z.strictObject({
   url: z.string().nullable(),
 });
 
-const eventSchema = z.strictObject({
-  type: z.enum(EVENT_TYPES),
-  company: companySchema,
-  announcedOn: z.string().nullable().describe("YYYY-MM-DD if stated"),
-  funding: fundingSchema.nullable(),
-  acquisition: acquisitionSchema.nullable(),
-  launch: launchSchema.nullable(),
-});
+function eventSchemaFor<Company extends z.ZodType>(company: Company) {
+  return z.strictObject({
+    type: z.enum(EVENT_TYPES),
+    company,
+    announcedOn: z.string().nullable().describe("YYYY-MM-DD if stated"),
+    funding: fundingSchema.nullable(),
+    acquisition: acquisitionSchema.nullable(),
+    launch: launchSchema.nullable(),
+  });
+}
 
-export const EXTRACTION_SCHEMA_V1 = z.strictObject({
-  isRelevant: z
-    .boolean()
-    .describe(
-      "True if the item reports a completed funding round, acquisition or launch by a startup or scale-up",
-    ),
-  events: z.array(eventSchema).max(10),
-});
+function extractionSchemaFor<Company extends z.ZodType>(company: Company) {
+  return z.strictObject({
+    isRelevant: z
+      .boolean()
+      .describe(
+        "True if the item reports a completed funding round, acquisition or launch by a startup or scale-up",
+      ),
+    events: z.array(eventSchemaFor(company)).max(10),
+  });
+}
+
+export const EXTRACTION_SCHEMA_V1 = extractionSchemaFor(companySchema);
 
 export type ExtractionV1 = z.infer<typeof EXTRACTION_SCHEMA_V1>;
 export type ExtractedEventV1 = ExtractionV1["events"][number];
 
-type JsonObject = { [key: string]: unknown };
+export const EXTRACTION_SCHEMA_V2 = extractionSchemaFor(companySchemaV2);
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+export type ExtractionV2 = z.infer<typeof EXTRACTION_SCHEMA_V2>;
+export type ExtractedEventV2 = ExtractionV2["events"][number];
+
+/** The schema new extraction calls use. */
+export const CURRENT_EXTRACTION_SCHEMA = EXTRACTION_SCHEMA_V2;
+
+/** Reads a stored V1 or V2 result as V2. V1 had no region, so it is null. */
+export function upgradeExtraction(
+  value: ExtractionV1 | ExtractionV2,
+): ExtractionV2 {
+  return {
+    ...value,
+    events: value.events.map((event) => ({
+      ...event,
+      company: {
+        ...event.company,
+        regionText:
+          "regionText" in event.company ? event.company.regionText : null,
+      },
+    })),
+  };
 }
 
-function strictNode(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(strictNode);
-  if (!isJsonObject(node)) return node;
-
-  const out: JsonObject = {};
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "$schema") continue;
-    if ((key === "properties" || key === "$defs") && isJsonObject(value)) {
-      out[key] = Object.fromEntries(
-        Object.entries(value).map(([name, child]) => [name, strictNode(child)]),
-      );
-    } else {
-      out[key] = strictNode(value);
-    }
-  }
-
-  if (out.type === "object") {
-    const properties = isJsonObject(out.properties) ? out.properties : {};
-    out.properties = properties;
-    out.required = Object.keys(properties);
-    out.additionalProperties = false;
-  }
-  return out;
-}
-
-/** JSON Schema for `EXTRACTION_SCHEMA_V1`, shaped for OpenAI strict mode. */
+/** JSON Schema for `CURRENT_EXTRACTION_SCHEMA`, shaped for OpenAI strict mode. */
 export function extractionJsonSchema(): Record<string, unknown> {
-  return strictNode(z.toJSONSchema(EXTRACTION_SCHEMA_V1)) as Record<
-    string,
-    unknown
-  >;
+  return strictJsonSchema(CURRENT_EXTRACTION_SCHEMA);
 }
