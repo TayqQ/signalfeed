@@ -14,13 +14,21 @@ export const pipelineEnvSchema = z.object({
   MAX_EXTRACTIONS_PER_RUN: z.coerce.number().int().positive().default(150),
   /** Contact URL or email sent in the User-Agent of outgoing requests. */
   HTTP_CONTACT: z.string().min(1),
+  // Phase 2
+  EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-small"),
+  MAX_EMBEDDINGS_PER_RUN: z.coerce.number().int().positive().default(2000),
+  MAX_THEME_NAMES_PER_RUN: z.coerce.number().int().positive().default(20),
+  MAX_GRANT_TAGGINGS_PER_RUN: z.coerce.number().int().positive().default(200),
+  /** Raises the GitHub API rate limit for star snapshots. Optional. */
+  GITHUB_TOKEN: z.string().min(1).optional(),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 
 /**
  * The same settings with no LLM key. Collecting costs nothing, and history can
  * only accumulate from the day collection starts, so a run without a key still
- * stores new items and leaves them pending for extraction later.
+ * stores new items and leaves them pending for extraction later. It inherits
+ * every other setting, Phase 2 limits included.
  */
 export const noLlmPipelineEnvSchema = pipelineEnvSchema.extend({
   OPENAI_API_KEY: z.string().min(1).optional(),

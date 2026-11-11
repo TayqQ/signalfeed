@@ -29,3 +29,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
 -- Feed summaries are LLM input only and are never shown.
 REVOKE ALL ON source_item_texts FROM signalfeed_web;
+
+-- Grant project abstracts are LLM input only and are never shown.
+REVOKE ALL ON grant_project_texts FROM signalfeed_web;

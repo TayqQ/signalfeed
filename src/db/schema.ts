@@ -29,19 +29,26 @@ import {
   EVENT_TYPES,
   EVIDENCE_LEVELS,
   FOUNDED_YEAR_SOURCES,
+  GRANT_ROLES,
   INGEST_STATUSES,
   INGEST_TRIGGERS,
   INVESTOR_KINDS,
   INVESTOR_ROLES,
   LAUNCH_KINDS,
   LLM_PURPOSES,
+  LOCATION_PRECISIONS,
+  LOCATION_SOURCES,
   MERGE_CANDIDATE_STATUSES,
   MERGE_ENTITIES,
+  RECORD_KINDS,
   ROUND_TYPES,
   SOURCE_ITEM_STATUSES,
   SOURCE_KINDS,
+  THEME_ASSIGNED_BY,
+  THEME_NAME_SOURCES,
+  THEME_STATUSES,
 } from "@/core/enums";
-import type { ExtractionV1 } from "@/core/extraction-schema";
+import type { ExtractionV1, ExtractionV2 } from "@/core/extraction-schema";
 
 export const EMBEDDING_DIMENSIONS = 512;
 
@@ -54,8 +61,8 @@ const moneyMinor = (name: string) => bigint(name, { mode: "number" });
 const currencyCode = (name: string) => char(name, { length: 3 });
 const countryCode = (name: string) => char(name, { length: 2 });
 const isoDate = (name: string) => date(name, { mode: "string" });
-const embedding = () =>
-  vector("embedding", { dimensions: EMBEDDING_DIMENSIONS });
+const embedding = (name = "embedding") =>
+  vector(name, { dimensions: EMBEDDING_DIMENSIONS });
 
 // Enums
 
@@ -85,6 +92,19 @@ export const mergeCandidateStatus = pgEnum(
   MERGE_CANDIDATE_STATUSES,
 );
 export const aliasSource = pgEnum("alias_source", ALIAS_SOURCES);
+
+// Phase 2 enums (docs/spec-phase2.md section 5.1)
+
+export const themeStatus = pgEnum("theme_status", THEME_STATUSES);
+export const themeNameSource = pgEnum("theme_name_source", THEME_NAME_SOURCES);
+export const themeAssignedBy = pgEnum("theme_assigned_by", THEME_ASSIGNED_BY);
+export const locationPrecision = pgEnum(
+  "location_precision",
+  LOCATION_PRECISIONS,
+);
+export const locationSource = pgEnum("location_source", LOCATION_SOURCES);
+export const grantRole = pgEnum("grant_role", GRANT_ROLES);
+export const recordKind = pgEnum("record_kind", RECORD_KINDS);
 
 // Collection and processing
 
@@ -147,7 +167,8 @@ export const extractions = pgTable(
       .references(() => sourceItems.id),
     promptVersion: text("prompt_version").notNull(),
     model: text("model").notNull(),
-    result: jsonb("result").$type<ExtractionV1>().notNull(),
+    /** Stored as written: rows from prompt v1 have no `regionText`. */
+    result: jsonb("result").$type<ExtractionV1 | ExtractionV2>().notNull(),
     isRelevant: boolean("is_relevant").notNull(),
     isCurrent: boolean("is_current").notNull().default(true),
     inputTokens: integer("input_tokens").notNull(),
@@ -550,10 +571,343 @@ export const entityMerges = pgTable("entity_merges", {
   note: text("note"),
 });
 
+// Themes (Phase 2, spec-phase2 section 5.2). Raw tags and `company_tags` are untouched.
+
+export const themes = pgTable(
+  "themes",
+  {
+    id: id(),
+    /** Never changes once assigned; merged themes redirect by slug. */
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    nameSource: themeNameSource("name_source").notNull().default("tag"),
+    /** One of the slugs in `src/core/sectors.ts`, checked in code (the list is append-only). */
+    sector: text("sector"),
+    status: themeStatus("status").notNull().default("active"),
+    mergedIntoId: integer("merged_into_id").references(
+      (): AnyPgColumn => themes.id,
+    ),
+    seedTagId: integer("seed_tag_id")
+      .notNull()
+      .references(() => tags.id),
+    centroid: embedding("centroid").notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    createdAt: createdNow("created_at"),
+    namedAt: timestamptz("named_at"),
+    reviewedAt: timestamptz("reviewed_at"),
+  },
+  (t) => [
+    index("themes_status_idx").on(t.status),
+    check("themes_not_merged_into_self", sql`${t.mergedIntoId} <> ${t.id}`),
+    check(
+      "themes_merged_has_target",
+      sql`(${t.status} = 'merged') = (${t.mergedIntoId} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/** One row per assigned tag. A null `theme_id` means a person decided the tag belongs to no theme. */
+export const tagThemes = pgTable(
+  "tag_themes",
+  {
+    tagId: integer("tag_id")
+      .primaryKey()
+      .references(() => tags.id),
+    themeId: integer("theme_id").references(() => themes.id),
+    /** Cosine similarity to the theme centroid; null for manual links. */
+    similarity: real("similarity"),
+    assignedBy: themeAssignedBy("assigned_by").notNull(),
+    embeddingModel: text("embedding_model"),
+    assignedAt: createdNow("assigned_at"),
+  },
+  (t) => [index("tag_themes_theme_id_idx").on(t.themeId)],
+);
+
+// Derived tables (spec-phase2 section 5.3, D37). Rebuilt from source tables,
+// so the rebuild may replace their rows.
+
+const nonNegativeCount = (name: string) => integer(name).notNull().default(0);
+
+export const companyThemes = pgTable(
+  "company_themes",
+  {
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    themeId: integer("theme_id")
+      .notNull()
+      .references(() => themes.id),
+    tagCount: integer("tag_count").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.companyId, t.themeId] }),
+    index("company_themes_theme_id_idx").on(t.themeId),
+    check("company_themes_tag_count_non_negative", sql`${t.tagCount} >= 0`),
+  ],
+);
+
+/** Only weeks with at least one event get a row. Rounds exclude grants. */
+export const themeWeeklyStats = pgTable(
+  "theme_weekly_stats",
+  {
+    themeId: integer("theme_id")
+      .notNull()
+      .references(() => themes.id),
+    /** A Monday. */
+    weekStart: isoDate("week_start").notNull(),
+    rounds: nonNegativeCount("rounds"),
+    roundsWithAmount: nonNegativeCount("rounds_with_amount"),
+    totalGbpMinor: moneyMinor("total_gbp_minor").notNull().default(0),
+    /** `pre_seed` and `seed`. */
+    earlyRounds: nonNegativeCount("early_rounds"),
+    /** `series_a` to `series_d_plus`, and `growth`. */
+    laterRounds: nonNegativeCount("later_rounds"),
+    unknownStageRounds: nonNegativeCount("unknown_stage_rounds"),
+    grants: nonNegativeCount("grants"),
+    grantGbpMinor: moneyMinor("grant_gbp_minor").notNull().default(0),
+    acquisitions: nonNegativeCount("acquisitions"),
+    launches: nonNegativeCount("launches"),
+    /** Distinct companies with any event that week. */
+    companies: nonNegativeCount("companies"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.themeId, t.weekStart] }),
+    index("theme_weekly_stats_week_start_idx").on(t.weekStart),
+    check(
+      "theme_weekly_stats_week_start_monday",
+      sql`extract(isodow from ${t.weekStart}) = 1`,
+    ),
+    check(
+      "theme_weekly_stats_non_negative",
+      sql`${t.rounds} >= 0 AND ${t.roundsWithAmount} >= 0 AND ${t.totalGbpMinor} >= 0 AND ${t.earlyRounds} >= 0 AND ${t.laterRounds} >= 0 AND ${t.unknownStageRounds} >= 0 AND ${t.grants} >= 0 AND ${t.grantGbpMinor} >= 0 AND ${t.acquisitions} >= 0 AND ${t.launches} >= 0 AND ${t.companies} >= 0`,
+    ),
+  ],
+);
+
+/** Distinct events across all companies, so an event in two themes counts once. */
+export const weeklyTotals = pgTable(
+  "weekly_totals",
+  {
+    /** A Monday. */
+    weekStart: isoDate("week_start").primaryKey(),
+    rounds: nonNegativeCount("rounds"),
+    earlyRounds: nonNegativeCount("early_rounds"),
+    grants: nonNegativeCount("grants"),
+    acquisitions: nonNegativeCount("acquisitions"),
+    launches: nonNegativeCount("launches"),
+  },
+  (t) => [
+    check(
+      "weekly_totals_week_start_monday",
+      sql`extract(isodow from ${t.weekStart}) = 1`,
+    ),
+    check(
+      "weekly_totals_non_negative",
+      sql`${t.rounds} >= 0 AND ${t.earlyRounds} >= 0 AND ${t.grants} >= 0 AND ${t.acquisitions} >= 0 AND ${t.launches} >= 0`,
+    ),
+  ],
+);
+
+/**
+ * Equity rounds only (funding rounds other than `debt` and `grant`, D43).
+ * Rows referring to a deleted event go with it; the next rebuild recomputes them.
+ */
+export const fundingRoundMomentum = pgTable(
+  "funding_round_momentum",
+  {
+    eventId: integer("event_id")
+      .primaryKey()
+      .references(() => events.id, { onDelete: "cascade" }),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    /** 1 means the first round SignalFeed has recorded. */
+    equityRoundNumber: smallint("equity_round_number").notNull(),
+    previousEventId: integer("previous_event_id").references(
+      (): AnyPgColumn => events.id,
+      { onDelete: "cascade" },
+    ),
+    monthsSincePrevious: smallint("months_since_previous"),
+    stepUpBasisEventId: integer("step_up_basis_event_id").references(
+      (): AnyPgColumn => events.id,
+      { onDelete: "cascade" },
+    ),
+    stepUpRatio: real("step_up_ratio"),
+    roundsIn24mToDate: smallint("rounds_in_24m_to_date").notNull(),
+  },
+  (t) => [
+    index("funding_round_momentum_company_id_idx").on(t.companyId),
+    check(
+      "funding_round_momentum_non_negative",
+      sql`${t.equityRoundNumber} >= 1 AND ${t.monthsSincePrevious} >= 0 AND ${t.stepUpRatio} >= 0 AND ${t.roundsIn24mToDate} >= 1`,
+    ),
+  ],
+);
+
+/** One row per company with at least a UK region or a non-UK city (spec-phase2 section 9.1). */
+export const companyLocations = pgTable(
+  "company_locations",
+  {
+    companyId: integer("company_id")
+      .primaryKey()
+      .references(() => companies.id),
+    countryCode: countryCode("country_code").notNull(),
+    /** ITL1 code, for example `TLE`. */
+    itl1Code: char("itl1_code", { length: 3 }),
+    placeSlug: text("place_slug"),
+    /** Postcode district, for example `L35`. */
+    outcode: text("outcode"),
+    latitude: real("latitude"),
+    longitude: real("longitude"),
+    precision: locationPrecision("precision").notNull(),
+    source: locationSource("source").notNull(),
+    computedAt: createdNow("computed_at"),
+  },
+  (t) => [
+    index("company_locations_itl1_code_idx").on(t.itl1Code),
+    index("company_locations_place_slug_idx").on(t.placeSlug),
+    index("company_locations_latitude_longitude_idx").on(
+      t.latitude,
+      t.longitude,
+    ),
+    check(
+      "company_locations_coordinates_paired",
+      sql`(${t.latitude} IS NULL) = (${t.longitude} IS NULL)`,
+    ),
+  ],
+);
+
+/** A rebuild is skipped when its input fingerprint has not changed. */
+export const derivedRebuilds = pgTable("derived_rebuilds", {
+  /** For example `stats` or `locations`. */
+  name: text("name").primaryKey(),
+  inputFingerprint: text("input_fingerprint").notNull(),
+  rebuiltAt: createdNow("rebuilt_at"),
+});
+
+// Grants: UKRI Gateway to Research (spec-phase2 section 5.4, D40)
+
+export const grantProjects = pgTable("grant_projects", {
+  id: id(),
+  sourceId: integer("source_id")
+    .notNull()
+    .references(() => sources.id),
+  gtrProjectId: text("gtr_project_id").notNull().unique(),
+  title: text("title").notNull(),
+  /** For example "Collaborative R&D". */
+  grantCategory: text("grant_category").notNull(),
+  leadFunder: text("lead_funder").notNull(),
+  status: text("status").notNull(),
+  startOn: isoDate("start_on"),
+  endOn: isoDate("end_on"),
+  gtrUrl: text("gtr_url").notNull(),
+  firstSeenAt: createdNow("first_seen_at"),
+  updatedAt: createdNow("updated_at"),
+});
+
+/** Project abstracts, used only as LLM input. Never displayed; the web role cannot read it. */
+export const grantProjectTexts = pgTable(
+  "grant_project_texts",
+  {
+    projectId: integer("project_id")
+      .primaryKey()
+      .references(() => grantProjects.id, { onDelete: "cascade" }),
+    abstract: text("abstract").notNull(),
+  },
+  (t) => [
+    check(
+      "grant_project_texts_abstract_length",
+      sql`char_length(${t.abstract}) <= 1500`,
+    ),
+  ],
+);
+
+/** Organisations only; participants that may be individual people are never stored. */
+export const grantParticipants = pgTable(
+  "grant_participants",
+  {
+    id: id(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => grantProjects.id),
+    gtrOrgId: text("gtr_org_id").notNull(),
+    organisationName: text("organisation_name").notNull(),
+    /** Companies House number, when GtR has one. */
+    regNumber: text("reg_number"),
+    postcode: text("postcode"),
+    outcode: text("outcode"),
+    regionText: text("region_text"),
+    role: grantRole("role").notNull(),
+    /** GBP pence. */
+    grantOfferMinor: moneyMinor("grant_offer_minor"),
+    projectCostMinor: moneyMinor("project_cost_minor"),
+    orgFetchedAt: timestamptz("org_fetched_at"),
+    companyId: integer("company_id").references(() => companies.id),
+    eventId: integer("event_id").references(() => events.id),
+    resolvedAt: timestamptz("resolved_at"),
+    skippedReason: text("skipped_reason"),
+  },
+  (t) => [
+    unique("grant_participants_project_id_gtr_org_id_unique").on(
+      t.projectId,
+      t.gtrOrgId,
+    ),
+    index("grant_participants_resolved_at_idx").on(t.resolvedAt),
+    check(
+      "grant_participants_amounts_non_negative",
+      sql`${t.grantOfferMinor} >= 0 AND ${t.projectCostMinor} >= 0`,
+    ),
+  ],
+);
+
+/** Tagging is paid for once per project, prompt version and model. */
+export const grantTaggings = pgTable(
+  "grant_taggings",
+  {
+    id: id(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => grantProjects.id),
+    promptVersion: text("prompt_version").notNull(),
+    model: text("model").notNull(),
+    tags: text("tags").array().notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    costUsdMicros: bigint("cost_usd_micros", { mode: "number" }).notNull(),
+    createdAt: createdNow("created_at"),
+  },
+  (t) => [
+    unique("grant_taggings_project_prompt_model_unique").on(
+      t.projectId,
+      t.promptVersion,
+      t.model,
+    ),
+    check(
+      "grant_taggings_usage_non_negative",
+      sql`${t.inputTokens} >= 0 AND ${t.outputTokens} >= 0 AND ${t.costUsdMicros} >= 0`,
+    ),
+  ],
+);
+
+/** Links an event to an official record instead of an extraction. */
+export const eventRecordSources = pgTable(
+  "event_record_sources",
+  {
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    recordKind: recordKind("record_kind").notNull(),
+    /** For `ukri_grant`, a `grant_participants.id`. */
+    recordId: integer("record_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.recordKind, t.recordId] })],
+);
+
 // Relations
 
 export const sourcesRelations = relations(sources, ({ many }) => ({
   items: many(sourceItems),
+  grantProjects: many(grantProjects),
 }));
 
 export const sourceItemsRelations = relations(sourceItems, ({ one, many }) => ({
@@ -604,6 +958,9 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   tags: many(companyTags),
   events: many(events),
   acquisitionsAsAcquirer: many(acquisitions, { relationName: "acquirer" }),
+  themes: many(companyThemes),
+  location: one(companyLocations),
+  grantParticipants: many(grantParticipants),
   mergedInto: one(companies, {
     fields: [companies.mergedIntoId],
     references: [companies.id],
@@ -619,8 +976,9 @@ export const companyAliasesRelations = relations(companyAliases, ({ one }) => ({
   }),
 }));
 
-export const tagsRelations = relations(tags, ({ many }) => ({
+export const tagsRelations = relations(tags, ({ one, many }) => ({
   companies: many(companyTags),
+  themeLink: one(tagThemes),
 }));
 
 export const companyTagsRelations = relations(companyTags, ({ one }) => ({
@@ -662,7 +1020,9 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   launch: one(launches),
   investors: many(eventInvestors),
   sources: many(eventSources),
+  recordSources: many(eventRecordSources),
   metricSnapshots: many(launchMetricSnapshots),
+  momentum: one(fundingRoundMomentum),
 }));
 
 export const fundingRoundsRelations = relations(fundingRounds, ({ one }) => ({
@@ -723,3 +1083,126 @@ export const eventSourcesRelations = relations(eventSources, ({ one }) => ({
     references: [sourceItems.id],
   }),
 }));
+
+export const themesRelations = relations(themes, ({ one, many }) => ({
+  seedTag: one(tags, { fields: [themes.seedTagId], references: [tags.id] }),
+  tagLinks: many(tagThemes),
+  companies: many(companyThemes),
+  weeklyStats: many(themeWeeklyStats),
+  mergedInto: one(themes, {
+    fields: [themes.mergedIntoId],
+    references: [themes.id],
+    relationName: "themeMerge",
+  }),
+  mergedFrom: many(themes, { relationName: "themeMerge" }),
+}));
+
+export const tagThemesRelations = relations(tagThemes, ({ one }) => ({
+  tag: one(tags, { fields: [tagThemes.tagId], references: [tags.id] }),
+  theme: one(themes, { fields: [tagThemes.themeId], references: [themes.id] }),
+}));
+
+export const companyThemesRelations = relations(companyThemes, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyThemes.companyId],
+    references: [companies.id],
+  }),
+  theme: one(themes, {
+    fields: [companyThemes.themeId],
+    references: [themes.id],
+  }),
+}));
+
+export const themeWeeklyStatsRelations = relations(
+  themeWeeklyStats,
+  ({ one }) => ({
+    theme: one(themes, {
+      fields: [themeWeeklyStats.themeId],
+      references: [themes.id],
+    }),
+  }),
+);
+
+// `previous_event_id` and `step_up_basis_event_id` have no relations: a second
+// and third link to `events` would make `events.momentum` ambiguous.
+export const fundingRoundMomentumRelations = relations(
+  fundingRoundMomentum,
+  ({ one }) => ({
+    event: one(events, {
+      fields: [fundingRoundMomentum.eventId],
+      references: [events.id],
+    }),
+    company: one(companies, {
+      fields: [fundingRoundMomentum.companyId],
+      references: [companies.id],
+    }),
+  }),
+);
+
+export const companyLocationsRelations = relations(
+  companyLocations,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [companyLocations.companyId],
+      references: [companies.id],
+    }),
+  }),
+);
+
+export const grantProjectsRelations = relations(
+  grantProjects,
+  ({ one, many }) => ({
+    source: one(sources, {
+      fields: [grantProjects.sourceId],
+      references: [sources.id],
+    }),
+    text: one(grantProjectTexts),
+    participants: many(grantParticipants),
+    taggings: many(grantTaggings),
+  }),
+);
+
+export const grantProjectTextsRelations = relations(
+  grantProjectTexts,
+  ({ one }) => ({
+    project: one(grantProjects, {
+      fields: [grantProjectTexts.projectId],
+      references: [grantProjects.id],
+    }),
+  }),
+);
+
+export const grantParticipantsRelations = relations(
+  grantParticipants,
+  ({ one }) => ({
+    project: one(grantProjects, {
+      fields: [grantParticipants.projectId],
+      references: [grantProjects.id],
+    }),
+    company: one(companies, {
+      fields: [grantParticipants.companyId],
+      references: [companies.id],
+    }),
+    event: one(events, {
+      fields: [grantParticipants.eventId],
+      references: [events.id],
+    }),
+  }),
+);
+
+export const grantTaggingsRelations = relations(grantTaggings, ({ one }) => ({
+  project: one(grantProjects, {
+    fields: [grantTaggings.projectId],
+    references: [grantProjects.id],
+  }),
+}));
+
+export const eventRecordSourcesRelations = relations(
+  eventRecordSources,
+  ({ one }) => ({
+    event: one(events, {
+      fields: [eventRecordSources.eventId],
+      references: [events.id],
+    }),
+  }),
+);
