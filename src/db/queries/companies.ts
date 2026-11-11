@@ -1,24 +1,36 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { LaunchKind, RoundType } from "@/core/enums";
 import type {
   CompanyDetail,
   CompanyEvent,
+  CompanyLocationView,
   EventInvestor,
   EventSourceLink,
+  RoundMomentum,
+  ThemeRef,
 } from "@/core/read-models";
+import { isSector, type Sector } from "@/core/sectors";
+import { roundsInLastMonths } from "@/lib/company-momentum";
+import { findPlaceBySlug } from "@/lib/geo/uk-places";
+import { ukRegionByCode } from "@/lib/geo/uk-regions";
 import type { Db } from "../client";
 import {
   acquisitions,
   companies,
+  companyLocations,
   companyTags,
+  companyThemes,
   eventInvestors,
   events,
+  fundingRoundMomentum,
   fundingRounds,
   investors,
   launches,
   sourceItems,
   sources,
   tags,
+  themes,
   eventSources,
 } from "../schema";
 
@@ -78,6 +90,8 @@ async function redirectSlug(
   return null;
 }
 
+const basisEvent = alias(events, "basis_event");
+
 const ROLE_RANK = { lead: 0, participant: 1, unknown: 2 } as const;
 
 function groupBy<T>(rows: T[], key: (row: T) => number): Map<number, T[]> {
@@ -91,9 +105,14 @@ function groupBy<T>(rows: T[], key: (row: T) => number): Map<number, T[]> {
   return grouped;
 }
 
+/**
+ * `now` is the date "rounds in the last 24 months" is counted against. Pages
+ * leave it out; tests pass a fixed date.
+ */
 export async function getCompanyDetail(
   db: Db,
   slug: string,
+  now: Date | string = new Date(),
 ): Promise<CompanyDetail | null> {
   const [company] = await db
     .select({
@@ -120,7 +139,14 @@ export async function getCompanyDetail(
     .limit(1);
   if (!company) return null;
 
-  const [redirectToSlug, tagRows, eventRows] = await Promise.all([
+  const [
+    redirectToSlug,
+    tagRows,
+    eventRows,
+    themeRows,
+    locationRows,
+    momentumRows,
+  ] = await Promise.all([
     redirectSlug(db, company.mergedIntoId),
     db
       .select({ slug: tags.slug, label: tags.label })
@@ -140,9 +166,73 @@ export async function getCompanyDetail(
       .from(events)
       .where(eq(events.companyId, company.id))
       .orderBy(desc(events.announcedOn), desc(events.id)),
+    db
+      .select({ slug: themes.slug, name: themes.name, sector: themes.sector })
+      .from(companyThemes)
+      .innerJoin(themes, eq(themes.id, companyThemes.themeId))
+      .where(eq(companyThemes.companyId, company.id))
+      .orderBy(asc(themes.name), asc(themes.slug)),
+    db
+      .select({
+        precision: companyLocations.precision,
+        countryCode: companyLocations.countryCode,
+        itl1Code: companyLocations.itl1Code,
+        placeSlug: companyLocations.placeSlug,
+        outcode: companyLocations.outcode,
+      })
+      .from(companyLocations)
+      .where(eq(companyLocations.companyId, company.id))
+      .limit(1),
+    db
+      .select({
+        eventId: fundingRoundMomentum.eventId,
+        equityRoundNumber: fundingRoundMomentum.equityRoundNumber,
+        monthsSincePrevious: fundingRoundMomentum.monthsSincePrevious,
+        stepUpRatio: fundingRoundMomentum.stepUpRatio,
+        stepUpBasisOn: basisEvent.announcedOn,
+      })
+      .from(fundingRoundMomentum)
+      .leftJoin(
+        basisEvent,
+        eq(basisEvent.id, fundingRoundMomentum.stepUpBasisEventId),
+      )
+      .where(eq(fundingRoundMomentum.companyId, company.id)),
   ]);
 
-  const companyEvents = await loadEvents(db, eventRows);
+  const momentumByEvent = new Map<number, RoundMomentum>(
+    momentumRows.map((row) => [
+      row.eventId,
+      {
+        equityRoundNumber: row.equityRoundNumber,
+        monthsSincePrevious: row.monthsSincePrevious,
+        stepUpRatio: row.stepUpRatio,
+        stepUpBasisOn:
+          row.stepUpRatio == null || row.stepUpBasisOn == null
+            ? null
+            : calendarDate(row.stepUpBasisOn),
+      },
+    ]),
+  );
+  const companyEvents = (await loadEvents(db, eventRows)).map((event) =>
+    event.type === "funding_round"
+      ? { ...event, momentum: momentumByEvent.get(event.id) ?? null }
+      : event,
+  );
+
+  const themeRefs: ThemeRef[] = themeRows.map((row) => ({
+    slug: row.slug,
+    name: row.name,
+    sector: row.sector != null && isSector(row.sector) ? row.sector : null,
+  }));
+  const sectors: Sector[] = [];
+  for (const theme of themeRefs) {
+    if (theme.sector && !sectors.includes(theme.sector)) {
+      sectors.push(theme.sector);
+    }
+  }
+  const fundingEvents = companyEvents.flatMap((event) =>
+    event.type === "funding_round" ? [event] : [],
+  );
 
   return {
     id: company.id,
@@ -164,6 +254,47 @@ export async function getCompanyDetail(
     tags: tagRows,
     redirectToSlug,
     events: companyEvents,
+    themes: themeRefs,
+    sectors,
+    location: toLocationView(locationRows[0], company.city),
+    roundsInLast24Months: roundsInLastMonths(
+      fundingEvents.map((event) => ({
+        announcedOn: event.announcedOn,
+        roundType: event.roundType,
+      })),
+      now,
+    ),
+  };
+}
+
+function toLocationView(
+  row:
+    | {
+        precision: CompanyLocationView["precision"];
+        countryCode: string;
+        itl1Code: string | null;
+        placeSlug: string | null;
+        outcode: string | null;
+      }
+    | undefined,
+  city: string | null,
+): CompanyLocationView | null {
+  if (!row) return null;
+  const place = row.placeSlug ? findPlaceBySlug(row.placeSlug) : null;
+  // Non-UK locations have no place slug; the news city is the name.
+  const placeName =
+    place?.name ??
+    (row.placeSlug == null && row.precision === "town"
+      ? trimOrNull(city)
+      : null);
+  return {
+    precision: row.precision,
+    ukRegion: row.itl1Code
+      ? (ukRegionByCode(row.itl1Code)?.slug ?? null)
+      : null,
+    placeName,
+    outcode: row.outcode,
+    countryCode: row.countryCode.trim(),
   };
 }
 

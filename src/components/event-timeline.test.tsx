@@ -132,3 +132,63 @@ describe("EventTimeline", () => {
     expect(screen.getByText("Around May 2026")).toBeInTheDocument();
   });
 });
+
+describe("EventTimeline momentum and grants", () => {
+  it("shows momentum facts for an equity round", () => {
+    render(
+      <EventTimeline
+        events={[
+          {
+            ...funding,
+            momentum: {
+              equityRoundNumber: 3,
+              monthsSincePrevious: 7,
+              stepUpRatio: 5.3,
+              stepUpBasisOn: "2025-03-10",
+            },
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Equity round 3 we have recorded, 7 months after the previous one, 5.3× the March 2025 round.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says history starts in November 2026 for a first round", () => {
+    render(
+      <EventTimeline
+        events={[
+          {
+            ...funding,
+            momentum: {
+              equityRoundNumber: 1,
+              monthsSincePrevious: null,
+              stepUpRatio: null,
+              stepUpBasisOn: null,
+            },
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "First round we have recorded. History starts in November 2026.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("credits UKRI on a grant and shows no momentum", () => {
+    render(
+      <EventTimeline
+        events={[{ ...funding, roundType: "grant", momentum: null }]}
+      />,
+    );
+    expect(
+      screen.getByText("Source: UKRI Gateway to Research"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/we have recorded/)).toBeNull();
+  });
+});

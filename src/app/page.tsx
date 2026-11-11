@@ -2,11 +2,17 @@ import type { FundingFilters } from "@/core/read-models";
 import { FundingFiltersForm } from "@/components/funding-filters-form";
 import { FundingTable } from "@/components/funding-table";
 import { Pagination } from "@/components/pagination";
-import { listFundingRounds } from "@/db/queries/funding";
+import {
+  countUnlocatedCompanies,
+  listFundingRounds,
+} from "@/db/queries/funding";
+import { listThemes } from "@/db/queries/themes";
 import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
+import { describeFundingCriteria } from "@/lib/filter-summary";
 import {
   parseFundingFilters,
+  serialiseFundingCriteria,
   serialiseFundingFilters,
 } from "@/lib/funding-filters";
 
@@ -23,10 +29,24 @@ export default async function HomePage({
 }) {
   const filters = parseFundingFilters(await searchParams);
   const key = serialiseFundingFilters(filters);
-  const page = await cached(
-    () => listFundingRounds(getWebDb(), filters),
-    ["funding", key],
-  );
+  const [page, themes, unlocated] = await Promise.all([
+    cached(() => listFundingRounds(getWebDb(), filters), ["funding", key]),
+    cached(() => listThemes(getWebDb()), ["themes", "active"]),
+    filters.near
+      ? cached(
+          () => countUnlocatedCompanies(getWebDb(), filters),
+          ["funding-unlocated", key],
+        )
+      : Promise.resolve(0),
+  ]);
+  const hasCriteria = serialiseFundingCriteria(filters).length > 0;
+  const summary = hasCriteria
+    ? describeFundingCriteria(filters, {
+        themes: Object.fromEntries(
+          themes.map((theme) => [theme.slug, theme.name]),
+        ),
+      })
+    : null;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
@@ -46,18 +66,32 @@ export default async function HomePage({
               Filter rounds
             </summary>
             <div className="mt-4">
-              <FundingFiltersForm filters={filters} />
+              <FundingFiltersForm filters={filters} themes={themes} />
             </div>
           </details>
           <div className="hidden lg:block">
-            <FundingFiltersForm filters={filters} />
+            <FundingFiltersForm filters={filters} themes={themes} />
           </div>
         </aside>
 
         <section aria-label="Funding rounds">
+          {summary ? (
+            <h2 className="mb-1 text-lg font-semibold leading-snug">
+              {summary}
+            </h2>
+          ) : null}
           <p className="mb-3 text-sm tabular-nums text-quiet" role="status">
             {page.total === 1 ? "1 round" : `${page.total} rounds`}
           </p>
+          {filters.near ? (
+            <p className="mb-3 max-w-2xl text-sm text-quiet">
+              {unlocated === 1
+                ? "1 company in these results has"
+                : `${unlocated} companies in these results have`}{" "}
+              no known town, so {unlocated === 1 ? "it is" : "they are"} not
+              included in distance searches.
+            </p>
+          ) : null}
           <FundingTable page={page} filters={filters} />
           <Pagination
             filters={filters}

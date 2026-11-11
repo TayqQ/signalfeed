@@ -122,3 +122,97 @@ describe("amountBarPercent", () => {
     expect(amountBarPercent(10 ** 15)).toBe(100);
   });
 });
+
+describe("FundingTable momentum, grants and sort links", () => {
+  const momentum = (
+    overrides: Partial<NonNullable<FundingRow["momentum"]>>,
+  ): NonNullable<FundingRow["momentum"]> => ({
+    equityRoundNumber: 3,
+    monthsSincePrevious: 7,
+    stepUpRatio: 5.3,
+    stepUpBasisOn: "2025-03-10",
+    ...overrides,
+  });
+
+  it("shows a first recorded round", () => {
+    render(
+      <FundingTable
+        page={page([
+          row({
+            momentum: momentum({
+              equityRoundNumber: 1,
+              monthsSincePrevious: null,
+              stepUpRatio: null,
+              stepUpBasisOn: null,
+            }),
+          }),
+        ])}
+        filters={filters}
+      />,
+    );
+    expect(screen.getByText("First recorded round")).toBeInTheDocument();
+  });
+
+  it("shows a repeat round with its gap and step-up", () => {
+    render(
+      <FundingTable
+        page={page([row({ momentum: momentum({}) })])}
+        filters={filters}
+      />,
+    );
+    expect(
+      screen.getByText("Round 3 · 7 months after the last · 5.3×"),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves out an unknown step-up", () => {
+    render(
+      <FundingTable
+        page={page([row({ momentum: momentum({ stepUpRatio: null }) })])}
+        filters={filters}
+      />,
+    );
+    expect(
+      screen.getByText("Round 3 · 7 months after the last"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a grant badge and the UKRI source", () => {
+    render(
+      <FundingTable
+        page={page([row({ roundType: "grant", momentum: null })])}
+        filters={filters}
+      />,
+    );
+    expect(screen.getByText("Grant")).toBeInTheDocument();
+    expect(screen.getByText("Source: UKRI")).toBeInTheDocument();
+    expect(screen.getByText("Not applicable to grants")).toBeInTheDocument();
+  });
+
+  it("keeps the targeting filters in sort links", () => {
+    render(
+      <FundingTable
+        page={page([row()])}
+        filters={{
+          page: 1,
+          pageSize: 25,
+          near: { placeSlug: "leeds", km: 50 },
+          sectors: ["health-life-sciences"],
+          themes: ["ai-agents"],
+          momentum: "first",
+        }}
+      />,
+    );
+    const href = screen
+      .getByRole("link", { name: /Amount/ })
+      .getAttribute("href");
+    expect(href).toBeTruthy();
+    const params = new URLSearchParams((href ?? "").split("?")[1]);
+    expect(params.get("near")).toBe("leeds");
+    expect(params.get("km")).toBe("50");
+    expect(params.get("sector")).toBe("health-life-sciences");
+    expect(params.get("theme")).toBe("ai-agents");
+    expect(params.get("momentum")).toBe("first");
+    expect(params.get("sort")).toBe("amount");
+  });
+});

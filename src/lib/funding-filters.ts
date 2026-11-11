@@ -1,12 +1,26 @@
 import { z } from "zod";
-import { FUNDING_SORTS, SORT_DIRECTIONS } from "@/core/read-models";
+import {
+  DEFAULT_NEAR_KM,
+  FUNDING_SORTS,
+  MOMENTUM_FILTERS,
+  NEAR_RADII_KM,
+  SORT_DIRECTIONS,
+} from "@/core/read-models";
 import type {
+  FundingCriteria,
   FundingFilters,
   FundingSort,
+  FundingView,
+  MomentumFilter,
+  NearRadiusKm,
   SortDirection,
 } from "@/core/read-models";
 import { ROUND_TYPES } from "@/core/enums";
 import type { RoundType } from "@/core/enums";
+import { isSector, SECTORS } from "@/core/sectors";
+import type { Sector } from "@/core/sectors";
+import { findPlaceBySlug } from "@/lib/geo/uk-places";
+import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { fromMinorUnits, toMinorUnits } from "@/lib/money";
 import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
 import { SIZE_BANDS, type SizeBand } from "@/lib/size-bands";
@@ -14,6 +28,19 @@ import type { Region } from "@/lib/regions";
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+const MAX_CITY_LENGTH = 80;
+const MAX_CITIES = 10;
+
+/**
+ * Version of the criteria model and its canonical serialisation. Phase 4
+ * stores it next to a saved search.
+ *
+ * - 1: Phase 1 parameters. Every round type was shown by default.
+ * - 2: grants are excluded unless `round=grant` is selected (D44), and the
+ *   targeting parameters `theme`, `sector`, `ukregion`, `city`, `near`, `km`
+ *   and `momentum` were added. Serialisation became canonical.
+ */
+export const FUNDING_CRITERIA_VERSION = 2;
 
 const roundSchema = z.enum(ROUND_TYPES);
 const sortSchema = z.enum(FUNDING_SORTS);
@@ -140,6 +167,44 @@ function parseSlug(value: string | undefined): string | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+function parseCity(value: string): string | undefined {
+  const city = value.trim().toLowerCase();
+  if (city.length === 0 || city.length > MAX_CITY_LENGTH) return undefined;
+  return city;
+}
+
+function parseUkRegionSlug(value: string): string | undefined {
+  const slug = value.trim().toLowerCase();
+  return ukRegionBySlug(slug) ? slug : undefined;
+}
+
+function parseSector(value: string): Sector | undefined {
+  const sector = value.trim().toLowerCase();
+  return isSector(sector) ? sector : undefined;
+}
+
+function parseThemeSlug(value: string): string | undefined {
+  return parseSlug(value.trim());
+}
+
+function parseNear(
+  near: string | undefined,
+  km: string | undefined,
+): FundingCriteria["near"] {
+  if (near == null) return undefined;
+  const placeSlug = near.trim().toLowerCase();
+  if (!findPlaceBySlug(placeSlug)) return undefined;
+  const radius = km == null ? Number.NaN : Number(km);
+  const known = NEAR_RADII_KM.find((value) => value === radius);
+  return { placeSlug, km: known ?? DEFAULT_NEAR_KM };
+}
+
+function parseMomentum(value: string | undefined): MomentumFilter | undefined {
+  if (value == null) return undefined;
+  const lower = value.toLowerCase();
+  return MOMENTUM_FILTERS.find((momentum) => momentum === lower);
+}
+
 function parseSort(value: string | undefined): FundingSort | undefined {
   if (value == null) return undefined;
   const parsed = sortSchema.safeParse(value);
@@ -178,83 +243,190 @@ function formatGbpMajor(amountMinor: number): string {
   return Number.isInteger(major) ? String(major) : major.toFixed(2);
 }
 
+/** Position in a fixed list, so multi values sort in domain order. */
+function orderBy<T extends string>(
+  order: readonly T[],
+): (a: T, b: T) => number {
+  return (a, b) => order.indexOf(a) - order.indexOf(b);
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function canonical<T extends string>(
+  values: readonly T[],
+  compare: (a: T, b: T) => number,
+): T[] {
+  return [...new Set(values)].sort(compare);
+}
+
 /**
- * Validates URL search params for the funding table.
- * Invalid values are dropped; `min` and `max` are GBP converted to minor units.
+ * Validates the "what to match" URL params. Invalid values are dropped; `min`
+ * and `max` are GBP converted to minor units. Multi values are de-duplicated
+ * and put in canonical order, so a parse is always canonical. `km` is ignored
+ * without a known `near`.
  */
-export function parseFundingFilters(
+export function parseFundingCriteria(
   searchParams: FundingSearchParams,
-): FundingFilters {
-  const filters: FundingFilters = {
-    page: parsePage(readFirst(searchParams, "page")),
-    pageSize: parsePageSize(readFirst(searchParams, "pageSize")),
-  };
+): FundingCriteria {
+  const criteria: FundingCriteria = {};
 
   const q = parseQuery(readFirst(searchParams, "q"));
-  if (q) filters.q = q;
+  if (q) criteria.q = q;
 
   const roundTypes = uniqueParsed(readMany(searchParams, "round"), parseRound);
-  if (roundTypes) filters.roundTypes = roundTypes;
+  if (roundTypes) {
+    criteria.roundTypes = canonical(roundTypes, orderBy(ROUND_TYPES));
+  }
 
   const regions = uniqueParsed(readMany(searchParams, "region"), parseRegion);
-  if (regions) filters.regions = regions;
+  if (regions) criteria.regions = canonical(regions, orderBy(REGIONS));
 
   const countryCodes = uniqueParsed(
     readMany(searchParams, "country"),
     parseCountry,
   );
-  if (countryCodes) filters.countryCodes = countryCodes;
+  if (countryCodes)
+    criteria.countryCodes = canonical(countryCodes, compareText);
 
   const tag = parseSlug(readFirst(searchParams, "tag"));
-  if (tag) filters.tag = tag;
+  if (tag) criteria.tag = tag;
 
   const investorSlug = parseSlug(readFirst(searchParams, "investor"));
-  if (investorSlug) filters.investorSlug = investorSlug;
+  if (investorSlug) criteria.investorSlug = investorSlug;
 
   const from = parseDate(readFirst(searchParams, "from"));
-  if (from) filters.from = from;
+  if (from) criteria.from = from;
 
   const to = parseDate(readFirst(searchParams, "to"));
-  if (to) filters.to = to;
+  if (to) criteria.to = to;
 
   const minGbpMinor = parseGbpMinor(readFirst(searchParams, "min"));
-  if (minGbpMinor != null) filters.minGbpMinor = minGbpMinor;
+  if (minGbpMinor != null) criteria.minGbpMinor = minGbpMinor;
 
   const maxGbpMinor = parseGbpMinor(readFirst(searchParams, "max"));
-  if (maxGbpMinor != null) filters.maxGbpMinor = maxGbpMinor;
+  if (maxGbpMinor != null) criteria.maxGbpMinor = maxGbpMinor;
 
   const sizeBands = uniqueParsed(readMany(searchParams, "size"), parseSizeBand);
-  if (sizeBands) filters.sizeBands = sizeBands;
+  if (sizeBands) criteria.sizeBands = canonical(sizeBands, orderBy(SIZE_BANDS));
 
-  const sort = parseSort(readFirst(searchParams, "sort"));
-  if (sort) filters.sort = sort;
+  const themes = uniqueParsed(readMany(searchParams, "theme"), parseThemeSlug);
+  if (themes) criteria.themes = canonical(themes, compareText);
 
-  const direction = parseDirection(readFirst(searchParams, "dir"));
-  if (direction) filters.direction = direction;
+  const sectors = uniqueParsed(readMany(searchParams, "sector"), parseSector);
+  if (sectors) criteria.sectors = canonical(sectors, orderBy(SECTORS));
 
-  return filters;
+  const ukRegions = uniqueParsed(
+    readMany(searchParams, "ukregion"),
+    parseUkRegionSlug,
+  );
+  if (ukRegions) criteria.ukRegions = canonical(ukRegions, compareText);
+
+  const cities = uniqueParsed(readMany(searchParams, "city"), parseCity);
+  if (cities) {
+    criteria.cities = canonical(cities.slice(0, MAX_CITIES), compareText);
+  }
+
+  const near = parseNear(
+    readFirst(searchParams, "near"),
+    readFirst(searchParams, "km"),
+  );
+  if (near) criteria.near = near;
+
+  const momentum = parseMomentum(readFirst(searchParams, "momentum"));
+  if (momentum) criteria.momentum = momentum;
+
+  return criteria;
 }
 
-/** Query string without a leading `?`. Defaults (`page=1`, page size 25) are omitted. */
+/** Validates the "how to show it" URL params: sort, direction and paging. */
+export function parseFundingView(
+  searchParams: FundingSearchParams,
+): FundingView {
+  const view: FundingView = {
+    page: parsePage(readFirst(searchParams, "page")),
+    pageSize: parsePageSize(readFirst(searchParams, "pageSize")),
+  };
+
+  const sort = parseSort(readFirst(searchParams, "sort"));
+  if (sort) view.sort = sort;
+
+  const direction = parseDirection(readFirst(searchParams, "dir"));
+  if (direction) view.direction = direction;
+
+  return view;
+}
+
+/** Criteria and view together, so Phase 1 callers keep working. */
+export function parseFundingFilters(
+  searchParams: FundingSearchParams,
+): FundingFilters {
+  return {
+    ...parseFundingCriteria(searchParams),
+    ...parseFundingView(searchParams),
+  };
+}
+
+function appendAll<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  values: readonly T[] | undefined,
+  compare: (a: T, b: T) => number,
+): void {
+  for (const value of canonical(values ?? [], compare)) {
+    params.append(key, value);
+  }
+}
+
+function appendCriteria(
+  params: URLSearchParams,
+  criteria: FundingCriteria,
+): void {
+  if (criteria.q) params.set("q", criteria.q);
+  appendAll(params, "round", criteria.roundTypes, orderBy(ROUND_TYPES));
+  appendAll(params, "size", criteria.sizeBands, orderBy(SIZE_BANDS));
+  if (criteria.minGbpMinor != null) {
+    params.set("min", formatGbpMajor(criteria.minGbpMinor));
+  }
+  if (criteria.maxGbpMinor != null) {
+    params.set("max", formatGbpMajor(criteria.maxGbpMinor));
+  }
+  if (criteria.from) params.set("from", criteria.from);
+  if (criteria.to) params.set("to", criteria.to);
+  appendAll(params, "region", criteria.regions, orderBy<string>(REGIONS));
+  appendAll(params, "country", criteria.countryCodes, compareText);
+  appendAll(params, "ukregion", criteria.ukRegions, compareText);
+  appendAll(params, "city", criteria.cities, compareText);
+  if (criteria.near) {
+    params.set("near", criteria.near.placeSlug);
+    if (criteria.near.km !== DEFAULT_NEAR_KM) {
+      params.set("km", String(criteria.near.km satisfies NearRadiusKm));
+    }
+  }
+  appendAll(params, "sector", criteria.sectors, orderBy(SECTORS));
+  appendAll(params, "theme", criteria.themes, compareText);
+  if (criteria.tag) params.set("tag", criteria.tag);
+  if (criteria.investorSlug) params.set("investor", criteria.investorSlug);
+  if (criteria.momentum) params.set("momentum", criteria.momentum);
+}
+
+/**
+ * The canonical query string for criteria, without a leading `?`. Keys are in
+ * a fixed order, multi values are sorted and de-duplicated, and defaults
+ * (`km=25`) are omitted. The same search always gives the same string.
+ * Phase 4 keys saved searches and alerts on it.
+ */
+export function serialiseFundingCriteria(criteria: FundingCriteria): string {
+  const params = new URLSearchParams();
+  appendCriteria(params, criteria);
+  return params.toString();
+}
+
+/** Query string without a leading `?`: criteria, then view. Defaults are omitted. */
 export function serialiseFundingFilters(filters: FundingFilters): string {
   const params = new URLSearchParams();
-  if (filters.q) params.set("q", filters.q);
-  for (const round of filters.roundTypes ?? []) params.append("round", round);
-  for (const region of filters.regions ?? []) params.append("region", region);
-  for (const country of filters.countryCodes ?? []) {
-    params.append("country", country);
-  }
-  if (filters.tag) params.set("tag", filters.tag);
-  if (filters.investorSlug) params.set("investor", filters.investorSlug);
-  if (filters.from) params.set("from", filters.from);
-  if (filters.to) params.set("to", filters.to);
-  if (filters.minGbpMinor != null) {
-    params.set("min", formatGbpMajor(filters.minGbpMinor));
-  }
-  if (filters.maxGbpMinor != null) {
-    params.set("max", formatGbpMajor(filters.maxGbpMinor));
-  }
-  for (const band of filters.sizeBands ?? []) params.append("size", band);
+  appendCriteria(params, filters);
   if (filters.sort) params.set("sort", filters.sort);
   if (filters.direction) params.set("dir", filters.direction);
   if (filters.page > 1) params.set("page", String(filters.page));
@@ -262,4 +434,14 @@ export function serialiseFundingFilters(filters: FundingFilters): string {
     params.set("pageSize", String(filters.pageSize));
   }
   return params.toString();
+}
+
+/**
+ * The round types a query should match: the selected ones, or every type
+ * except `grant` when none are selected (D44).
+ */
+export function effectiveRoundTypes(criteria: FundingCriteria): RoundType[] {
+  const selected = criteria.roundTypes;
+  if (selected && selected.length > 0) return [...selected];
+  return ROUND_TYPES.filter((type) => type !== "grant");
 }

@@ -2,6 +2,9 @@ import Link from "next/link";
 
 const NAV = [
   { href: "/", label: "Funding" },
+  { href: "/trends", label: "Trends" },
+  { href: "/acquisitions", label: "Acquisitions" },
+  { href: "/investors", label: "Investors" },
   { href: "/about", label: "About" },
   { href: "/status", label: "Status" },
 ];
@@ -14,7 +17,7 @@ export function SiteHeader() {
           SignalFeed
         </Link>
         <nav aria-label="Main">
-          <ul className="flex gap-5 text-sm">
+          <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
             {NAV.map((item) => (
               <li key={item.href}>
                 <Link

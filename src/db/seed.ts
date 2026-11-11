@@ -3,17 +3,22 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { parseWebEnv } from "@/core/env";
 import type { ExtractionV1 } from "@/core/extraction-schema";
+import { computeRoundMomentum } from "@/lib/company-momentum";
 import { normaliseCompanyName, normaliseInvestorName } from "@/lib/normalise";
 import { createPipelineDb, type Db } from "./client";
 import {
+  EMBEDDING_DIMENSIONS,
   acquisitions,
   companies,
   companyAliases,
+  companyLocations,
   companyTags,
+  companyThemes,
   eventInvestors,
   eventSources,
   events,
   extractions,
+  fundingRoundMomentum,
   fundingRounds,
   ingestRuns,
   investors,
@@ -21,7 +26,11 @@ import {
   llmUsage,
   sourceItems,
   sources,
+  tagThemes,
   tags,
+  themes,
+  themeWeeklyStats,
+  weeklyTotals,
 } from "./schema";
 import {
   buildSeedDataset,
@@ -166,14 +175,14 @@ async function insertTags(
   db: Db,
   data: SeedDataset,
   companyIds: Map<string, number>,
-): Promise<void> {
-  if (data.tags.length === 0) return;
+): Promise<Map<string, number>> {
+  if (data.tags.length === 0) return new Map();
   const inserted = await db
     .insert(tags)
     .values(data.tags.map((tag) => ({ slug: tag.slug, label: tag.label })))
     .returning({ id: tags.id, slug: tags.slug });
   const tagIds = new Map(inserted.map((tag) => [tag.slug, tag.id]));
-  if (data.companyTags.length === 0) return;
+  if (data.companyTags.length === 0) return tagIds;
   await db.insert(companyTags).values(
     data.companyTags.map((link) => ({
       companyId: requireId(companyIds, "company", link.companySlug),
@@ -182,6 +191,7 @@ async function insertTags(
       mentionCount: 1,
     })),
   );
+  return tagIds;
 }
 
 async function insertAliases(
@@ -282,43 +292,56 @@ async function insertEvents(
   companyIds: Map<string, number>,
   investorIds: Map<string, number>,
   sourceId: number,
-): Promise<void> {
-  if (eventsToInsert.length === 0) return;
+): Promise<number[]> {
+  const eventIds: number[] = [];
+  if (eventsToInsert.length === 0) return eventIds;
   const articles = eventsToInsert.flatMap((event) => event.articles);
-  const insertedItems = await db
-    .insert(sourceItems)
-    .values(
-      articles.map((item) => ({
-        sourceId,
-        externalId: item.externalId,
-        url: item.url,
-        canonicalUrl: item.url,
-        title: item.title,
-        publishedAt: new Date(item.publishedAt),
-        status: "extracted" as const,
-      })),
-    )
-    .returning({ id: sourceItems.id, externalId: sourceItems.externalId });
+  const insertedItems =
+    articles.length === 0
+      ? []
+      : await db
+          .insert(sourceItems)
+          .values(
+            articles.map((item) => ({
+              sourceId,
+              externalId: item.externalId,
+              url: item.url,
+              canonicalUrl: item.url,
+              title: item.title,
+              publishedAt: new Date(item.publishedAt),
+              status: "extracted" as const,
+            })),
+          )
+          .returning({
+            id: sourceItems.id,
+            externalId: sourceItems.externalId,
+          });
   const itemIdByExternal = new Map(
     insertedItems.map((item) => [item.externalId, item.id]),
   );
 
-  const insertedExtractions = await db
-    .insert(extractions)
-    .values(
-      insertedItems.map((item) => ({
-        sourceItemId: item.id,
-        promptVersion: "v1",
-        model: "gpt-4.1-nano",
-        result: EXTRACTION_RESULT,
-        isRelevant: true,
-        isCurrent: true,
-        inputTokens: 400,
-        outputTokens: 120,
-        costUsdMicros: 90,
-      })),
-    )
-    .returning({ id: extractions.id, sourceItemId: extractions.sourceItemId });
+  const insertedExtractions =
+    insertedItems.length === 0
+      ? []
+      : await db
+          .insert(extractions)
+          .values(
+            insertedItems.map((item) => ({
+              sourceItemId: item.id,
+              promptVersion: "v1",
+              model: "gpt-4.1-nano",
+              result: EXTRACTION_RESULT,
+              isRelevant: true,
+              isCurrent: true,
+              inputTokens: 400,
+              outputTokens: 120,
+              costUsdMicros: 90,
+            })),
+          )
+          .returning({
+            id: extractions.id,
+            sourceItemId: extractions.sourceItemId,
+          });
   const extractionIdByItem = new Map(
     insertedExtractions.map((row) => [row.sourceItemId, row.id]),
   );
@@ -331,12 +354,13 @@ async function insertEvents(
         companyId: requireId(companyIds, "company", event.companySlug),
         announcedOn: event.announcedOn,
         datePrecision: "day",
-        evidence: "reported",
+        evidence: event.evidence ?? "reported",
         sourceCount: event.articles.length,
       })
       .returning({ id: events.id });
     if (!inserted) throw new Error("Event insert failed");
     const eventId = inserted.id;
+    eventIds.push(eventId);
 
     if (event.type === "funding_round") {
       await db.insert(fundingRounds).values({
@@ -382,6 +406,7 @@ async function insertEvents(
       });
     }
 
+    if (event.articles.length === 0) continue;
     await db.insert(eventSources).values(
       event.articles.map((item, index) => {
         const sourceItemId = itemIdByExternal.get(item.externalId);
@@ -396,25 +421,176 @@ async function insertEvents(
       }),
     );
   }
+  return eventIds;
 }
 
-async function insertAll(db: Db, data: SeedDataset): Promise<void> {
+/** A unit vector with a single 1, so seeded theme centroids are obviously synthetic. */
+function fixtureCentroid(position: number): number[] {
+  const vector = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+  vector[position % EMBEDDING_DIMENSIONS] = 1;
+  return vector;
+}
+
+async function insertThemes(
+  db: Db,
+  data: SeedDataset,
+  tagIds: Map<string, number>,
+  companyIds: Map<string, number>,
+  now: Date,
+): Promise<void> {
+  if (data.themes.length === 0) return;
+  const ids = new Map<string, number>();
+  const surviving = data.themes.filter((theme) => !theme.mergedIntoSlug);
+  const merged = data.themes.filter((theme) => theme.mergedIntoSlug);
+  const row = (theme: SeedDataset["themes"][number], position: number) => ({
+    slug: theme.slug,
+    name: theme.name,
+    nameSource: theme.nameSource,
+    sector: theme.sector,
+    status: theme.mergedIntoSlug ? ("merged" as const) : ("active" as const),
+    seedTagId: requireId(tagIds, "tag", theme.seedTagSlug),
+    centroid: fixtureCentroid(position),
+    embeddingModel: "seed-fixture",
+    namedAt: theme.nameSource === "tag" ? null : now,
+    reviewedAt: theme.reviewed ? now : null,
+  });
+  const first = await db
+    .insert(themes)
+    .values(surviving.map((theme, index) => row(theme, index)))
+    .returning({ id: themes.id, slug: themes.slug });
+  for (const inserted of first) ids.set(inserted.slug, inserted.id);
+  if (merged.length > 0) {
+    const second = await db
+      .insert(themes)
+      .values(
+        merged.map((theme, index) => ({
+          ...row(theme, surviving.length + index),
+          mergedIntoId: requireId(ids, "theme", theme.mergedIntoSlug ?? ""),
+        })),
+      )
+      .returning({ id: themes.id, slug: themes.slug });
+    for (const inserted of second) ids.set(inserted.slug, inserted.id);
+  }
+
+  await db.insert(tagThemes).values(
+    data.tagThemes.map((link) => ({
+      tagId: requireId(tagIds, "tag", link.tagSlug),
+      themeId: requireId(ids, "theme", link.themeSlug),
+      similarity: link.similarity,
+      assignedBy: link.assignedBy,
+      embeddingModel: "seed-fixture",
+    })),
+  );
+  await db.insert(companyThemes).values(
+    data.companyThemes.map((link) => ({
+      companyId: requireId(companyIds, "company", link.companySlug),
+      themeId: requireId(ids, "theme", link.themeSlug),
+      tagCount: link.tagCount,
+    })),
+  );
+  if (data.themeWeeklyStats.length > 0) {
+    await db.insert(themeWeeklyStats).values(
+      data.themeWeeklyStats.map(({ themeSlug, ...week }) => ({
+        ...week,
+        themeId: requireId(ids, "theme", themeSlug),
+      })),
+    );
+  }
+}
+
+async function insertWeeklyTotals(db: Db, data: SeedDataset): Promise<void> {
+  if (data.weeklyTotals.length === 0) return;
+  await db.insert(weeklyTotals).values(data.weeklyTotals);
+}
+
+async function insertLocations(
+  db: Db,
+  data: SeedDataset,
+  companyIds: Map<string, number>,
+): Promise<void> {
+  if (data.locations.length === 0) return;
+  await db.insert(companyLocations).values(
+    data.locations.map(({ companySlug, ...location }) => ({
+      ...location,
+      companyId: requireId(companyIds, "company", companySlug),
+    })),
+  );
+}
+
+/** Equity-round momentum for every company, by the rules in spec section 8.3. */
+async function insertMomentum(
+  db: Db,
+  data: SeedDataset,
+  companyIds: Map<string, number>,
+  eventIds: number[],
+): Promise<void> {
+  const byCompany = new Map<
+    string,
+    Parameters<typeof computeRoundMomentum>[0][number][]
+  >();
+  data.events.forEach((event, index) => {
+    if (event.type !== "funding_round") return;
+    const list = byCompany.get(event.companySlug) ?? [];
+    const eventId = eventIds[index];
+    if (eventId == null) throw new Error(`Missing seed event ${index}`);
+    list.push({
+      eventId,
+      announcedOn: event.announcedOn,
+      datePrecision: "day",
+      roundType: event.roundType,
+      amountGbpMinor: event.amountGbpMinor,
+    });
+    byCompany.set(event.companySlug, list);
+  });
+  const rows = [...byCompany].flatMap(([companySlug, rounds]) =>
+    computeRoundMomentum(rounds).map((result) => ({
+      eventId: result.eventId,
+      companyId: requireId(companyIds, "company", companySlug),
+      equityRoundNumber: result.equityRoundNumber,
+      previousEventId: result.previousEventId,
+      monthsSincePrevious: result.monthsSincePrevious,
+      stepUpBasisEventId: result.stepUpBasisEventId,
+      stepUpRatio: result.stepUpRatio,
+      roundsIn24mToDate: result.roundsIn24mToDate,
+    })),
+  );
+  if (rows.length === 0) return;
+  await db.insert(fundingRoundMomentum).values(rows);
+}
+
+async function insertAll(db: Db, data: SeedDataset, now: Date): Promise<void> {
   const companyIds = await insertCompanies(db, data);
   await insertAliases(db, data, companyIds);
-  await insertTags(db, data, companyIds);
+  const tagIds = await insertTags(db, data, companyIds);
   const investorIds = await insertInvestors(db, data);
   const runIds = await insertRuns(db, data);
   await insertUsage(db, data, runIds);
   const sourceId = await insertSource(db, data);
-  await insertEvents(db, data.events, companyIds, investorIds, sourceId);
+  const eventIds = await insertEvents(
+    db,
+    data.events,
+    companyIds,
+    investorIds,
+    sourceId,
+  );
+  // Derived rows are written directly from the seed, by the same rules as the
+  // stats and location rebuilds. Task 043 can later switch the seed to the real
+  // rebuild. This file does not import the pipeline, so it can run on its own.
+  await insertThemes(db, data, tagIds, companyIds, now);
+  await insertWeeklyTotals(db, data);
+  await insertLocations(db, data, companyIds);
+  await insertMomentum(db, data, companyIds, eventIds);
 }
 
 /** Inserts fictional local data. Returns false when the seed company is already present. */
-export async function seedDatabase(db: Db): Promise<boolean> {
+export async function seedDatabase(
+  db: Db,
+  now: Date = new Date(),
+): Promise<boolean> {
   if (await alreadySeeded(db)) return false;
-  const data = buildSeedDataset();
+  const data = buildSeedDataset(now);
   await db.transaction(async (tx) => {
-    await insertAll(tx, data);
+    await insertAll(tx, data, now);
   });
   return true;
 }

@@ -6,6 +6,7 @@ import {
   formatMoneyCompact,
   formatRoundType,
 } from "@/lib/format";
+import { describeRoundMomentumLong } from "./company-momentum";
 import { InvestorList } from "./investor-list";
 import { RoundAmount } from "./round-amount";
 import { SourceList } from "./source-list";
@@ -34,6 +35,16 @@ function EventBody({ event }: { event: CompanyEvent }) {
             />
           </div>
           <InvestorList investors={event.investors} />
+          {event.roundType === "grant" ? (
+            <p className="mt-1 text-sm text-quiet">
+              Source: UKRI Gateway to Research
+            </p>
+          ) : null}
+          {describeRoundMomentumLong(event.momentum) ? (
+            <p className="mt-1 text-sm text-quiet">
+              {describeRoundMomentumLong(event.momentum)}
+            </p>
+          ) : null}
           {event.includesIndividualAngels ? (
             <p className="mt-1 text-sm text-quiet">
               Individual angels also took part.
