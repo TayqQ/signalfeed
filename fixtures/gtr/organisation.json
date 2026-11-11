@@ -1,0 +1,46 @@
+{
+  "links": {
+    "link": [
+      {
+        "href": "http://gtr.ukri.org/gtr/api/projects/11111111-1111-4111-8111-111111111111",
+        "rel": "PROJECT",
+        "start": null,
+        "end": null,
+        "otherAttributes": {}
+      }
+    ]
+  },
+  "ext": null,
+  "id": "aaaaaaaa-0000-4000-8000-000000000001",
+  "outcomeid": null,
+  "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000001",
+  "created": 1783503145000,
+  "updated": null,
+  "name": "ACME ROBOTICS LTD",
+  "regNumber": "01234567",
+  "website": "https://www.example.com",
+  "addresses": {
+    "address": [
+      {
+        "links": null,
+        "ext": null,
+        "id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "outcomeid": null,
+        "href": null,
+        "created": 1783503145000,
+        "updated": null,
+        "line1": null,
+        "line2": null,
+        "line3": null,
+        "line4": null,
+        "line5": null,
+        "city": null,
+        "county": null,
+        "postCode": "L35 9JJ",
+        "region": "North West",
+        "country": null,
+        "type": "MAIN_ADDRESS"
+      }
+    ]
+  }
+}
