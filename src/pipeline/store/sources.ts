@@ -1,5 +1,6 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { SourceConfig } from "@/core/domain";
+import type { SourceKind } from "@/core/enums";
 import type { Db } from "@/db/client";
 import { sources } from "@/db/schema";
 
@@ -53,12 +54,25 @@ export async function upsertSources(
     });
 }
 
-/** Enabled sources, highest priority first, then slug. */
-export async function listEnabledSources(db: Db): Promise<EnabledSource[]> {
+/**
+ * Enabled sources, highest priority first, then slug. With `kinds`, only
+ * sources of those kinds, so a source with no collector (such as `ukri-gtr`,
+ * which has its own command) is never handed to the wrong one.
+ */
+export async function listEnabledSources(
+  db: Db,
+  kinds?: readonly SourceKind[],
+): Promise<EnabledSource[]> {
+  if (kinds?.length === 0) return [];
   const rows = await db
     .select()
     .from(sources)
-    .where(eq(sources.enabled, true))
+    .where(
+      and(
+        eq(sources.enabled, true),
+        kinds ? inArray(sources.kind, [...kinds]) : undefined,
+      ),
+    )
     .orderBy(desc(sources.priority), asc(sources.slug));
 
   return rows.map((row) => ({

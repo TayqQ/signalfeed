@@ -50,6 +50,9 @@ jobs:
           node -e '
             const s = JSON.parse(require("fs").readFileSync("summary.json", "utf8"));
             const t = s.stats;
+            // A missing step result means that step failed; the run error says why.
+            const show = (step, value) => (step ? value(step) : "failed");
+            const rebuilt = (step) => show(step, (r) => (r.skipped ? "skipped: no change" : "rebuilt"));
             const rows = t
               ? [
                   ["Status", s.status],
@@ -58,6 +61,13 @@ jobs:
                   ["Filtered out", t.prefilter.itemsFilteredOut],
                   ["Extracted", t.extract.skipped ? "skipped: no key" : t.extract.itemsExtracted],
                   ["Events created", t.resolve.eventsCreated],
+                  ["Grant projects tagged", show(t.grantResolve, (g) => (g.taggingSkipped ? "skipped" : g.projectsTagged))],
+                  ["Grants resolved", show(t.grantResolve, (g) => g.participantsResolved)],
+                  ["Tags embedded", show(t.embed, (e) => (e.skipped ? "skipped" : e.tagsEmbedded))],
+                  ["Themes created", show(t.themes, (h) => (h.skipped ? "skipped" : h.themesCreated))],
+                  ["Themes named", show(t.themes, (h) => (h.skipped || h.namingSkipped ? "skipped" : h.themesNamed))],
+                  ["Locations", rebuilt(t.locations)],
+                  ["Stats", rebuilt(t.stats)],
                   ["Run spend (USD micros)", t.spendUsdMicros],
                 ]
               : [["Ran", String(s.ran)]];
