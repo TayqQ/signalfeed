@@ -128,3 +128,81 @@ Each entry records the decision, the alternatives considered, and why. New decis
 ## D32. Roundups count as events, with an approximate date
 - **Chosen:** a roundup that names completed raises gives one event per raise. With no stated date, those events are marked `month` precision.
 - **Why:** this matches the fixtures. A roundup can recap older rounds, so its publish date is only approximate, and the company page says "Around".
+
+## D33. Extraction v2 adds `regionText` and tighter city and tag rules
+- **Chosen:** one new nullable field, `company.regionText`, copied as the text states it ("Scottish", "Yorkshire"). Code maps it to an ITL1 region. The prompt (`v2`) also asks for a plain town name and for specific, industry-standard tags, with generic words banned. The change lands in wave 1, before any paid extraction.
+- **Alternatives:** no change; a fixed `sector` field; an ITL1 code chosen by the model; extra fields such as employee count or B2B/B2C.
+- **Why:** UK news often names a nation or region without a town, and V1 would lose it for good unless items were re-extracted. Copying text and mapping it in code follows D8. A sector field would make the model classify, which themes and the sector map do in code (D34, D35). Employee counts are rarely stated. Doing this before the first paid run means no re-extraction is needed.
+
+## D34. Themes by greedy centroid assignment
+- **Chosen:** tags are processed in a fixed order (mentions, then slug). Each joins the most similar theme centroid if cosine similarity is at least τ, otherwise it starts a new theme. τ is chosen by a labelled eval (Task 039). People can merge, move and rename.
+- **Alternatives:** k-means (needs k, reshuffles themes on every run); HDBSCAN (no maintained TypeScript implementation, and also reshuffles); agglomerative clustering (O(n²) memory and a full rebuild each time); asking an LLM to group tags (costly, not reproducible).
+- **Why:** the method is incremental and stable. Old themes never move when new tags arrive, so theme slugs can be stored in saved searches. It is deterministic given stored embeddings, and each link records its similarity. The cost is order dependence, which the manual tools correct.
+
+## D35. Theme slugs come from the seed tag; names belong to people
+- **Chosen:** a theme's slug is its first tag's slug and never changes. The LLM suggests a name and a sector once. Manual names and sectors are never overwritten. Merged themes redirect.
+- **Why:** an LLM name is a guess, and a slug derived from it would freeze the guess into URLs. The seed tag is meaningful and stable. Keeping the human decision final avoids an automated step undoing a review.
+
+## D36. Rising score: a shrunk log ratio against the baseline share
+- **Chosen:** *s* = ln((*r* + 3) / (*e* + 3)), where *e* is the theme's baseline share of rounds applied to the recent total. 8 recent weeks, up to 26 baseline weeks, at least 8 weeks of baseline. Counts, not money. Grants excluded. Themes need at least 3 recent rounds to be listed.
+- **Alternatives:** a raw growth ratio (explodes on tiny counts); a z-score (unstable when expected counts are near 0); a Bayesian model with a fitted prior (harder to explain and test).
+- **Why:** the pseudo-count shrinks small counts towards 0, so one round cannot top the chart, and leaves large counts almost untouched. Comparing shares, not raw counts, cancels growth in overall coverage. The score reads simply as "about 2× its usual share". Money is excluded because round sizes are heavy-tailed.
+
+## D37. Derived tables are rebuilt as diffs, and only when inputs change
+- **Chosen:** `company_themes`, `theme_weekly_stats`, `weekly_totals`, `funding_round_momentum` and `company_locations` are recomputed from source tables. Only changed rows are written, and the rebuild is skipped when an input fingerprint is unchanged.
+- **Why:** full recomputation is simple and always correct, like canonical event fields (D12). Writing only differences keeps hourly runs from churning Neon storage and compute. These tables hold nothing that cannot be recomputed, so replacing their rows does not break "never delete historical data".
+
+## D38. Charts are hand-written server-side SVG
+- **Alternatives:** Recharts, Chart.js, Nivo (client-side or DOM-dependent); Observable Plot (needs a DOM shim on the server); visx (server-safe but many packages).
+- **Why:** three simple chart types need about 300 lines of code we own. Rendering on the server means no client JavaScript and charts that work without it. Each chart has a caption and a data table for screen readers. There is no dependency to update.
+
+## D39. UK location: ITL1 regions, towns and postcode districts from static open data
+- **Chosen:** ITL1 (12 areas) for sub-regions. A committed gazetteer of UK towns and postcode-district centroids, built once from OGL data. "Near" is the distance between centroids.
+- **Alternatives:** ITL2 or ITL3 (too fine for news, unfamiliar names); counties (inconsistent, overlapping); postcodes.io, OS Names API or Nominatim at run time (network dependency, keys or share-alike terms).
+- **Why:** ITL1 is the official regional scheme and matches GtR's region names. Static data is deterministic, testable offline and free. Town-level precision is the best the news data supports, and the pages say what distance search cannot do.
+
+## D40. Innovate UK grants from the Gateway to Research API
+- **Chosen:** the GtR-2 JSON API, filtered to Innovate UK, collected daily. Organisations only (a legal-form suffix or a company number). Each kept participant becomes a company and a `confirmed` grant event, linked by `event_record_sources`, and is never matched to or overwritten by news events. Grant projects are tagged by a small batched LLM call so they join themes.
+- **Alternatives:** the Innovate UK funded-projects spreadsheets (24 MB `.xlsx`, irregular updates, ukri.org content mostly CC BY-NC-SA 4.0); the GtR bulk download (885 MB); leaving grants to Phase 3 or 4.
+- **Why:** grant recipients are the small UK companies the targeting user wants, with postcode, amount and date. The API is free and keyless, its terms allow use for any purpose, and it supports backfill. Storing organisations only keeps sole traders' names out (D19). Keeping grant events apart from the news resolver avoids corrupting either until Phase 3 builds proper matching.
+
+## D41. A versioned, canonical filter model
+- **Chosen:** filters split into criteria and view. Criteria serialise canonically (fixed key order, sorted values, defaults omitted) and carry a version (2). Phase 1 URLs keep their meaning, apart from grants now being hidden by default.
+- **Why:** Phase 4 saved searches and alerts need one stable string per search, and old links must not change meaning silently. Building it now, while filters are simple, costs little.
+
+## D42. Demand-signal collectors are last and cuttable; no YC directory
+- **Chosen:** Hacker News and GitHub collectors are the final two waves and may be cut. Y Combinator directory data is not collected. The batch is read from Launch HN titles instead.
+- **Why:** both sources support backfill or matter only for launches we already track, so delaying them loses little. The only practical YC source, the yc-oss mirror, still has no licence (A25).
+
+## D43. Company momentum uses equity rounds and says "first recorded"
+- **Chosen:** months since previous, step-up and rounds in 24 months use funding rounds other than `debt` and `grant`. Step-up compares with the latest earlier round that has an amount, within 36 months. Round numbers mean "recorded by SignalFeed".
+- **Why:** debt and grants are not steps in an equity sequence, and would make step-ups meaningless. Amounts are often missing, so skipping back to the last known amount keeps the signal useful, and the 36-month limit keeps it relevant. History starts at collection, so claiming "first round" would be false.
+
+## D44. Grants are hidden by default and excluded from trend counts
+- **Chosen:** with no round filter, the funding table shows every round type except `grant`. Trend scores and momentum ignore grants. Grants have their own counts in weekly stats.
+- **Why:** the grants backfill would swamp both the home page and the first months of trend data. Public grants are a different signal from venture rounds. Selecting "Grant" brings them back for the targeting user.
+
+## D45: Phase 2 decisions confirmed by the maintainer (11 November 2026)
+
+- Extraction v2 (`company.regionText`, sharper city and tag rules) is approved. The two small paid checks, the extraction eval and the theme clustering eval, are approved.
+- The 16-sector list in `docs/spec-phase2.md` section 7.2 is approved as written.
+- Grants are hidden on the funding table unless "Grant" is selected. The grants backfill starts on 1 April 2024.
+- Tasks 046 (Hacker News) and 047 (GitHub stars) are deferred to a later phase. Hacker News can be backfilled, so nothing is lost. GitHub star history starts only when 047 is built.
+- Commercial reuse of Gateway to Research data is to be confirmed with UKRI before Phase 4.
+
+
+## D46. Tags are embedded in a short template, and the theme eval labels markets
+- **Chosen:** each tag is embedded as "Startup market: <tag>" (`tagEmbeddingInput`, template `market-v1`). `tags.embedding_model` and `themes.embedding_model` store `<model>+market-v1` (`tagEmbeddingIdentity`), so tags embedded with another template are embedded again and never mix with new ones. The greedy centroid rule (D34) is unchanged. τ is 0.76. The theme eval's labelled groups now follow a written market rule (`fixtures/themes/README.md`): one group per product or service, sector words only with their synonyms.
+- **Alternatives measured** on the market labels (pairwise F1 at each method's best τ): bare tags 0.53; "Startup sector: <tag>" 0.57; "The <tag> market" 0.56; "Startup market: <tag>" 0.60. Joining by the most similar member (0.49 bare, 0.55 templated) or by the mean member similarity (0.52 bare, 0.59 templated) did no better than the centroid. A second pass that merges close theme centroids collapsed themes and lowered F1. Removing the template's own direction from each vector gave 0.59.
+- **Why:** the template is the only change that helped, and it costs nothing at run time. The old 27 groups mixed markets with sectors (vector databases with prompt management, cultivated meat with meal kits), so they rewarded merging whole sectors. F1 0.58 on those groups (0.65 with the template) overstated quality.
+- **Limits:** F1 is 0.60, below the 0.75 target (A26). Even a perfect clustering of these embeddings could not reach it: a plain cut on pair similarity peaks near 0.55. The model ranks tags by shared words ("prompt management" with "fleet management", the "-tech" sector words with each other) and places jargon far from its meaning ("baas", "black mass processing"). The template also packs similarities into a narrow band, so F1 falls fast below τ (0.49 at 0.74). Manual merge and move (spec 7.3) stay the fix for single errors.
+- **text-embedding-3-large at 512 dimensions** (priced at $0.13 per million tokens, against $0.02) did not help: F1 0.55 at τ 0.84 with the template and 0.56 at τ 0.54 on bare tags, against 0.60 for the small model. Its pair similarities rank slightly better (a plain cut peaks at 0.59), but the greedy clustering does not turn that into better themes. The small model stays the default. `pnpm eval --themes --model <id>` scores another model.
+
+## D47. An LLM check places tags in a similarity band
+- **Chosen:** two bands around the greedy rule (D34). A tag whose best centroid similarity is at least τ_high = 0.88 joins that theme. Below τ_low = 0.72 it starts a new theme. In between, `gpt-5.6-luna` sees the tag and up to 3 candidate themes (each shown by its top 6 tags) and picks one or none. Calls are batched 20 tags at a time, use a strict schema with no string length keywords, and go through `LlmClient` and `BudgetGuard` with purpose `theme_naming`. A new purpose value would need a database migration, and theme naming is already the purpose for theme LLM calls. On a budget refusal or provider error, the band tags fall back to the embedding-only rule at τ = 0.76, so the assignment run is never lost. With no key, assignment is embedding-only, as before.
+- **Measured** on the 215 labelled tags, replaying recorded verdicts (`docs/theme-eval-results.md`): embedding-only 0.604 F1 (precision 0.540, recall 0.685). With the check at 0.72 to 0.88: 0.662 F1 (precision 0.930, recall 0.515). Other bands: 0.72 to 0.84 gave 0.651, 0.74 to 0.88 gave 0.646 and 0.76 to 0.88 gave 0.632. Wrong merges fall from 239 to 16.
+- **Prompt:** version `theme-check-v2` states the market rule from `fixtures/themes/README.md` with examples that are not in the labelled set. The first version, which used three labelled tags as examples and a looser wording, reached 0.681 F1 at 0.72 to 0.84, but with precision 0.694. v2 is kept: it is 0.02 lower on F1 but makes far fewer wrong merges, and it does not quote the test set.
+- **Merge check between themes: not built.** A trial asked about the 94 pairs of themes from the chosen run whose centroids were at least 0.76 alike ($0.0033). The LLM called none of them the same market, so F1 did not change. A perfect judge on the same pairs would have reached about 0.84, so the gap is the model's narrow reading of "market", not the pairing. The trial's answers are in `fixtures/themes/recorded/merge-trial-gpt-5.6-luna.json`.
+- **Cost:** 249 questions in 15 calls for the 215 tags, starting with no themes. That is about 21 calls and $0.037 for 300 new tags, at $0.000106 a question. Most of the cost is reasoning tokens. The first live run cut answers off at 2,600 output tokens and lost 400 questions, so a call now allows 4,000 tokens plus 50 a tag.
+- **Limits:** F1 0.662 is below the 0.75 target (A26), and the target test still fails. With perfect verdicts the same bands would reach about 0.87, so the limit is the model's judgement against these labels. It splits finer than the labels in some markets ("threat detection" from "cybersecurity", "cross-border payments" from "payment rails") and joins neighbours in others ("vehicle-to-grid" with electric vehicles, "lettings platform" with estate agency software). Low recall means more small themes. `pnpm themes suggest-merges` and `merge` fix them, and a missed merge is safer than a wrong one.
+- **Eval:** verdicts are recorded once per model, prompt version and embedding recording, keyed by the exact question the LLM saw, so a change of prompt, band or embeddings asks again rather than reusing a stale answer. A prompt hash catches unversioned edits. `pnpm eval --themes --check --live` records missing verdicts one pass at a time, as production asks them, with a $0.05 cap a run. This decision used $0.098 of live calls.
