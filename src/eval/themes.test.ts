@@ -9,6 +9,7 @@ import {
   tagEmbeddingInput,
 } from "@/pipeline/embed/embed-tags";
 import { createFakeEmbeddingClient } from "@/pipeline/embed/testing";
+import { themeCheckPromptVersion } from "@/pipeline/themes/theme-check";
 import {
   bandQuestionKey,
   DEFAULT_THEME_BANDS,
@@ -25,6 +26,8 @@ import {
   recordThemeChecks,
   sweepBands,
   themeBandGrid,
+  THEME_BAND_GRID,
+  THEME_PRECISION_TARGET,
   themeCheckRecordingPath,
   type LabelledTag,
   LABELLED_TAGS_SCHEMA,
@@ -372,7 +375,7 @@ describe("theme check eval", () => {
     const join = await sweepBands(
       tags,
       embeddings,
-      { verdicts: { [unoKey]: 0 } },
+      { verdicts: { [unoKey]: [9] } },
       bands,
     );
     expect(join.rows[0]).toMatchObject({
@@ -385,7 +388,7 @@ describe("theme check eval", () => {
     const apart = await sweepBands(
       tags,
       embeddings,
-      { verdicts: { [unoKey]: null } },
+      { verdicts: { [unoKey]: [2] } },
       bands,
     );
     expect(apart.rows[0]).toMatchObject({ recall: 0, themes: 3, missing: 0 });
@@ -431,7 +434,7 @@ describe("theme check eval", () => {
       today: new Date("2026-11-12T10:00:00Z"),
     });
     expect(requests).toHaveLength(1);
-    expect(result.recording.verdicts).toEqual({ [unoKey]: 0 });
+    expect(result.recording.verdicts).toEqual({ [unoKey]: [10] });
     expect(result.recording).toMatchObject({
       calls: 1,
       questions: 1,
@@ -517,26 +520,32 @@ describe("theme check eval", () => {
 });
 
 describe("recorded verdicts replay", () => {
-  const recorded =
-    existsSync(THEME_RECORDING_PATH) && existsSync(themeCheckRecordingPath());
+  const checkPath = themeCheckRecordingPath(
+    undefined,
+    THEME_RECORDING_PATH,
+    DEFAULT_THEME_BANDS,
+  );
+  const recorded = existsSync(THEME_RECORDING_PATH) && existsSync(checkPath);
   if (!recorded) {
     console.warn(
-      `Skipped: no verdicts at ${themeCheckRecordingPath()}. The maintainer runs pnpm eval --themes --check --live to create them.`,
+      `Skipped: no verdicts at ${checkPath}. The maintainer runs pnpm eval --themes --check --live to create them.`,
     );
   }
+  const defaultMode = themeCheckPromptVersion(DEFAULT_THEME_BANDS);
 
   it.skipIf(!recorded)(
-    `reaches F1 ${THEME_F1_TARGET} with the LLM check at the default bands`,
+    `reaches F1 ${THEME_F1_TARGET} and precision ${THEME_PRECISION_TARGET} at the defaults`,
     async () => {
       const tags = loadLabelledTags();
       const { rows } = await sweepBands(
         tags,
         loadThemeRecording(tags).vectors,
-        loadThemeCheckRecording(),
+        loadThemeCheckRecording(checkPath, DEFAULT_THEME_BANDS),
         [DEFAULT_THEME_BANDS],
       );
       expect(rows[0]!.missing).toBe(0);
       expect(rows[0]!.f1).toBeGreaterThanOrEqual(THEME_F1_TARGET);
+      expect(rows[0]!.precision).toBeGreaterThanOrEqual(THEME_PRECISION_TARGET);
     },
   );
 
@@ -547,7 +556,10 @@ describe("recorded verdicts replay", () => {
       const { rows } = await sweepBands(
         tags,
         loadThemeRecording(tags).vectors,
-        loadThemeCheckRecording(),
+        loadThemeCheckRecording(checkPath, DEFAULT_THEME_BANDS),
+        THEME_BAND_GRID.filter(
+          (bands) => themeCheckPromptVersion(bands) === defaultMode,
+        ),
       );
       expect(chooseBands(rows)).toMatchObject(DEFAULT_THEME_BANDS);
     },

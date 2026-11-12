@@ -5,6 +5,7 @@ import type { BudgetGuard, EmbeddingClient } from "@/core/ports";
 import type { Db } from "@/db/client";
 import { companies, companyTags, tags } from "@/db/schema";
 import { costUsdMicros, estimateEmbeddingCost } from "../extract/pricing";
+import { TAG_MEANING_PROMPT_VERSION } from "./describe-tags";
 
 export const EMBED_BATCH_SIZE = 256;
 
@@ -14,10 +15,25 @@ export const EMBED_BATCH_SIZE = 256;
  * tag is embedded again and old and new vectors never mix (D46).
  */
 export const TAG_EMBEDDING_TEMPLATE = "market-v1";
+/**
+ * The template with an LLM-written meaning after the label (D48). Measured by
+ * the theme eval and not used by the pipeline: it did not beat the plain one.
+ */
+export const TAG_MEANING_TEMPLATE = `market-${TAG_MEANING_PROMPT_VERSION}`;
 
-/** The text embedded for a tag: its label in a short context (D46). */
-export function tagEmbeddingInput(label: string): string {
-  return `Startup market: ${label}`;
+/**
+ * The text embedded for a tag: its label in a short context (D46). The eval
+ * can add a meaning (D48); the pipeline does not.
+ */
+export function tagEmbeddingInput(label: string, meaning?: string): string {
+  return meaning
+    ? `Startup market: ${label} — ${meaning}`
+    : `Startup market: ${label}`;
+}
+
+/** The template for tags embedded with or without a meaning. */
+export function tagEmbeddingTemplate(withMeanings: boolean): string {
+  return withMeanings ? TAG_MEANING_TEMPLATE : TAG_EMBEDDING_TEMPLATE;
 }
 
 /**

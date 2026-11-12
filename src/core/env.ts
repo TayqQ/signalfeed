@@ -19,6 +19,11 @@ export const pipelineEnvSchema = z.object({
   MAX_EMBEDDINGS_PER_RUN: z.coerce.number().int().positive().default(2000),
   MAX_THEME_NAMES_PER_RUN: z.coerce.number().int().positive().default(20),
   MAX_GRANT_TAGGINGS_PER_RUN: z.coerce.number().int().positive().default(200),
+  /**
+   * Model for the theme check (D49). Falls back to `EXTRACTION_MODEL` for the
+   * rest of a run if it fails.
+   */
+  THEME_CHECK_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   /** Raises the GitHub API rate limit for star snapshots. Optional. */
   GITHUB_TOKEN: z.string().min(1).optional(),
 });

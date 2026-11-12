@@ -10,8 +10,12 @@ import { BudgetExceededError, ExtractionValidationError } from "@/core/errors";
 import type { BudgetGuard, LlmClient, LlmTokenUsage } from "@/core/ports";
 import { costUsdMicros, estimateCost } from "../extract/pricing";
 import {
+  DEFAULT_THEME_BANDS,
   DEFAULT_THEME_THRESHOLD,
+  THEME_CHECK_MAX_CANDIDATES,
+  THEME_CHECK_MIN_SCORE,
   assignGreedy,
+  bandQuestionKey,
   type BandQuestion,
   type BandVerdict,
   type GreedyResult,
@@ -21,20 +25,87 @@ import {
 } from "./cluster";
 
 /** Bump with any change to the prompt or schema: recorded verdicts then stop matching. */
-export const THEME_CHECK_PROMPT_VERSION = "theme-check-v2";
+export const THEME_CHECK_PROMPT_VERSION = "theme-check-v4";
+/** The graded prompt's schema name (D48). */
+export const THEME_SCORES_SCHEMA_NAME = "theme_scores";
+/** The one-answer prompt's schema name (D47), the default. */
 export const THEME_CHECK_SCHEMA_NAME = "theme_check";
+/** The one-answer prompt chosen in D47 and kept as the default in D49. */
+export const THEME_PICK_PROMPT_VERSION = "theme-check-v2";
 /** The model the check was evaluated with (D47). */
 export const THEME_CHECK_MODEL = "gpt-5.6-luna";
 /** Band tags per LLM call. Small enough that one cut-off answer loses little. */
 export const THEME_CHECK_BATCH_SIZE = 20;
 /** Greedy passes that may ask new questions. Later questions fall back. */
-export const THEME_CHECK_MAX_ROUNDS = 6;
+export const THEME_CHECK_MAX_ROUNDS = 10;
+/** Scores run from 0 (unrelated) to this (synonyms). */
+export const THEME_CHECK_MAX_SCORE = 10;
 
 /**
- * Strict output of one check call. `match` is the candidate number (1, 2 or
- * 3) or 0 for none. No string length keywords: OpenAI strict mode may reject them.
+ * Strict output of one check call: a score for each candidate, in order. No
+ * string length keywords or array size keywords: OpenAI strict mode may
+ * reject them. The count and range are checked in code (`acceptedVerdicts`).
  */
 export const themeCheckSchema = z.strictObject({
+  verdicts: z.array(
+    z.strictObject({
+      id: z.number().int(),
+      scores: z
+        .array(z.number().int())
+        .describe(
+          "One score from 0 to 10 for each candidate, in candidate order",
+        ),
+    }),
+  ),
+});
+export type ThemeCheckOutput = z.infer<typeof themeCheckSchema>;
+
+/** Candidate scores for one question, in candidate order. */
+export type CheckScores = readonly number[];
+
+/** What one question shows the LLM. `BandQuestion` from `cluster.ts` fits. */
+export interface CheckQuestion {
+  key: string;
+  tag: string;
+  candidates: readonly { tags: readonly string[] }[];
+}
+
+/** The prompt for placing every tag among many candidates (D48, option 3). */
+export const THEME_PLACE_PROMPT_VERSION = "theme-place-v1";
+
+/** True when the setting uses graded scores rather than one answer. */
+export function usesScores(bands: ThemeBands): boolean {
+  return Boolean(bands.scores || bands.pairScores);
+}
+
+/** The prompt version for a band setting. */
+export function themeCheckPromptVersion(bands: ThemeBands): string {
+  if (bands.pairScores) {
+    return `${THEME_PLACE_PROMPT_VERSION}-c${bands.candidates ?? THEME_CHECK_MAX_CANDIDATES}`;
+  }
+  return bands.scores ? THEME_CHECK_PROMPT_VERSION : THEME_PICK_PROMPT_VERSION;
+}
+
+/** The strict output schema for a band setting. */
+export function themeCheckSchemaFor(bands: ThemeBands): z.ZodType {
+  return usesScores(bands) ? themeCheckSchema : themePickSchema;
+}
+
+/** The system prompt for a band setting. */
+export function themeCheckSystemPrompt(bands: ThemeBands): string {
+  if (!usesScores(bands)) return buildThemePickSystemPrompt();
+  if (!bands.pairScores) return buildThemeCheckSystemPrompt();
+  return buildThemeCheckSystemPrompt().replace(
+    "you get up to 3 candidate themes",
+    `you get up to ${bands.candidates ?? THEME_CHECK_MAX_CANDIDATES} candidate themes, the closest by meaning first`,
+  );
+}
+
+/**
+ * Strict output of the one-answer prompt (D47): `match` is the candidate
+ * number, or 0 for none. No string length keywords.
+ */
+export const themePickSchema = z.strictObject({
   verdicts: z.array(
     z.strictObject({
       id: z.number().int(),
@@ -45,16 +116,9 @@ export const themeCheckSchema = z.strictObject({
     }),
   ),
 });
-export type ThemeCheckOutput = z.infer<typeof themeCheckSchema>;
 
-/** What one question shows the LLM. `BandQuestion` from `cluster.ts` fits. */
-export interface CheckQuestion {
-  key: string;
-  tag: string;
-  candidates: readonly { tags: readonly string[] }[];
-}
-
-export function buildThemeCheckSystemPrompt(): string {
+/** The one-answer prompt (D47). Its text must not change: recordings hash it. */
+export function buildThemePickSystemPrompt(): string {
   // The examples are deliberately not tags from the labelled eval fixture.
   return [
     "You sort startup tags into markets for a UK startup news site.",
@@ -70,6 +134,50 @@ export function buildThemeCheckSystemPrompt(): string {
     "- a sector word, a word that spans many products, such as fintech, healthtech, cleantech, regtech, legaltech, proptech, insurtech, edtech, agritech, food tech, space tech, construction tech, digital health or logistics. A sector word joins only its own synonyms. It never joins a specific market or another sector word, and a specific market never joins it.",
     "When in doubt, answer 0. A wrong match does more harm than a missed one, because people can merge two themes later.",
     "Return one verdict for every tag id.",
+  ].join("\n");
+}
+
+/**
+ * One-answer verdicts as scores, so both prompts share one join rule: the
+ * chosen candidate scores 10 and the rest 0. Ids not asked, repeats and
+ * numbers past the candidate list are left out.
+ */
+export function acceptedPicks(
+  data: unknown,
+  batch: readonly CheckQuestion[],
+): Map<string, CheckScores> {
+  const verdicts = new Map<string, CheckScores>();
+  const parsed = themePickSchema.safeParse(data);
+  if (!parsed.success) return verdicts;
+  for (const { id, match } of parsed.data.verdicts) {
+    const question = batch[id - 1];
+    if (!question || verdicts.has(question.key)) continue;
+    if (match < 0 || match > question.candidates.length) continue;
+    verdicts.set(
+      question.key,
+      question.candidates.map((_, i) =>
+        i + 1 === match ? THEME_CHECK_MAX_SCORE : 0,
+      ),
+    );
+  }
+  return verdicts;
+}
+
+export function buildThemeCheckSystemPrompt(): string {
+  // The examples are deliberately not tags from the labelled eval fixture.
+  return [
+    "You sort startup tags into markets for a UK startup news site.",
+    "Think of a market map of startups. A market is one box on that map: one kind of product or service that a buyer buys to do one job, named the way a founder would in a short phrase.",
+    "For each tag you get up to 3 candidate themes. Each candidate is a list of tags already in it, most common first. Judge a candidate by its first tags.",
+    "Score every candidate from 0 to 10 for how close the tag is to the candidate's market. Use the whole scale:",
+    "- 10: the same thing: a synonym, spelling variant or abbreviation (crm and customer relationship management; hris and hr software).",
+    "- 8 or 9: the same product seen from another role: making, installing, financing, servicing or writing software for it (heat pump installation and heat pump financing).",
+    "- 6 or 7: a narrower part of the same product: a sub-type, technique or feature that does the same job for the same buyer (applicant tracking and recruiting software; transaction monitoring and anti-money laundering).",
+    "- 4 or 5: a sibling: a different product for a related job, in the same area or for the same customers (hiring software and payroll software; heat pumps and smart thermostats; the vehicles and the chargers for them; chip design software and chip fabrication).",
+    "- 2 or 3: only the same broad sector.",
+    "- 0 or 1: unrelated, or the tags only share a word (fraud detection and leak detection).",
+    "Sector words span many markets: fintech, healthtech, cleantech, regtech, legaltech, proptech, insurtech, edtech, agritech, food tech, space tech, construction tech, digital health, logistics and the like. A sector word scores 10 against its own synonyms and 3 or less against anything else, in both directions: a specific market scores 3 or less against a candidate led by a sector word.",
+    "Return one verdict for every tag id, with exactly one score per candidate.",
   ].join("\n");
 }
 
@@ -89,33 +197,48 @@ export function buildThemeCheckUserPrompt(
 }
 
 /**
- * About 15 tokens a verdict plus room for reasoning, which `gpt-5.6-luna`
+ * About 25 tokens a verdict plus room for reasoning, which `gpt-5.6-luna`
  * counts as output. The live eval saw answers cut off at 2,600 tokens.
  */
 export function checkMaxOutputTokens(batchSize: number): number {
-  return 4000 + 50 * batchSize;
+  return 4000 + 60 * batchSize;
 }
 
 /**
- * Verdicts by question key from one call's output. Ids that were not asked,
- * repeats and numbers past the candidate list are left out.
+ * Scores by question key from one call's output. Ids that were not asked,
+ * repeats, and answers with the wrong number of scores or a score out of
+ * range are left out.
  */
 export function acceptedVerdicts(
   data: unknown,
   batch: readonly CheckQuestion[],
-): Map<string, BandVerdict> {
-  const verdicts = new Map<string, BandVerdict>();
+): Map<string, CheckScores> {
+  const verdicts = new Map<string, CheckScores>();
   const parsed = themeCheckSchema.safeParse(data);
   if (!parsed.success) return verdicts;
-  for (const { id, match } of parsed.data.verdicts) {
+  for (const { id, scores } of parsed.data.verdicts) {
     const question = batch[id - 1];
     if (!question || verdicts.has(question.key)) continue;
-    if (match === 0) verdicts.set(question.key, null);
-    else if (match >= 1 && match <= question.candidates.length) {
-      verdicts.set(question.key, match - 1);
-    }
+    if (scores.length !== question.candidates.length) continue;
+    if (scores.some((s) => s < 0 || s > THEME_CHECK_MAX_SCORE)) continue;
+    verdicts.set(question.key, scores);
   }
   return verdicts;
+}
+
+/**
+ * The verdict from scores: the best-scoring candidate (the first on a tie)
+ * when its score is at least `minScore`, otherwise none.
+ */
+export function verdictFromScores(
+  scores: CheckScores,
+  minScore: number,
+): BandVerdict {
+  let best = -1;
+  for (const [index, score] of scores.entries()) {
+    if (best === -1 || score > scores[best]!) best = index;
+  }
+  return best !== -1 && scores[best]! >= minScore ? best : null;
 }
 
 export interface ThemeCheckDeps {
@@ -126,11 +249,16 @@ export interface ThemeCheckDeps {
   purpose: LlmPurpose;
   runId?: number;
   batchSize?: number;
+  /**
+   * Used instead of `llm` from the first call that fails with an error other
+   * than invalid output (D49). Typically the cheaper default model.
+   */
+  fallbackLlm?: { llm: LlmClient; model: string };
 }
 
 export type ThemeCheckFallback = "budget" | "error";
 
-export interface AskResult<V = BandVerdict> {
+export interface AskResult<V = CheckScores> {
   verdicts: Map<string, V>;
   calls: number;
   /** Questions sent. Fewer than asked when a refusal stopped the asking. */
@@ -143,6 +271,8 @@ export interface AskResult<V = BandVerdict> {
   /** Why asking stopped early. Questions not sent have no verdict. */
   fallback?: ThemeCheckFallback;
   error?: unknown;
+  /** The fallback model, when the main model failed and asking switched to it. */
+  switched?: string;
 }
 
 function isTokenUsage(value: unknown): value is LlmTokenUsage {
@@ -170,7 +300,9 @@ async function askInBatches<Q, V>(
   deps: ThemeCheckDeps,
   spec: AskSpec<Q, V>,
 ): Promise<AskResult<V>> {
-  const { llm, budget, model, purpose, runId } = deps;
+  const { budget, purpose, runId } = deps;
+  let { llm, model } = deps;
+  let fallbackLlm = deps.fallbackLlm;
   const batchSize = deps.batchSize ?? THEME_CHECK_BATCH_SIZE;
   const result: AskResult<V> = {
     verdicts: new Map(),
@@ -198,7 +330,7 @@ async function askInBatches<Q, V>(
     });
   };
 
-  for (let start = 0; start < questions.length; start += batchSize) {
+  for (let start = 0; start < questions.length;) {
     const batch = questions.slice(start, start + batchSize);
     const user = spec.user(batch);
     const maxOutputTokens = checkMaxOutputTokens(batch.length);
@@ -233,27 +365,42 @@ async function askInBatches<Q, V>(
         const usage = (error as { usage?: unknown }).usage;
         if (isTokenUsage(usage)) await record(usage);
         result.invalid += batch.length;
+        start += batchSize;
+        continue;
+      }
+      if (fallbackLlm) {
+        // Switch for the rest of the run and ask this batch again.
+        ({ llm, model } = fallbackLlm);
+        fallbackLlm = undefined;
+        result.switched = model;
+        result.sent -= batch.length;
         continue;
       }
       result.fallback = "error";
       result.error = error;
       return result;
     }
+    start += batchSize;
   }
   return result;
 }
 
-/** Asks the LLM about each band tag, in batches, through the budget guard. */
+/**
+ * Asks the LLM about each band tag, in batches, through the budget guard,
+ * with the prompt for `mode`. Answers come back as scores either way.
+ */
 export function askThemeChecks(
   questions: readonly CheckQuestion[],
   deps: ThemeCheckDeps,
+  mode: ThemeBands = DEFAULT_THEME_BANDS,
 ): Promise<AskResult> {
+  const scores = usesScores(mode);
   return askInBatches(questions, deps, {
-    system: buildThemeCheckSystemPrompt(),
+    system: themeCheckSystemPrompt(mode),
     user: buildThemeCheckUserPrompt,
-    schema: themeCheckSchema,
-    schemaName: THEME_CHECK_SCHEMA_NAME,
-    accept: acceptedVerdicts,
+    schema: themeCheckSchemaFor(mode),
+    schemaName: scores ? THEME_SCORES_SCHEMA_NAME : THEME_CHECK_SCHEMA_NAME,
+    accept: scores ? acceptedVerdicts : acceptedPicks,
   });
 }
 
@@ -280,6 +427,8 @@ export interface ThemeCheckStats {
   errorMessage?: string;
   /** The error itself, so the caller can tell a provider refusal apart. */
   error?: unknown;
+  /** Set when the check model failed and the fallback model took over. */
+  switchedTo?: string;
 }
 
 export interface AssignWithCheckInput {
@@ -334,6 +483,7 @@ export async function assignWithThemeCheck({
   if (!check) {
     return { greedy: assignGreedy({ tags, themes, threshold }) };
   }
+  let deps: ThemeCheckDeps = check;
 
   // By `refKey`: the chosen candidate's ref, or null for none. A verdict
   // stands while the tag's candidate set is the same, even as members change.
@@ -345,6 +495,19 @@ export async function assignWithThemeCheck({
     if (ref === null) return null;
     const index = question.candidates.findIndex((c) => c.ref === ref);
     return index === -1 ? undefined : index;
+  };
+  // Placing mode: scores are kept per tag and candidate theme, so a new
+  // candidate is asked about alone and the rest are not asked again.
+  const pairs = new Map<string, number>();
+  const pairKey = (question: BandQuestion, ref: string) =>
+    `${question.tagId}|${ref}`;
+  const minScore = bands.minScore ?? THEME_CHECK_MIN_SCORE;
+  const pairVerdictFor = (question: BandQuestion): BandVerdict | undefined => {
+    const scores = question.candidates.map((c) =>
+      pairs.get(pairKey(question, c.ref)),
+    );
+    if (scores.some((score) => score === undefined)) return undefined;
+    return verdictFromScores(scores as number[], minScore);
   };
   const stats: ThemeCheckStats = {
     rounds: 0,
@@ -365,11 +528,28 @@ export async function assignWithThemeCheck({
       tags,
       themes,
       threshold,
-      check: { bands, verdictFor },
+      check: {
+        bands,
+        verdictFor: bands.pairScores ? pairVerdictFor : verdictFor,
+      },
     });
 
     const fresh: BandQuestion[] = [];
     for (const question of greedy.unanswered) {
+      if (bands.pairScores) {
+        // Ask only about candidates never asked for this tag.
+        const candidates = question.candidates.filter(
+          (c) => !asked.has(pairKey(question, c.ref)),
+        );
+        if (candidates.length === 0) continue;
+        for (const c of candidates) asked.add(pairKey(question, c.ref));
+        fresh.push({
+          ...question,
+          candidates,
+          key: bandQuestionKey(question.tag, candidates),
+        });
+        continue;
+      }
       if (asked.has(question.refKey)) continue;
       asked.add(question.refKey);
       fresh.push(question);
@@ -384,11 +564,28 @@ export async function assignWithThemeCheck({
       return { greedy, stats };
     }
 
-    const answer = await askThemeChecks(fresh, check);
+    const answer = await askThemeChecks(fresh, deps, bands);
+    if (answer.switched && deps.fallbackLlm) {
+      // Later passes stay on the fallback model.
+      deps = {
+        ...deps,
+        llm: deps.fallbackLlm.llm,
+        model: deps.fallbackLlm.model,
+        fallbackLlm: undefined,
+      };
+      stats.switchedTo = answer.switched;
+    }
     stats.questions += answer.sent;
     for (const question of fresh) {
-      const verdict = answer.verdicts.get(question.key);
-      if (verdict === undefined) continue;
+      const scores = answer.verdicts.get(question.key);
+      if (scores === undefined) continue;
+      if (bands.pairScores) {
+        for (const [i, c] of question.candidates.entries()) {
+          pairs.set(pairKey(question, c.ref), scores[i]!);
+        }
+        continue;
+      }
+      const verdict = verdictFromScores(scores, minScore);
       chosen.set(
         question.refKey,
         verdict === null ? null : question.candidates[verdict]!.ref,

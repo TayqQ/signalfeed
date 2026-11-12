@@ -16,8 +16,10 @@ import { createBudgetGuard } from "../budget/budget-guard";
 import {
   embedTagsStep,
   TAG_EMBEDDING_TEMPLATE,
+  TAG_MEANING_TEMPLATE,
   tagEmbeddingIdentity,
   tagEmbeddingInput,
+  tagEmbeddingTemplate,
 } from "./embed-tags";
 import { createFakeEmbeddingClient } from "./testing";
 
@@ -97,7 +99,7 @@ describe("embedTagsStep", () => {
     expect(embedder.calls).toHaveLength(1);
     expect(embedder.calls[0]?.dimensions).toBe(512);
     expect([...(embedder.calls[0]?.inputs ?? [])].sort()).toEqual(
-      ["ai", "fintech", "old-model"].map(tagEmbeddingInput),
+      ["ai", "fintech", "old-model"].map((label) => tagEmbeddingInput(label)),
     );
     const rows = await db.select().from(tags);
     for (const row of rows) {
@@ -114,6 +116,14 @@ describe("embedTagsStep", () => {
     );
     expect(IDENTITY).toBe(`${MODEL}+${TAG_EMBEDDING_TEMPLATE}`);
     expect(IDENTITY).not.toBe(MODEL);
+  });
+
+  it("adds a meaning after the label for the meaning template (D48)", () => {
+    expect(
+      tagEmbeddingInput("baas", "banking infrastructure for fintechs"),
+    ).toBe("Startup market: baas — banking infrastructure for fintechs");
+    expect(tagEmbeddingTemplate(true)).toBe(TAG_MEANING_TEMPLATE);
+    expect(tagEmbeddingTemplate(false)).toBe(TAG_EMBEDDING_TEMPLATE);
   });
 
   it("re-embeds tags stored under the bare model name, so old and new inputs never mix", async () => {

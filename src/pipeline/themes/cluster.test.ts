@@ -52,7 +52,7 @@ describe("vector helpers", () => {
     expect(DEFAULT_THEME_THRESHOLD).toBe(0.76);
   });
 
-  it("defaults the LLM check band to 0.72 to 0.88 (D47)", () => {
+  it("defaults the LLM check band to 0.72 to 0.88 (D47, D49)", () => {
     expect(DEFAULT_THEME_BANDS).toEqual({ low: 0.72, high: 0.88 });
   });
 });

@@ -137,6 +137,20 @@ export interface GreedyResult {
 export interface ThemeBands {
   low: number;
   high: number;
+  /** Most candidate themes shown for one tag. Default `THEME_CHECK_MAX_CANDIDATES`. */
+  candidates?: number;
+  /** Least LLM score (0 to 10) to join a candidate. Default `THEME_CHECK_MIN_SCORE`. */
+  minScore?: number;
+  /**
+   * Graded scores (prompt `theme-check-v4`, D48) instead of one answer
+   * (`theme-check-v2`, D47).
+   */
+  scores?: boolean;
+  /**
+   * Placing mode (D48, option 3), with graded scores: scores are kept per tag and candidate, so
+   * only new candidates are asked about. Used with many candidates.
+   */
+  pairScores?: boolean;
 }
 
 /**
@@ -146,6 +160,8 @@ export interface ThemeBands {
 export const DEFAULT_THEME_BANDS: ThemeBands = { low: 0.72, high: 0.88 };
 /** Candidate themes shown for one tag, best first. */
 export const THEME_CHECK_MAX_CANDIDATES = 3;
+/** Least LLM score, out of 10, for a band tag to join a candidate (D47). */
+export const THEME_CHECK_MIN_SCORE = 7;
 /** Member tags shown for one candidate theme, most mentioned first. */
 export const THEME_CHECK_TOP_TAGS = 6;
 
@@ -268,10 +284,11 @@ function bandQuestion(
   tag: GreedyTag,
   ranked: readonly Scored[],
   low: number,
+  limit: number,
 ): BandQuestion {
   const candidates = ranked
     .filter((scored) => scored.similarity >= low)
-    .slice(0, THEME_CHECK_MAX_CANDIDATES)
+    .slice(0, limit)
     .map((scored) => ({
       target: scored.theme.target,
       ref: scored.theme.ref,
@@ -393,7 +410,12 @@ export function assignGreedy({
       continue;
     }
 
-    const question = bandQuestion(tag, ranked, low);
+    const question = bandQuestion(
+      tag,
+      ranked,
+      low,
+      check.bands.candidates ?? THEME_CHECK_MAX_CANDIDATES,
+    );
     const verdict = check.verdictFor(question);
     if (verdict === undefined) {
       unanswered.push(question);

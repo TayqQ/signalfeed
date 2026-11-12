@@ -202,7 +202,7 @@ The OpenAI LLM adapter becomes schema-generic: it sends the JSON schema of `requ
 
 ## 7. Themes
 
-### 7.1 Clustering method (D34, D47)
+### 7.1 Clustering method (D34, D47, D48, D49)
 
 Greedy centroid assignment with an LLM check in a similarity band, in a fixed order:
 
@@ -211,25 +211,28 @@ Greedy centroid assignment with an LLM check in a similarity band, in a fixed or
 3. For each tag, compute cosine similarity with the centroid of every active theme.
 4. If the best similarity is at least **τ_high** (`DEFAULT_THEME_BANDS.high`, 0.88), assign the tag to that theme.
 5. If it is below **τ_low** (`DEFAULT_THEME_BANDS.low`, 0.72), start a new theme. Its slug is the tag's slug (with `-2` and so on if taken), its name is the tag's label (`name_source = tag`), and its centroid is the tag's embedding.
-6. In between, the LLM check decides. It sees the tag and up to 3 candidate themes, best first, each at least τ_low, each shown by its top 6 member tags by mentions. It answers with one candidate or none. None starts a new theme.
+6. In between, the LLM check decides. It sees the tag and up to 3 candidate themes, best first, each at least τ_low, each shown by its top 6 member tags by mentions. It answers with one candidate or none (prompt `theme-check-v2`). None starts a new theme.
 7. A joined theme's centroid becomes the normalised mean of its members' embeddings.
 
 The check (`src/pipeline/themes/theme-check.ts`):
 
-- **Batched and repeated.** The greedy pass runs with the verdicts known so far. Band tags with no verdict are asked, 20 to a call, and the pass runs again, until a pass asks nothing new (at most 6 passes). A verdict is reused while the tag's set of candidate themes stays the same.
+- **Batched and repeated.** The greedy pass runs with the verdicts known so far. Band tags with no verdict are asked, 20 to a call, and the pass runs again, until a pass asks nothing new (at most 10 passes). A verdict is reused while the tag's set of candidate themes stays the same.
 - **Strict output.** `{ verdicts: [{ id, match }] }`, where `match` is the candidate number or 0. No string length keywords.
-- **Paid and guarded.** Every call goes through `LlmClient` and `BudgetGuard`, with purpose `theme_naming`, the existing purpose for theme LLM calls. The model is the pipeline's `EXTRACTION_MODEL` (default `gpt-5.6-luna`).
-- **Never loses the run.** On a budget refusal or a provider error, the asking stops, and the remaining band tags fall back to the embedding-only rule at **τ** (`DEFAULT_THEME_THRESHOLD`, 0.76): join the best theme if it is at least τ, otherwise start a new one. A budget refusal sets `budgetPaused` on the step's stats; an error sets `providerError` and is listed in the run's errors. Theme naming then waits for the next run.
+- **Its own model.** `THEME_CHECK_MODEL` (default `gpt-5.6-luna`) sets the model, separately from `EXTRACTION_MODEL`. If a call to it fails with anything other than invalid output, that batch and the rest of the run use the extraction model instead. The default costs about $0.04 for 300 new tags.
+- **Paid and guarded.** Every call goes through `LlmClient` and `BudgetGuard`, with purpose `theme_naming`, the existing purpose for theme LLM calls.
+- **Never loses the run.** On a budget refusal, or an error on the fallback model too, the asking stops, and the remaining band tags fall back to the embedding-only rule at **τ** (`DEFAULT_THEME_THRESHOLD`, 0.76): join the best theme if it is at least τ, otherwise start a new one. A budget refusal sets `budgetPaused` on the step's stats; an error sets `providerError` and is listed in the run's errors. Theme naming then waits for the next run.
 - **Optional.** With no LLM key the step runs embedding-only at τ, as before.
 - Manual links are never overridden: tags that already have a `tag_themes` row are never asked about.
+
+On the labelled tags the method reaches F1 0.662 with precision 0.930 (embedding-only: 0.604 and 0.540). The maintainer chose this strict setting for hands-off running (D50): wrong merges mislead users, while split themes are harmless and easy to merge. The eval now guards precision ≥ 0.90 and F1 ≥ 0.65. A wider band with graded scores, tag meanings before embedding, an LLM that places every tag, and stronger check models were measured. None met the target, and none matched this precision (D48, D49). The graded mode (`scores: true`) and the placing mode stay in the code for the eval.
 
 Why this method:
 
 - **Stable.** New tags join existing themes without reshuffling old ones. Theme slugs are safe to store in saved searches (Phase 4).
-- **Incremental.** Each run only touches new tags, so the cost is small and constant: about $0.04 for 300 new tags (D47).
+- **Incremental.** Each run only touches new tags, so the cost is small and constant.
 - **Explainable.** Every assignment has one similarity score, stored on the link.
 - **Deterministic** given stored embeddings and LLM verdicts, because order and ties are fixed. The eval replays recorded verdicts.
-- **Precise.** On the labelled tags, precision rises from 0.54 to 0.93. Wrong merges are worse than missed ones, because a person can merge two themes later.
+- **Precise.** Wrong merges are worse than missed ones, because a person can merge two themes later.
 
 The cost is order dependence: an early, specific tag can become a theme that a later, broader tag would have described better. Manual merge, move and rename fix those cases (7.3). `suggest-merges` lists pairs of active themes whose centroids are within τ + 0.10 of each other.
 
@@ -594,7 +597,7 @@ Continuing from A14 in `docs/spec.md`. "Verified" rows were checked on 11 Novemb
 | A23 | ITL1 codes as of January 2025 are TLC-TLN as in section 9.1, with TLN Northern Ireland | Mostly verified | 026 |
 | A24 | HN Algolia allows about 10,000 requests an hour per IP; `search_by_date` supports `numericFilters` on `points` and `created_at_i`; hits include `author`, which must not be stored | To verify | 046 |
 | A25 | yc-oss/api still has no licence (GitHub API `license: null`) | Verified | none (not built) |
-| A26 | Some τ in 0.40-0.80 gives pairwise F1 ≥ 0.75 on the labelled tag set | To measure | 039 |
+| A26 | Some τ in 0.40-0.80 gives pairwise F1 ≥ 0.75 on the labelled tag set | Not met on the agent-written set (best default F1 0.66, precision 0.93). Re-measure on real, maintainer-labelled tags (D50) | 039, 045 |
 | A27 | About 300-600 new tags a month at first, falling over time | To measure | 045 |
 | A28 | The model states a city for about a quarter of events (6 of 24 in the recorded eval), and v2 does not reduce it | To measure | 024 |
 | A29 | About 250 new Innovate UK projects and 400 participants a month; about 6,000 projects since April 2024 | To measure | 035 |

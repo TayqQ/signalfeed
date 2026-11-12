@@ -199,6 +199,7 @@ Each entry records the decision, the alternatives considered, and why. New decis
 - **text-embedding-3-large at 512 dimensions** (priced at $0.13 per million tokens, against $0.02) did not help: F1 0.55 at τ 0.84 with the template and 0.56 at τ 0.54 on bare tags, against 0.60 for the small model. Its pair similarities rank slightly better (a plain cut peaks at 0.59), but the greedy clustering does not turn that into better themes. The small model stays the default. `pnpm eval --themes --model <id>` scores another model.
 
 ## D47. An LLM check places tags in a similarity band
+- **Update:** D48 measured a wider band with graded scores, and D49 stronger models. Neither met the new target, so this setting stays the default (D49).
 - **Chosen:** two bands around the greedy rule (D34). A tag whose best centroid similarity is at least τ_high = 0.88 joins that theme. Below τ_low = 0.72 it starts a new theme. In between, `gpt-5.6-luna` sees the tag and up to 3 candidate themes (each shown by its top 6 tags) and picks one or none. Calls are batched 20 tags at a time, use a strict schema with no string length keywords, and go through `LlmClient` and `BudgetGuard` with purpose `theme_naming`. A new purpose value would need a database migration, and theme naming is already the purpose for theme LLM calls. On a budget refusal or provider error, the band tags fall back to the embedding-only rule at τ = 0.76, so the assignment run is never lost. With no key, assignment is embedding-only, as before.
 - **Measured** on the 215 labelled tags, replaying recorded verdicts (`docs/theme-eval-results.md`): embedding-only 0.604 F1 (precision 0.540, recall 0.685). With the check at 0.72 to 0.88: 0.662 F1 (precision 0.930, recall 0.515). Other bands: 0.72 to 0.84 gave 0.651, 0.74 to 0.88 gave 0.646 and 0.76 to 0.88 gave 0.632. Wrong merges fall from 239 to 16.
 - **Prompt:** version `theme-check-v2` states the market rule from `fixtures/themes/README.md` with examples that are not in the labelled set. The first version, which used three labelled tags as examples and a looser wording, reached 0.681 F1 at 0.72 to 0.84, but with precision 0.694. v2 is kept: it is 0.02 lower on F1 but makes far fewer wrong merges, and it does not quote the test set.
@@ -206,3 +207,58 @@ Each entry records the decision, the alternatives considered, and why. New decis
 - **Cost:** 249 questions in 15 calls for the 215 tags, starting with no themes. That is about 21 calls and $0.037 for 300 new tags, at $0.000106 a question. Most of the cost is reasoning tokens. The first live run cut answers off at 2,600 output tokens and lost 400 questions, so a call now allows 4,000 tokens plus 50 a tag.
 - **Limits:** F1 0.662 is below the 0.75 target (A26), and the target test still fails. With perfect verdicts the same bands would reach about 0.87, so the limit is the model's judgement against these labels. It splits finer than the labels in some markets ("threat detection" from "cybersecurity", "cross-border payments" from "payment rails") and joins neighbours in others ("vehicle-to-grid" with electric vehicles, "lettings platform" with estate agency software). Low recall means more small themes. `pnpm themes suggest-merges` and `merge` fix them, and a missed merge is safer than a wrong one.
 - **Eval:** verdicts are recorded once per model, prompt version and embedding recording, keyed by the exact question the LLM saw, so a change of prompt, band or embeddings asks again rather than reusing a stale answer. A prompt hash catches unversioned edits. `pnpm eval --themes --check --live` records missing verdicts one pass at a time, as production asks them, with a $0.05 cap a run. This decision used $0.098 of live calls.
+
+## D48. A wider band and graded scores for the theme check; meanings and full placing measured
+- **Target:** F1 at least 0.80 with precision at least 0.85, so themes can run without review. Running cost at most about $0.25 per 300 new tags.
+- **Result:** the best option measured is τ_low 0.64, τ_high 0.88 with graded scores (prompt `theme-check-v4`): a tag joins the best candidate at 7 or more out of 10. It gives F1 0.736, precision 0.794, recall 0.685 and 73 wrong merges, for about $0.074 per 300 tags. **The target is not met.** It was the default briefly; D49 restores the D47 setting, because only that one reaches precision 0.85.
+- **Measured** (pairwise, 215 labelled tags, recorded verdicts):
+
+| Method | Precision | Recall | F1 | Wrong merges | Per 300 tags |
+|---|---|---|---|---|---|
+| Embedding only, τ 0.76 | 0.540 | 0.685 | 0.604 | 239 | $0 |
+| D47: band 0.72 to 0.88, one answer | 0.930 | 0.515 | 0.662 | 16 | $0.037 |
+| 1. Band 0.64 to 0.88, first graded prompt (v3) | 0.579 | 0.834 | 0.683 | 249 | about $0.08 |
+| 1. Band 0.64 to 0.88, graded prompt v4 (chosen) | 0.794 | 0.685 | 0.736 | 73 | $0.074 |
+| 1. Same, τ_high 0.92 | 0.804 | 0.651 | 0.720 | 65 | $0.090 |
+| 2. Meanings, then band 0.62 to 0.80 | 0.769 | 0.617 | 0.685 | 76 | $0.048 |
+| 3. LLM places every tag among 8 themes | 0.714 | 0.810 | 0.759 | 133 | $0.131 |
+
+- **Option 1, a wider band.** Moving τ_low from 0.72 to 0.64 lets the LLM see most true pairs. The one-answer prompt of D47 was too strict for that, so it now scores candidates. A first scale (v3) put sub-types with synonyms and merged whole sectors. v4 separates "a narrower part of the same product" (6 or 7) from "a sibling product" (4 or 5). Cut-offs of 6 and 8, replayed with some verdicts missing, did no better (F1 about 0.74 at precision 0.71, and about 0.55). τ_high above 0.88 sends a few wrong automatic joins to the LLM but costs more recall than it saves. In a simulation, showing 5 candidates instead of 3 stopped the passes from settling.
+- **Option 2, describe then embed.** The LLM writes a 6 to 15 word meaning for each tag ($0.021 per 300 tags), and the tag is embedded as "Startup market: <tag> — <meaning>". Embedding-only F1 fell from 0.604 to 0.589, though the most similar pairs became more precise. With the check it reached 0.685. Not adopted. The code that writes meanings (`src/pipeline/embed/describe-tags.ts`) is kept for the eval and is not called by the pipeline, so no migration was added. The model's "broad sector word" flag was too noisy to use as a rule ("agentic ai", "ecommerce" and "cybersecurity" were marked broad).
+- **Option 3, the LLM places every tag.** Embeddings shortlist the 8 closest themes and the LLM scores each one. Scores are kept per tag and theme, so only new candidates are asked about. Recall rose to 0.810 but precision fell to 0.714. Not adopted: it costs more and makes the most wrong merges.
+- **Why not met:** the limit is the model's sense of where one market ends. With a perfect judge, the chosen bands would reach about 0.94. The errors split two ways against the labels. The model joins neighbours ("e-bikes" with electric vehicles, "earth observation" with satellites, "buy now pay later" with embedded finance, several robotics markets with industrial automation, "tutoring marketplace" with online learning) and lets specific markets join a sector word ("last-mile delivery" with logistics). It also leaves parts of a labelled market alone ("threat detection" apart from cybersecurity). A score cut-off cannot fix both, because the same scores are given to right and wrong joins. A hand-made list of sector words would fix several errors, but it would be fitted to this test set, so it was not tried.
+- **Cost:** the chosen method makes about 509 questions in 30 calls for the 215 tags, so about $0.074 per 300 new tags, inside the limit. Live calls for this decision cost $0.251 of the $0.50 approved: option 1 $0.123 (with the v3 trial), option 2 $0.034, option 3 $0.094.
+- **Next:** a stronger check model (gpt-5.4-mini costs about four times as much, near the limit), or labels reviewed against the market rule where the model and the labels disagree.
+
+## D49. A separate check model; luna and the D47 setting stay the default
+- **Chosen:** `THEME_CHECK_MODEL` sets the theme check model, separately from `EXTRACTION_MODEL`. It stays `gpt-5.6-luna`. If the check model fails with anything other than invalid output, the rest of the run uses the extraction model. No configuration met F1 0.80 with precision 0.85. By the rule for that case, the default is the best option with precision at least 0.85: the D47 setting (band 0.72 to 0.88, one answer, prompt `theme-check-v2`). It gives F1 0.662, precision 0.930 and 16 wrong merges, for about $0.037 per 300 tags.
+- **Prices**, checked on OpenAI's pricing page (developers.openai.com) on 11 November 2026: `gpt-5.4-mini` $0.75 in, $4.50 out per million tokens, as in `pricing.ts`. `gpt-5.6-terra` $2 in, $12 out, now in `pricing.ts`. The deprecations page lists no shutdown for `gpt-5.4-mini`; the shutdown on 1 April 2027 is for `gpt-5.4-nano`.
+- **Measured** (215 labelled tags, recorded verdicts, graded prompt v4):
+
+| Model | Band | P | R | F1 | Wrong merges | Per 300 tags |
+|---|---|---|---|---|---|---|
+| gpt-5.6-luna, one answer (default) | 0.72–0.88 | 0.930 | 0.515 | 0.662 | 16 | $0.037 |
+| gpt-5.6-luna | 0.64–0.88 | 0.794 | 0.685 | 0.736 | 73 | $0.074 |
+| gpt-5.4-mini | 0.64–0.88 | 0.591 | 0.556 | 0.573 | 158 | $0.091 |
+| gpt-5.4-mini | 0.72–0.88 | 0.678 | 0.641 | 0.659 | 125 | $0.043 |
+| gpt-5.4-mini, least score 8 | 0.72–0.88 | 0.705 | 0.588 | 0.641 | 101 | $0.044 |
+| gpt-5.6-terra | 0.64–0.88 | not finished | | | | about $0.55 |
+
+- **gpt-5.4-mini** reasons far less than luna, so it costs only about 20% more a question. But it lumps more: it joins specific markets to sector words ("telehealth" into digital health, "freight forwarding" into logistics) and merges neighbours ("neobank" with embedded finance). No band or cut-off came near precision 0.85.
+- **gpt-5.6-terra** cost $0.00078 a question in its first round, so a run would cost about $0.55 per 300 tags, over the $0.30 limit. It was stopped after 60 questions ($0.047) and cannot be the default whatever its quality.
+- **Live spend:** $0.139 of $0.40: mini $0.092, terra $0.047.
+- **Code:** the eval takes `--check-model`. The graded and placing modes stay as settings (`scores`, `pairScores` on `ThemeBands`), so every recorded option still replays.
+
+## D50. Ship the strict theme setting; measure again on real tags (12 November 2026)
+
+**Decision.** The maintainer chose the strict D47 setting as the Phase 2 default: `gpt-5.6-luna`, band 0.72-0.88, one answer per tag. On the labelled set it scores precision 0.93, recall 0.52 and F1 0.66, at about $0.037 per 300 new tags. The theme eval now guards this level (precision >= 0.90, F1 >= 0.65). The F1 >= 0.80 target from D48 is retired until there is a trustworthy answer key.
+
+**Why.** SignalFeed should run hands-off. A wrong merge puts companies under the wrong market, and nobody will find it. A missed merge splits one market into two correct themes, which is visible and fixed with `pnpm themes merge`. The balanced setting (F1 0.74) made 4.5 times as many wrong merges (73 against 16). Stronger models did not help: `gpt-5.4-mini` lumped more, and `gpt-5.6-terra` was over budget (D49).
+
+**What comes next.** The labelled set was written by an agent, under a strict one-market rule. Part of the remaining gap may be in the labels, not the method. At go-live (Task 045):
+1. The maintainer labels about 100 real tags once (about 20 minutes), giving a trustworthy answer key.
+2. The check is given each tag's company context (its one-line description), which real data provides.
+3. If open grouping is still weak, move to classifying tags into a curated list of about 100 named markets under the 16 sectors.
+
+**Cost.** About 3p a month for the theme check. The whole pipeline is expected to stay under £1 a month inside the £3 cap.
+

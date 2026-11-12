@@ -51,21 +51,31 @@ pnpm eval --themes --live
 
 ## LLM check verdicts
 
-Tags in the similarity band are placed by an LLM verdict (D47). `recorded/check-<model>-<prompt version>-<embedding recording>.json` holds the verdicts, so the full method replays for free and gives the same result every time.
+Tags in the similarity band are placed by LLM scores (D47, D48). `recorded/check-<model>-<prompt version>-<embedding recording>.json` holds them, so the full method replays for free and gives the same result every time.
 
-- The file name carries the check model, `THEME_CHECK_PROMPT_VERSION` and the embedding recording. The file also stores a hash of the system prompt and schema, and a file with another hash is refused. Bump the version with any prompt change.
+- The file name carries the check model, the prompt version (`themeCheckPromptVersion`) and the embedding recording. The file also stores a hash of the system prompt and schema, and a file with another hash is refused. Bump the version with any prompt change.
 - Each verdict is keyed by the exact question the LLM saw: the tag and each candidate theme's top tags (`bandQuestionKey`). A change of band, embeddings or theme contents that changes a question finds no verdict. The replay reports it as missing and never guesses.
-- A verdict is the chosen candidate's index from 0, or `null` for none.
+- A verdict is one score from 0 to 10 per candidate, in candidate order. The join rule (least score 7) is applied at replay, so it is not stored. One-answer files store the chosen candidate's index, or `null`, and new one-answer verdicts are stored as scores of 10 and 0.
 - `questions`, `invalid` and the token and cost totals count every paid call, including answers that were cut off and so gave no verdict.
 
-Do not edit it by hand. The maintainer adds missing verdicts for the band grid with:
+Do not edit them by hand. The maintainer adds missing verdicts with:
 
 ```
-pnpm eval --themes --check --live [--low <τ>... --high <τ>...] [--rounds <n>]
+pnpm eval --themes --check --live [--meanings] [--place --candidates <n>] [--low <τ>... --high <τ>... [--min-score <n>]...] [--rounds <n>]
 ```
 
-Without `--low` and `--high` it covers `THEME_BAND_GRID`. It asks one pass of the method at a time, as production would, saves after every paid round and stops at $0.05 a run.
+Without `--low` and `--high` it covers the grid in `THEME_BAND_GRIDS` for the template. It asks one pass of the method at a time, as production would, saves after every paid round and stops at $0.10 a run (`--cap` changes it). `--check-model` picks another check model.
 
-`recorded/check-gpt-5.6-luna-theme-check-v1-….json` holds the verdicts from the first prompt. Its totals include 400 questions whose answers were cut off. Nothing reads it. It is kept as the baseline in D47 and can be deleted.
+Files read by `pnpm eval --themes`:
 
-`recorded/merge-trial-gpt-5.6-luna.json` holds the answers from the merge-check trial in D47. The check was not built, and nothing reads the file. Its token counts are included in the v2 verdicts file's totals; its calls, questions and cost are not.
+- `check-gpt-5.6-luna-theme-check-v2-….json`: the default method (D47, D49), one answer per tag. Its verdicts are the chosen candidate's index or `null`.
+- `check-gpt-5.6-luna-theme-check-v4-…-market-v1.json`: option 1 of D48, graded scores.
+- `check-gpt-5.4-mini-theme-check-v4-….json` and `check-gpt-5.6-terra-theme-check-v4-….json`: the stronger check models in D49. The terra file stops after one round.
+- `check-…-theme-place-v1-c8-…-market-v1.json`: option 3 of D48, the LLM placing every tag among 8 themes.
+- `meanings-gpt-5.6-luna-meaning-v1.json`, `text-embedding-3-small-512-market-meaning-v1.json` and `check-…-theme-check-v4-…-market-meaning-v1.json`: option 2 of D48, tag meanings before embedding. `pnpm eval --themes --describe --live` records the meanings and the embeddings.
+
+Kept as baselines; nothing reads them, and they can be deleted:
+
+- `check-…-theme-check-v1-….json`: the first prompt in D47. Its totals include 400 questions whose answers were cut off.
+- `check-…-theme-check-v3-….json`: the first graded prompt in D48.
+- `merge-trial-gpt-5.6-luna.json`: the merge-check trial in D47. Its token counts are included in the v2 file's totals; its calls, questions and cost are not.

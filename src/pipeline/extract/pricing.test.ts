@@ -47,6 +47,11 @@ describe("MODEL_PRICES", () => {
         outputUsdPerMillion: 4.5,
       },
       {
+        model: "gpt-5.6-terra",
+        inputUsdPerMillion: 2,
+        outputUsdPerMillion: 12,
+      },
+      {
         model: "text-embedding-3-small",
         inputUsdPerMillion: 0.02,
         outputUsdPerMillion: 0,

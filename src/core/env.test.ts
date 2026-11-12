@@ -33,6 +33,7 @@ describe("parsePipelineEnv", () => {
       MAX_EMBEDDINGS_PER_RUN: 2000,
       MAX_THEME_NAMES_PER_RUN: 20,
       MAX_GRANT_TAGGINGS_PER_RUN: 200,
+      THEME_CHECK_MODEL: "gpt-5.6-luna",
     });
   });
 

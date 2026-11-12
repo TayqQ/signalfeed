@@ -17,6 +17,13 @@ export const MODEL_PRICES: ModelPrice[] = [
   { model: "gpt-5.6-luna", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.2 },
   { model: "gpt-5.4-nano", inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.25 },
   { model: "gpt-5.4-mini", inputUsdPerMillion: 0.75, outputUsdPerMillion: 4.5 },
+  // OpenAI pricing page (developers.openai.com), checked 11 Nov 2026. Short
+  // context, up to 272K input tokens. Evaluated as the theme checker (D49).
+  {
+    model: "gpt-5.6-terra",
+    inputUsdPerMillion: 2,
+    outputUsdPerMillion: 12,
+  },
   // Embeddings price input only. OpenAI pricing page, checked 11 Nov 2026 (A15).
   {
     model: "text-embedding-3-small",

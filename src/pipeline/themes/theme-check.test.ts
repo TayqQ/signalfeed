@@ -17,7 +17,13 @@ import {
   assignWithThemeCheck,
   buildThemeCheckSystemPrompt,
   buildThemeCheckUserPrompt,
+  THEME_CHECK_PROMPT_VERSION,
+  THEME_PICK_PROMPT_VERSION,
+  THEME_PLACE_PROMPT_VERSION,
+  themeCheckPromptVersion,
   themeCheckSchema,
+  THEME_SCORES_SCHEMA_NAME,
+  verdictFromScores,
 } from "./theme-check";
 import { axis, vectorAt } from "./testing";
 
@@ -46,7 +52,15 @@ function fakeLlm(
       if (error) return Promise.reject(error);
       const { tags } = JSON.parse(request.user) as { tags: PromptItem[] };
       const data = request.schema.parse({
-        verdicts: tags.map((item) => ({ id: item.id, match: pick(item) })),
+        verdicts: tags.map((item) => {
+          const match = pick(item);
+          return request.schemaName === THEME_SCORES_SCHEMA_NAME
+            ? {
+                id: item.id,
+                scores: item.candidates.map((c) => (c.n === match ? 9 : 2)),
+              }
+            : { id: item.id, match };
+        }),
       });
       return Promise.resolve({ data, usage, model });
     },
@@ -115,8 +129,14 @@ describe("theme check prompt and schema", () => {
       ],
     });
     const system = buildThemeCheckSystemPrompt();
-    expect(system).toMatch(/sector word/);
-    expect(system).toMatch(/answer 0/);
+    expect(system).toMatch(/Sector words/);
+    expect(system).toMatch(/from 0 to 10/);
+  });
+
+  it("picks the best score when it reaches the least score", () => {
+    expect(verdictFromScores([3, 8, 8], 7)).toBe(1);
+    expect(verdictFromScores([3, 6], 7)).toBeNull();
+    expect(verdictFromScores([7], 7)).toBe(0);
   });
 
   it("keeps only verdicts that were asked, once, and in range", () => {
@@ -128,19 +148,24 @@ describe("theme check prompt and schema", () => {
     const verdicts = acceptedVerdicts(
       {
         verdicts: [
-          { id: 1, match: 0 },
-          { id: 1, match: 1 },
-          { id: 2, match: 2 },
-          { id: 3, match: 2 },
-          { id: 9, match: 1 },
+          { id: 1, scores: [0] },
+          { id: 1, scores: [9] },
+          { id: 2, scores: [3, 8] },
+          { id: 3, scores: [2, 9] },
+          { id: 9, scores: [9] },
         ],
       },
       batch,
     );
     expect([...verdicts]).toEqual([
-      ["a", null],
-      ["b", 1],
+      ["a", [0]],
+      ["b", [3, 8]],
     ]);
+    const outOfRange = acceptedVerdicts(
+      { verdicts: [{ id: 1, scores: [11] }] },
+      batch,
+    );
+    expect(outOfRange.size).toBe(0);
     expect(acceptedVerdicts({ nonsense: true }, batch).size).toBe(0);
   });
 });
@@ -342,6 +367,48 @@ describe("assignWithThemeCheck", () => {
   });
 });
 
+describe("placing mode", () => {
+  it("asks each tag about each candidate once and uses the place prompt", async () => {
+    const llm = fakeLlm(() => 0);
+    const { stats } = await assignWithThemeCheck({
+      tags,
+      themes: [],
+      bands: { low: 0, high: 0.99, candidates: 8, pairScores: true },
+      check: { llm, budget: budgetGuard(), model, purpose: "eval" },
+    });
+    const seen = new Set<string>();
+    for (const request of llm.requests) {
+      expect(request.system).toMatch(/up to 8 candidate themes/);
+      const { tags: items } = JSON.parse(request.user) as {
+        tags: PromptItem[];
+      };
+      for (const item of items) {
+        for (const c of item.candidates) {
+          const key = `${item.tag}|${c.tags[0]}`;
+          expect(seen.has(key)).toBe(false);
+          seen.add(key);
+        }
+      }
+    }
+    // Every tag after the first is asked, and every answer was "none".
+    expect(stats).toMatchObject({ joined: 0, rejected: 3, fallbacks: 0 });
+    expect(themeCheckPromptVersion({ low: 0, high: 1 })).toBe(
+      THEME_PICK_PROMPT_VERSION,
+    );
+    expect(themeCheckPromptVersion({ low: 0, high: 1, scores: true })).toBe(
+      THEME_CHECK_PROMPT_VERSION,
+    );
+    expect(
+      themeCheckPromptVersion({
+        low: 0,
+        high: 1,
+        candidates: 8,
+        pairScores: true,
+      }),
+    ).toBe(`${THEME_PLACE_PROMPT_VERSION}-c8`);
+  });
+});
+
 describe("askThemeChecks", () => {
   it("stops at the first refusal and reports what was sent", async () => {
     let calls = 0;
@@ -362,5 +429,59 @@ describe("askThemeChecks", () => {
     });
     expect(result).toMatchObject({ calls: 2, sent: 4, fallback: "error" });
     expect([...result.verdicts.keys()]).toEqual(["k0", "k1"]);
+  });
+
+  it("switches to the fallback model on an error and asks the batch again", async () => {
+    const outage = Object.assign(new Error("model gone"), { status: 404 });
+    const primary = fakeLlm(
+      () => 1,
+      () => outage,
+    );
+    const fallback = fakeLlm(() => 1);
+    const budget = budgetGuard();
+    const questions = Array.from({ length: 3 }, (_, i) => ({
+      key: `k${i}`,
+      tag: `t${i}`,
+      candidates: [{ tags: ["x"] }],
+    }));
+    const result = await askThemeChecks(questions, {
+      llm: primary,
+      budget,
+      model: "gpt-5.4-mini",
+      purpose: "eval",
+      batchSize: 2,
+      fallbackLlm: { llm: fallback, model },
+    });
+    expect(primary.requests).toHaveLength(1);
+    expect(fallback.requests).toHaveLength(2);
+    expect(result).toMatchObject({ sent: 3, switched: model });
+    expect(result.fallback).toBeUndefined();
+    expect(result.verdicts.size).toBe(3);
+    expect(budget.records.map((row) => row.model)).toEqual([model, model]);
+  });
+
+  it("keeps later passes on the fallback model", async () => {
+    let calls = 0;
+    const primary = fakeLlm(
+      () => 1,
+      () => (++calls === 1 ? new Error("down") : null),
+    );
+    const fallback = fakeLlm(() => 1);
+    const { stats } = await assignWithThemeCheck({
+      tags,
+      themes: [],
+      bands,
+      check: {
+        llm: primary,
+        budget: budgetGuard(),
+        model: "gpt-5.4-mini",
+        purpose: "eval",
+        fallbackLlm: { llm: fallback, model },
+      },
+    });
+    expect(primary.requests).toHaveLength(1);
+    expect(fallback.requests.length).toBeGreaterThan(0);
+    expect(stats).toMatchObject({ switchedTo: model });
+    expect(stats?.fallback).toBeUndefined();
   });
 });

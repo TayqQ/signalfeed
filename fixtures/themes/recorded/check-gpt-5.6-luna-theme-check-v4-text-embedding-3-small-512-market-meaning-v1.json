@@ -1,0 +1,613 @@
+{
+  "model": "gpt-5.6-luna",
+  "promptVersion": "theme-check-v4",
+  "promptHash": "fc733879eb66a5e6",
+  "embeddings": "text-embedding-3-small-512-market-meaning-v1.json",
+  "recordedOn": "2026-11-11",
+  "calls": 13,
+  "questions": 216,
+  "invalid": 0,
+  "inputTokens": 17666,
+  "outputTokens": 13062,
+  "costUsdMicros": 19214,
+  "verdicts": {
+    "[\"food tech\",[[\"space tech\"]]]": [2],
+    "[\"construction tech\",[[\"food tech\"],[\"space tech\"]]]": [2, 2],
+    "[\"payment rails\",[[\"embedded finance\"]]]": [5],
+    "[\"digital health\",[[\"construction tech\"],[\"food tech\"],[\"space tech\"]]]": [
+      2, 2, 2
+    ],
+    "[\"agritech\",[[\"food tech\"],[\"space tech\"],[\"construction tech\"]]]": [
+      3, 2, 2
+    ],
+    "[\"satellites\",[[\"space tech\"]]]": [3],
+    "[\"solar panels\",[[\"grid storage\"]]]": [5],
+    "[\"battery storage\",[[\"grid storage\"],[\"battery recycling\"],[\"solar panels\"]]]": [
+      8, 5, 5
+    ],
+    "[\"edtech\",[[\"food tech\",\"agritech\"],[\"digital health\"],[\"space tech\"]]]": [
+      2, 3, 2
+    ],
+    "[\"banking as a service\",[[\"embedded finance\"],[\"payment rails\"]]]": [
+      6, 5
+    ],
+    "[\"ev charging\",[[\"electric vehicles\"]]]": [5],
+    "[\"neobank\",[[\"banking as a service\"]]]": [5],
+    "[\"e-commerce\",[[\"logistics\"]]]": [5],
+    "[\"payments infrastructure\",[[\"banking as a service\"],[\"payment rails\"],[\"embedded finance\"]]]": [
+      6, 8, 6
+    ],
+    "[\"proptech\",[[\"construction tech\"],[\"space tech\"],[\"food tech\",\"agritech\"]]]": [
+      3, 2, 2
+    ],
+    "[\"cybersecurity\",[[\"digital health\"],[\"space tech\"],[\"edtech\"]]]": [
+      2, 2, 2
+    ],
+    "[\"insurtech\",[[\"proptech\"],[\"food tech\",\"agritech\"],[\"digital health\"]]]": [
+      3, 2, 2
+    ],
+    "[\"ai drug discovery\",[[\"drug discovery\"],[\"ai agents\"]]]": [7, 1],
+    "[\"mental health\",[[\"digital health\"],[\"cybersecurity\"]]]": [3, 1],
+    "[\"quantum hardware\",[[\"quantum computing\"]]]": [8],
+    "[\"telehealth\",[[\"digital health\"],[\"mental health\"]]]": [3, 3],
+    "[\"earth observation\",[[\"satellites\"],[\"space tech\"]]]": [6, 3],
+    "[\"precision agriculture\",[[\"food tech\",\"agritech\"]]]": [3],
+    "[\"wind turbines\",[[\"solar panels\",\"solar installation\"],[\"offshore wind\",\"floating wind\"],[\"grid storage\",\"battery storage\"]]]": [
+      5, 7, 4
+    ],
+    "[\"online learning\",[[\"edtech\"],[\"e-commerce\"],[\"telehealth\"]]]": [
+      3, 0, 0
+    ],
+    "[\"baas\",[[\"banking as a service\",\"payments infrastructure\"],[\"embedded finance\"],[\"neobank\"]]]": [
+      10, 5, 4
+    ],
+    "[\"charge point network\",[[\"ev charging\"],[\"electric vehicles\"]]]": [
+      10, 5
+    ],
+    "[\"supply chain\",[[\"logistics\"]]]": [5],
+    "[\"open banking payments\",[[\"payment rails\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"],[\"neobank\",\"digital bank\"]]]": [
+      6, 4, 3
+    ],
+    "[\"digital insurance\",[[\"insurtech\"],[\"neobank\",\"digital bank\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"]]]": [
+      3, 1, 1
+    ],
+    "[\"launch vehicles\",[[\"space tech\"],[\"satellites\",\"earth observation\"]]]": [
+      3, 4
+    ],
+    "[\"wind farm software\",[[\"solar panels\",\"solar installation\",\"wind turbines\"],[\"offshore wind\",\"floating wind\"],[\"grid storage\",\"battery storage\",\"long-duration storage\"]]]": [
+      8, 7, 3
+    ],
+    "[\"3d printing\",[[\"additive manufacturing\"]]]": [10],
+    "[\"cultivated meat\",[[\"alternative protein\",\"plant-based food\"]]]": [
+      7
+    ],
+    "[\"model serving\",[[\"ai agents\",\"agentic ai\"],[\"llmops\",\"llm ops\"]]]": [
+      4, 8
+    ],
+    "[\"protein design\",[[\"drug discovery\",\"ai drug discovery\"],[\"alternative protein\",\"plant-based food\",\"cultivated meat\"]]]": [
+      7, 4
+    ],
+    "[\"offsite manufacturing\",[[\"modular construction\"],[\"additive manufacturing\",\"3d printing\"]]]": [
+      7, 4
+    ],
+    "[\"rooftop solar\",[[\"solar panels\",\"solar installation\",\"wind turbines\"]]]": [
+      8
+    ],
+    "[\"carbon credits\",[[\"carbon capture\",\"direct air capture\",\"carbon removal\"]]]": [
+      5
+    ],
+    "[\"learning platform\",[[\"edtech\",\"online learning\"],[\"e-commerce\",\"ecommerce\"]]]": [
+      3, 0
+    ],
+    "[\"freight forwarding\",[[\"logistics\"]]]": [3],
+    "[\"estate agency software\",[[\"proptech\",\"property technology\"]]]": [
+      3
+    ],
+    "[\"crop monitoring\",[[\"precision agriculture\"]]]": [7],
+    "[\"insurance software\",[[\"digital insurance\"],[\"insurtech\"],[\"estate agency software\"]]]": [
+      6, 3, 0
+    ],
+    "[\"small satellites\",[[\"launch vehicles\"],[\"satellites\",\"earth observation\"],[\"space tech\"]]]": [
+      4, 7, 3
+    ],
+    "[\"solar financing\",[[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\"],[\"embedded finance\",\"embedded lending\"]]]": [
+      8, 5
+    ],
+    "[\"threat detection\",[[\"cybersecurity\",\"cyber security\"]]]": [3],
+    "[\"home batteries\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"],[\"battery recycling\",\"battery reuse\",\"second-life batteries\"]]]": [
+      7, 4, 5
+    ],
+    "[\"industrial automation\",[[\"food tech\",\"agritech\"],[\"construction tech\"]]]": [
+      3, 3
+    ],
+    "[\"precision fermentation\",[[\"protein design\"],[\"alternative protein\",\"plant-based food\",\"cultivated meat\"]]]": [
+      5, 7
+    ],
+    "[\"therapy app\",[[\"mental health\",\"mental wellbeing\"],[\"telehealth\",\"telemedicine\",\"remote consultations\"]]]": [
+      6, 5
+    ],
+    "[\"tutoring marketplace\",[[\"edtech\",\"online learning\",\"learning platform\"]]]": [
+      3
+    ],
+    "[\"e-bikes\",[[\"electric vehicles\",\"electric vans\"],[\"ev charging\",\"charge point network\"]]]": [
+      7, 4
+    ],
+    "[\"last-mile delivery\",[[\"logistics\"],[\"freight forwarding\"],[\"supply chain\"]]]": [
+      3, 4, 3
+    ],
+    "[\"mobile banking\",[[\"neobank\",\"digital bank\",\"challenger bank\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"],[\"embedded finance\",\"embedded lending\"]]]": [
+      8, 5, 4
+    ],
+    "[\"white-label banking\",[[\"neobank\",\"digital bank\",\"challenger bank\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"],[\"embedded finance\",\"embedded lending\"]]]": [
+      7, 9, 6
+    ],
+    "[\"construction robotics\",[[\"construction tech\"],[\"modular construction\",\"offsite manufacturing\"],[\"industrial automation\"]]]": [
+      3, 4, 7
+    ],
+    "[\"cross-border payments\",[[\"payment rails\",\"payment processing\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"],[\"open banking payments\"]]]": [
+      7, 6, 5
+    ],
+    "[\"lettings platform\",[[\"estate agency software\"],[\"proptech\",\"property technology\"],[\"e-commerce\",\"ecommerce\",\"online retail\"]]]": [
+      7, 3, 0
+    ],
+    "[\"carbon accounting\",[[\"carbon credits\"],[\"carbon capture\",\"direct air capture\",\"carbon removal\"]]]": [
+      4, 4
+    ],
+    "[\"claims automation\",[[\"digital insurance\",\"insurance software\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\"],[\"insurtech\"]]]": [
+      7, 4, 3
+    ],
+    "[\"endpoint security\",[[\"cybersecurity\",\"cyber security\"],[\"threat detection\"]]]": [
+      7, 5
+    ],
+    "[\"biologics\",[[\"protein design\"],[\"drug discovery\",\"ai drug discovery\"]]]": [
+      6, 5
+    ],
+    "[\"prompt management\",[[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\"],[\"model serving\"]]]": [
+      4, 4
+    ],
+    "[\"robotics\",[[\"construction robotics\"],[\"industrial automation\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"prompt management\"]]]": [
+      7, 5, 2
+    ],
+    "[\"quantum sensing\",[[\"quantum computing\",\"quantum hardware\",\"quantum software\",\"qubits\"]]]": [
+      5
+    ],
+    "[\"perovskite solar\",[[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"]]]": [
+      7
+    ],
+    "[\"wind blade recycling\",[[\"battery recycling\",\"battery reuse\",\"second-life batteries\",\"lithium recovery\"],[\"offshore wind\",\"floating wind\",\"onshore wind\"]]]": [
+      5, 4
+    ],
+    "[\"flow batteries\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\"],[\"battery recycling\",\"battery reuse\",\"second-life batteries\",\"lithium recovery\",\"ev battery recycling\"]]]": [
+      7, 4
+    ],
+    "[\"food waste\",[[\"food tech\",\"agritech\"]]]": [3],
+    "[\"language learning\",[[\"edtech\",\"online learning\",\"learning platform\"],[\"tutoring marketplace\"],[\"llmops\",\"llm ops\"]]]": [
+      6, 4, 1
+    ],
+    "[\"card issuing api\",[[\"payment rails\",\"payment processing\"],[\"banking as a service\",\"payments infrastructure\",\"baas\"],[\"open banking payments\"]]]": [
+      5, 7, 4
+    ],
+    "[\"micromobility\",[[\"electric vehicles\",\"electric vans\",\"e-bikes\"],[\"food tech\",\"agritech\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"]]]": [
+      7, 1, 2
+    ],
+    "[\"warehouse automation\",[[\"construction robotics\",\"robotics\",\"farm robotics\"],[\"industrial automation\"],[\"logistics\"]]]": [
+      6, 7, 3
+    ],
+    "[\"d2c brands\",[[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"]]]": [
+      6
+    ],
+    "[\"payment orchestration\",[[\"payment rails\",\"payment processing\"]]]": [
+      6
+    ],
+    "[\"site management software\",[[\"estate agency software\",\"property management software\"],[\"wind farm software\"]]]": [
+      3, 4
+    ],
+    "[\"identity security\",[[\"threat detection\"],[\"endpoint security\"],[\"cybersecurity\",\"cyber security\"]]]": [
+      5, 5, 3
+    ],
+    "[\"space debris\",[[\"launch vehicles\"],[\"satellites\",\"earth observation\",\"satellite data\"]]]": [
+      3, 4
+    ],
+    "[\"turbine maintenance\",[[\"wind farm software\"],[\"offshore wind\",\"floating wind\",\"onshore wind\"],[\"wind blade recycling\"]]]": [
+      7, 5, 4
+    ],
+    "[\"inference optimisation\",[[\"model serving\"]]]": [7],
+    "[\"small molecule discovery\",[[\"drug discovery\",\"ai drug discovery\"],[\"biologics\"]]]": [
+      7, 4
+    ],
+    "[\"smart factory\",[[\"industrial automation\"],[\"construction tech\"],[\"construction robotics\",\"robotics\",\"farm robotics\"]]]": [
+      8, 2, 4
+    ],
+    "[\"virtual power plant\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\",\"flow batteries\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"],[\"wind farm software\"]]]": [
+      5, 4, 4
+    ],
+    "[\"workplace wellbeing\",[[\"mental health\",\"mental wellbeing\"],[\"therapy app\",\"cbt app\"]]]": [
+      6, 4
+    ],
+    "[\"online gp\",[[\"telehealth\",\"telemedicine\",\"remote consultations\",\"virtual care\"]]]": [
+      10
+    ],
+    "[\"quantum cryptography\",[[\"quantum computing\",\"quantum hardware\",\"quantum software\",\"qubits\"],[\"quantum sensing\"]]]": [
+      5, 4
+    ],
+    "[\"account-to-account payments\",[[\"open banking payments\"],[\"payment rails\",\"payment processing\",\"payment orchestration\"],[\"cross-border payments\"]]]": [
+      9, 7, 5
+    ],
+    "[\"low-carbon concrete\",[[\"carbon capture\",\"direct air capture\",\"carbon removal\"],[\"carbon credits\",\"carbon markets\"]]]": [
+      3, 2
+    ],
+    "[\"soil health\",[[\"food tech\",\"agritech\"],[\"crop monitoring\"]]]": [
+      3, 5
+    ],
+    "[\"solar monitoring\",[[\"wind farm software\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"],[\"crop monitoring\"]]]": [
+      7, 4, 3
+    ],
+    "[\"black mass processing\",[[\"battery recycling\",\"battery reuse\",\"second-life batteries\",\"lithium recovery\",\"ev battery recycling\"],[\"wind blade recycling\"]]]": [
+      9, 5
+    ],
+    "[\"corporate training\",[[\"edtech\",\"online learning\",\"learning platform\"],[\"tutoring marketplace\"],[\"language learning\"]]]": [
+      3, 4, 4
+    ],
+    "[\"ai observability\",[[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"prompt management\",\"agent orchestration\"],[\"model serving\"],[\"crop monitoring\"]]]": [
+      4, 7, 0
+    ],
+    "[\"business current account\",[[\"open banking payments\",\"account-to-account payments\"],[\"banking as a service\",\"payments infrastructure\",\"baas\",\"fintech apis\"],[\"neobank\",\"digital bank\",\"challenger bank\"]]]": [
+      4, 5, 7
+    ],
+    "[\"fleet management\",[[\"electric vehicles\",\"electric vans\",\"e-bikes\",\"micromobility\",\"fleet electrification\"],[\"ev charging\",\"charge point network\"],[\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"]]]": [
+      4, 4, 3
+    ],
+    "[\"target identification\",[[\"drug discovery\",\"ai drug discovery\",\"small molecule discovery\"],[\"biologics\"],[\"protein design\"]]]": [
+      7, 4, 5
+    ],
+    "[\"mortgage broker software\",[[\"estate agency software\",\"property management software\"],[\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"],[\"embedded finance\",\"embedded lending\"]]]": [
+      5, 3, 5
+    ],
+    "[\"quantum error correction\",[[\"quantum computing\",\"quantum hardware\",\"quantum software\",\"qubits\",\"quantum cryptography\"]]]": [
+      8
+    ],
+    "[\"remote patient monitoring\",[[\"telehealth\",\"telemedicine\",\"remote consultations\",\"virtual care\",\"online gp\"],[\"digital health\"]]]": [
+      7, 3
+    ],
+    "[\"agricultural drones\",[[\"construction robotics\",\"robotics\",\"farm robotics\"],[\"precision agriculture\"],[\"crop monitoring\"]]]": [
+      6, 7, 6
+    ],
+    "[\"community solar\",[[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"],[\"virtual power plant\"],[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\",\"flow batteries\"]]]": [
+      7, 6, 4
+    ],
+    "[\"embedded insurance\",[[\"embedded finance\",\"embedded lending\"],[\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"],[\"insurtech\"]]]": [
+      5, 7, 3
+    ],
+    "[\"orbital logistics\",[[\"launch vehicles\"],[\"space tech\"],[\"logistics\"]]]": [
+      5, 3, 3
+    ],
+    "[\"wind forecasting\",[[\"wind farm software\"],[\"offshore wind\",\"floating wind\",\"onshore wind\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"]]]": [
+      7, 5, 4
+    ],
+    "[\"zero trust\",[[\"identity security\"],[\"endpoint security\"]]]": [
+      7, 5
+    ],
+    "[\"cobots\",[[\"construction robotics\",\"robotics\",\"farm robotics\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"prompt management\",\"agent orchestration\"],[\"warehouse automation\"]]]": [
+      7, 2, 5
+    ],
+    "[\"demand response\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\",\"flow batteries\"],[\"virtual power plant\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"]]]": [
+      4, 7, 3
+    ],
+    "[\"mindfulness app\",[[\"therapy app\",\"cbt app\"],[\"mental health\",\"mental wellbeing\",\"workplace wellbeing\"]]]": [
+      5, 3
+    ],
+    "[\"student assessment\",[[\"edtech\",\"online learning\",\"learning platform\",\"corporate training\"]]]": [
+      3
+    ],
+    "[\"buy now pay later\",[[\"embedded finance\",\"embedded lending\",\"embedded insurance\"]]]": [
+      7
+    ],
+    "[\"savings app\",[[\"mobile banking\",\"banking app\"],[\"neobank\",\"digital bank\",\"challenger bank\"],[\"embedded finance\",\"embedded lending\",\"embedded insurance\"]]]": [
+      7, 5, 3
+    ],
+    "[\"shipment tracking\",[[\"logistics\"],[\"last-mile delivery\"],[\"freight forwarding\"]]]": [
+      6, 4, 4
+    ],
+    "[\"vehicle-to-grid\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\",\"flow batteries\"],[\"electric vehicles\",\"electric vans\",\"e-bikes\",\"micromobility\",\"fleet electrification\"],[\"virtual power plant\"]]]": [
+      6, 6, 7
+    ],
+    "[\"building retrofit\",[[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"]]]": [
+      4
+    ],
+    "[\"home buying platform\",[[\"lettings platform\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"],[\"embedded finance\",\"embedded lending\",\"embedded insurance\"]]]": [
+      5, 3, 2
+    ],
+    "[\"merchant acquiring\",[[\"payment rails\",\"payment processing\",\"payment orchestration\"],[\"card issuing api\"],[\"cross-border payments\"]]]": [
+      9, 5, 4
+    ],
+    "[\"shopify apps\",[[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"]]]": [
+      4
+    ],
+    "[\"security operations\",[[\"threat detection\"],[\"cybersecurity\",\"cyber security\"],[\"identity security\"]]]": [
+      7, 3, 4
+    ],
+    "[\"employee assistance\",[[\"mental health\",\"mental wellbeing\",\"workplace wellbeing\"]]]": [
+      6
+    ],
+    "[\"preclinical research\",[[\"drug discovery\",\"ai drug discovery\",\"small molecule discovery\",\"target identification\"]]]": [
+      7
+    ],
+    "[\"digital therapeutics\",[[\"therapy app\",\"cbt app\",\"mindfulness app\"],[\"drug discovery\",\"ai drug discovery\",\"small molecule discovery\",\"target identification\"],[\"telehealth\",\"telemedicine\",\"remote consultations\",\"virtual care\",\"online gp\",\"remote patient monitoring\"]]]": [
+      8, 0, 5
+    ],
+    "[\"photonic computing\",[[\"quantum computing\",\"quantum hardware\",\"quantum software\",\"qubits\",\"quantum cryptography\"]]]": [
+      5
+    ],
+    "[\"livestock monitoring\",[[\"crop monitoring\"],[\"solar monitoring\"],[\"precision agriculture\"]]]": [
+      5, 0, 3
+    ],
+    "[\"solar tracking\",[[\"solar monitoring\"],[\"solar panels\",\"solar installation\",\"wind turbines\",\"rooftop solar\",\"solar financing\"],[\"wind farm software\",\"wind forecasting\"]]]": [
+      6, 5, 2
+    ],
+    "[\"school software\",[[\"edtech\",\"online learning\",\"learning platform\",\"corporate training\"],[\"student assessment\"],[\"site management software\"]]]": [
+      3, 7, 3
+    ],
+    "[\"digital wallet\",[[\"neobank\",\"digital bank\",\"challenger bank\"],[\"mobile banking\",\"banking app\"],[\"open banking payments\",\"account-to-account payments\"]]]": [
+      5, 7, 5
+    ],
+    "[\"freight marketplace\",[[\"freight forwarding\"],[\"logistics\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"]]]": [
+      7, 3, 0
+    ],
+    "[\"usage-based insurance\",[[\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\",\"insurance analytics\"],[\"embedded finance\",\"embedded lending\",\"embedded insurance\"]]]": [
+      8, 7
+    ],
+    "[\"vulnerability management\",[[\"identity security\"],[\"threat detection\",\"security operations\"],[\"cybersecurity\",\"cyber security\"]]]": [
+      4, 5, 3
+    ],
+    "[\"predictive maintenance\",[[\"turbine maintenance\"],[\"wind farm software\",\"wind forecasting\"]]]": [
+      7, 4
+    ],
+    "[\"stress management\",[[\"mental health\",\"mental wellbeing\",\"workplace wellbeing\"],[\"therapy app\",\"cbt app\",\"mindfulness app\"]]]": [
+      7, 5
+    ],
+    "[\"proptech\",[[\"construction tech\"],[\"space tech\"],[\"edtech\"]]]": [
+      3, 2, 1
+    ],
+    "[\"insurtech\",[[\"proptech\"],[\"digital health\"],[\"construction tech\"]]]": [
+      2, 2, 2
+    ],
+    "[\"precision agriculture\",[[\"agritech\"]]]": [3],
+    "[\"baas\",[[\"banking as a service\"],[\"embedded finance\"],[\"payment rails\",\"payments infrastructure\"]]]": [
+      10, 6, 5
+    ],
+    "[\"digital insurance\",[[\"insurtech\"],[\"neobank\",\"digital bank\"],[\"digital health\"]]]": [
+      10, 4, 2
+    ],
+    "[\"rooftop solar\",[[\"solar panels\",\"solar installation\",\"wind farm software\"],[\"offshore wind\",\"floating wind\",\"wind turbines\"]]]": [
+      8, 5
+    ],
+    "[\"crop monitoring\",[[\"precision agriculture\"],[\"agritech\"],[\"earth observation\"]]]": [
+      7, 3, 4
+    ],
+    "[\"industrial automation\",[[\"agritech\"],[\"construction tech\"]]]": [
+      3, 3
+    ],
+    "[\"precision fermentation\",[[\"alternative protein\",\"plant-based food\",\"cultivated meat\"]]]": [
+      7
+    ],
+    "[\"tutoring marketplace\",[[\"online learning\",\"learning platform\"],[\"edtech\"]]]": [
+      7, 3
+    ],
+    "[\"claims automation\",[[\"insurance software\"],[\"digital insurance\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\"]]]": [
+      8, 6, 4
+    ],
+    "[\"biologics\",[[\"drug discovery\",\"ai drug discovery\",\"protein design\"]]]": [
+      5
+    ],
+    "[\"prompt management\",[[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\"],[\"llmops\",\"llm ops\",\"model serving\"]]]": [
+      5, 7
+    ],
+    "[\"satellite data\",[[\"earth observation\"],[\"satellites\",\"small satellites\"],[\"space tech\"]]]": [
+      8, 5, 3
+    ],
+    "[\"language learning\",[[\"online learning\",\"learning platform\",\"tutoring marketplace\"],[\"llmops\",\"llm ops\",\"model serving\"]]]": [
+      7, 0
+    ],
+    "[\"banking app\",[[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\"],[\"banking as a service\",\"baas\",\"white-label banking\"],[\"open banking payments\"]]]": [
+      6, 6, 4
+    ],
+    "[\"micromobility\",[[\"electric vehicles\",\"electric vans\",\"e-bikes\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"]]]": [
+      7, 0
+    ],
+    "[\"warehouse automation\",[[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\"],[\"logistics\"],[\"supply chain\"]]]": [
+      7, 5, 4
+    ],
+    "[\"site management software\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"insurance software\",\"claims automation\"],[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\"]]]": [
+      6, 2, 4
+    ],
+    "[\"identity security\",[[\"cybersecurity\",\"cyber security\",\"endpoint security\"],[\"threat detection\"]]]": [
+      3, 4
+    ],
+    "[\"turbine maintenance\",[[\"offshore wind\",\"floating wind\",\"wind turbines\",\"onshore wind\"],[\"wind blade recycling\"]]]": [
+      8, 5
+    ],
+    "[\"inference optimisation\",[[\"llmops\",\"llm ops\",\"model serving\"]]]": [
+      8
+    ],
+    "[\"meal kits\",[[\"food tech\"]]]": [3],
+    "[\"smart factory\",[[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\"],[\"construction tech\"]]]": [
+      7, 3
+    ],
+    "[\"virtual power plant\",[[\"grid storage\",\"battery storage\",\"long-duration storage\",\"energy storage\",\"home batteries\",\"flow batteries\"],[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"],[\"offshore wind\",\"floating wind\",\"wind turbines\",\"onshore wind\"]]]": [
+      5, 4, 3
+    ],
+    "[\"fintech apis\",[[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\"],[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\"],[\"embedded finance\",\"embedded lending\"]]]": [
+      8, 6, 5
+    ],
+    "[\"account-to-account payments\",[[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\"],[\"open banking payments\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"]]]": [
+      7, 9, 4
+    ],
+    "[\"soil health\",[[\"agritech\"],[\"crop monitoring\"]]]": [3, 5],
+    "[\"solar monitoring\",[[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"],[\"crop monitoring\"],[\"earth observation\",\"satellite data\"]]]": [
+      6, 2, 4
+    ],
+    "[\"corporate training\",[[\"online learning\",\"learning platform\",\"tutoring marketplace\"],[\"edtech\"],[\"language learning\"]]]": [
+      5, 3, 4
+    ],
+    "[\"ai observability\",[[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"prompt management\",\"agent orchestration\"],[\"llmops\",\"llm ops\",\"model serving\"],[\"crop monitoring\"]]]": [
+      4, 7, 0
+    ],
+    "[\"business current account\",[[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"],[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\",\"account-to-account payments\"],[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\",\"banking app\"]]]": [
+      5, 4, 7
+    ],
+    "[\"fleet management\",[[\"electric vehicles\",\"electric vans\",\"e-bikes\",\"micromobility\",\"fleet electrification\"],[\"ev charging\",\"charge point network\"],[\"estate agency software\",\"lettings platform\",\"property management software\"]]]": [
+      5, 4, 1
+    ],
+    "[\"target identification\",[[\"drug discovery\",\"ai drug discovery\",\"protein design\",\"small molecule discovery\"],[\"biologics\"]]]": [
+      7, 4
+    ],
+    "[\"mortgage broker software\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"insurance software\",\"claims automation\",\"underwriting automation\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"]]]": [
+      5, 4, 3
+    ],
+    "[\"quantum error correction\",[[\"quantum computing\",\"quantum hardware\",\"quantum software\",\"qubits\"],[\"quantum cryptography\"]]]": [
+      7, 4
+    ],
+    "[\"agricultural drones\",[[\"precision agriculture\"],[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\"],[\"agritech\"]]]": [
+      7, 6, 3
+    ],
+    "[\"embedded insurance\",[[\"digital insurance\"],[\"embedded finance\",\"embedded lending\"],[\"insurance software\",\"claims automation\",\"underwriting automation\"]]]": [
+      7, 6, 5
+    ],
+    "[\"orbital logistics\",[[\"launch vehicles\"],[\"space tech\"],[\"satellites\",\"small satellites\"]]]": [
+      5, 3, 4
+    ],
+    "[\"wind forecasting\",[[\"offshore wind\",\"floating wind\",\"wind turbines\",\"onshore wind\"],[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"]]]": [
+      5, 7
+    ],
+    "[\"zero trust\",[[\"identity security\"],[\"cybersecurity\",\"cyber security\",\"endpoint security\"]]]": [
+      7, 6
+    ],
+    "[\"cobots\",[[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"prompt management\",\"agent orchestration\"]]]": [
+      7, 1
+    ],
+    "[\"student assessment\",[[\"online learning\",\"learning platform\",\"tutoring marketplace\",\"corporate training\"]]]": [
+      5
+    ],
+    "[\"savings app\",[[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\",\"banking app\"],[\"embedded finance\",\"embedded lending\",\"buy now pay later\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"]]]": [
+      8, 3, 3
+    ],
+    "[\"home buying platform\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"],[\"embedded finance\",\"embedded lending\",\"buy now pay later\"]]]": [
+      5, 3, 2
+    ],
+    "[\"merchant acquiring\",[[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\",\"account-to-account payments\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"],[\"business current account\"]]]": [
+      7, 3, 4
+    ],
+    "[\"employee assistance\",[[\"workplace wellbeing\"],[\"mental health\",\"mental wellbeing\"],[\"therapy app\",\"cbt app\"]]]": [
+      8, 5, 4
+    ],
+    "[\"rag pipelines\",[[\"llmops\",\"llm ops\",\"model serving\"]]]": [7],
+    "[\"digital therapeutics\",[[\"therapy app\",\"cbt app\"],[\"drug discovery\",\"ai drug discovery\",\"protein design\",\"small molecule discovery\",\"target identification\",\"preclinical research\"],[\"mental health\",\"mental wellbeing\"]]]": [
+      7, 1, 4
+    ],
+    "[\"livestock monitoring\",[[\"crop monitoring\"],[\"precision agriculture\"]]]": [
+      4, 6
+    ],
+    "[\"solar tracking\",[[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"],[\"offshore wind\",\"floating wind\",\"wind turbines\",\"onshore wind\"],[\"virtual power plant\",\"demand response\",\"vehicle-to-grid\"]]]": [
+      6, 3, 3
+    ],
+    "[\"school software\",[[\"online learning\",\"learning platform\",\"tutoring marketplace\",\"corporate training\"],[\"student assessment\"],[\"edtech\"]]]": [
+      4, 5, 3
+    ],
+    "[\"digital wallet\",[[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\",\"banking app\"],[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\",\"account-to-account payments\",\"merchant acquiring\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"]]]": [
+      6, 6, 3
+    ],
+    "[\"usage-based insurance\",[[\"digital insurance\",\"embedded insurance\"],[\"insurance software\",\"claims automation\",\"underwriting automation\",\"insurance analytics\"]]]": [
+      6, 4
+    ],
+    "[\"predictive maintenance\",[[\"turbine maintenance\"],[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\",\"cobots\"]]]": [
+      7, 3
+    ],
+    "[\"stress management\",[[\"workplace wellbeing\"],[\"mental health\",\"mental wellbeing\"],[\"therapy app\",\"cbt app\"]]]": [
+      7, 6, 4
+    ],
+    "[\"claims automation\",[[\"insurtech\",\"digital insurance\",\"insurance software\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\"],[\"industrial automation\",\"construction robotics\"]]]": [
+      3, 1, 1
+    ],
+    "[\"biologics\",[[\"drug discovery\",\"ai drug discovery\",\"protein design\"],[\"alternative protein\",\"plant-based food\",\"cultivated meat\",\"precision fermentation\"]]]": [
+      7, 1
+    ],
+    "[\"food waste\",[[\"food tech\"],[\"alternative protein\",\"plant-based food\",\"cultivated meat\",\"precision fermentation\"]]]": [
+      3, 2
+    ],
+    "[\"site management software\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\"]]]": [
+      4, 3
+    ],
+    "[\"meal kits\",[[\"alternative protein\",\"plant-based food\",\"cultivated meat\",\"precision fermentation\"],[\"food tech\"]]]": [
+      4, 3
+    ],
+    "[\"soil health\",[[\"precision agriculture\",\"crop monitoring\"],[\"agritech\"],[\"alternative protein\",\"plant-based food\",\"cultivated meat\",\"precision fermentation\"]]]": [
+      6, 3, 2
+    ],
+    "[\"solar monitoring\",[[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"],[\"precision agriculture\",\"crop monitoring\"],[\"earth observation\",\"satellite data\"]]]": [
+      8, 1, 3
+    ],
+    "[\"corporate training\",[[\"online learning\",\"learning platform\",\"tutoring marketplace\",\"language learning\"],[\"edtech\"]]]": [
+      6, 3
+    ],
+    "[\"ai observability\",[[\"llmops\",\"llm ops\",\"model serving\",\"prompt management\",\"inference optimisation\"],[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"agent orchestration\"]]]": [
+      7, 4
+    ],
+    "[\"business current account\",[[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"],[\"open banking payments\",\"account-to-account payments\"],[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\"]]]": [
+      8, 4, 4
+    ],
+    "[\"fleet management\",[[\"electric vehicles\",\"electric vans\",\"e-bikes\",\"micromobility\",\"fleet electrification\"],[\"ev charging\",\"charge point network\"],[\"insurtech\",\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"]]]": [
+      5, 4, 2
+    ],
+    "[\"mortgage broker software\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"insurtech\",\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"]]]": [
+      5, 2, 2
+    ],
+    "[\"embedded insurance\",[[\"insurtech\",\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\"],[\"embedded finance\",\"embedded lending\"],[\"pet insurance\",\"pet health cover\",\"veterinary insurance\",\"cat insurance\",\"dog insurance\",\"pet wellness plans\"]]]": [
+      3, 5, 6
+    ],
+    "[\"savings app\",[[\"banking app\"],[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\"],[\"embedded finance\",\"embedded lending\",\"buy now pay later\"]]]": [
+      7, 5, 3
+    ],
+    "[\"merchant acquiring\",[[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\"],[\"open banking payments\",\"account-to-account payments\"]]]": [
+      7, 4, 5
+    ],
+    "[\"ai copilots\",[[\"ai agents\",\"agentic ai\",\"autonomous agents\",\"ai agent platform\",\"agent orchestration\",\"multi-agent systems\"],[\"llmops\",\"llm ops\",\"model serving\",\"prompt management\",\"inference optimisation\"],[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\",\"smart factory\"]]]": [
+      7, 4, 3
+    ],
+    "[\"livestock monitoring\",[[\"precision agriculture\",\"crop monitoring\",\"agricultural drones\"]]]": [
+      6
+    ],
+    "[\"usage-based insurance\",[[\"insurtech\",\"digital insurance\",\"insurance software\",\"claims automation\",\"underwriting automation\",\"embedded insurance\"]]]": [
+      3
+    ],
+    "[\"predictive maintenance\",[[\"industrial automation\",\"construction robotics\",\"robotics\",\"farm robotics\",\"warehouse automation\",\"smart factory\"]]]": [
+      5
+    ],
+    "[\"embedded insurance\",[[\"insurtech\",\"digital insurance\",\"insurance software\"],[\"embedded finance\",\"embedded lending\"],[\"claims automation\",\"underwriting automation\"]]]": [
+      3, 5, 4
+    ],
+    "[\"wind forecasting\",[[\"offshore wind\",\"floating wind\",\"wind turbines\",\"onshore wind\",\"turbine maintenance\"],[\"solar panels\",\"solar installation\",\"wind farm software\",\"rooftop solar\",\"solar financing\",\"perovskite solar\"],[\"llmops\",\"llm ops\",\"model serving\",\"prompt management\",\"inference optimisation\",\"ai observability\"]]]": [
+      7, 4, 1
+    ],
+    "[\"buy now pay later\",[[\"embedded finance\",\"embedded lending\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\",\"business current account\"]]]": [
+      7, 4
+    ],
+    "[\"savings app\",[[\"banking app\"],[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\",\"business current account\"]]]": [
+      7, 5, 3
+    ],
+    "[\"home buying platform\",[[\"estate agency software\",\"lettings platform\",\"property management software\"],[\"e-commerce\",\"ecommerce\",\"online retail\",\"online shopping\"],[\"banking as a service\",\"baas\",\"white-label banking\",\"card issuing api\",\"fintech apis\",\"business current account\"]]]": [
+      6, 3, 1
+    ],
+    "[\"digital twins\",[[\"llmops\",\"llm ops\",\"model serving\",\"prompt management\",\"inference optimisation\",\"ai observability\"]]]": [
+      1
+    ],
+    "[\"usage-based insurance\",[[\"insurtech\",\"digital insurance\",\"insurance software\",\"embedded insurance\",\"insurance analytics\"],[\"claims automation\",\"underwriting automation\"]]]": [
+      3, 5
+    ],
+    "[\"digital wallet\",[[\"neobank\",\"digital bank\",\"challenger bank\",\"mobile banking\"],[\"banking app\",\"savings app\"],[\"payment rails\",\"payments infrastructure\",\"payment processing\",\"cross-border payments\",\"merchant acquiring\"]]]": [
+      5, 7, 6
+    ],
+    "[\"usage-based insurance\",[[\"embedded insurance\"],[\"insurtech\",\"digital insurance\",\"insurance software\",\"insurance analytics\"],[\"claims automation\",\"underwriting automation\"]]]": [
+      5, 3, 4
+    ]
+  }
+}

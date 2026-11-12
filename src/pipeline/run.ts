@@ -80,6 +80,7 @@ import {
 } from "./store/sources";
 import { assignThemesStep } from "./themes/assign-themes";
 import { nameThemesStep } from "./themes/name-themes";
+import type { ThemeCheckDeps } from "./themes/theme-check";
 
 /** Much larger than any real backlog; keeps one query from being unbounded. */
 const STEP_BATCH_LIMIT = 5000;
@@ -94,6 +95,8 @@ export const COLLECTED_SOURCE_KINDS: readonly SourceKind[] = ["rss"];
 export interface PipelineConfig {
   /** Extraction model, also used for grant tagging and theme naming. */
   model: string;
+  /** Theme check model (D49). Absent: the extraction model. */
+  themeCheckModel?: string;
   maxExtractionsPerRun: number;
   capGbp: number;
   embeddingModel: string;
@@ -107,6 +110,8 @@ export interface PipelineDeps {
   collector: Collector;
   /** Null when no key is configured: new items wait for a later run. */
   llm: LlmClient | null;
+  /** The theme check client, bound to `config.themeCheckModel`. Absent: `llm`. */
+  themeCheckLlm?: LlmClient | null;
   /** Null when no key is configured: tags wait for a later run. */
   embedder: EmbeddingClient | null;
   /** Gateway to Research. Used only by `pnpm ingest grants`, never by `run`. */
@@ -544,6 +549,23 @@ export async function embedStep(
 }
 
 /**
+ * The theme check runs on its own model when one is configured, and falls
+ * back to the extraction model for the rest of the run if that fails (D49).
+ */
+function themeCheckDeps(deps: PipelineDeps, llm: LlmClient): ThemeCheckDeps {
+  const model = deps.config.themeCheckModel ?? deps.config.model;
+  const own = deps.themeCheckLlm && model !== deps.config.model;
+  return {
+    llm: own ? deps.themeCheckLlm! : llm,
+    model: own ? model : deps.config.model,
+    budget: deps.budget,
+    purpose: "theme_naming",
+    runId: deps.runId,
+    fallbackLlm: own ? { llm, model: deps.config.model } : undefined,
+  };
+}
+
+/**
  * Step 10: assign embedded tags to themes (free), then name themes (paid,
  * needs a key). After a pause or refusal earlier in the run the whole step
  * waits for the next run.
@@ -572,15 +594,7 @@ export async function themesStep(
     const assigned = await assignThemesStep({
       db: deps.db,
       model: tagEmbeddingIdentity(deps.config.embeddingModel),
-      check: deps.llm
-        ? {
-            llm: deps.llm,
-            budget: deps.budget,
-            model: deps.config.model,
-            purpose: "theme_naming",
-            runId: deps.runId,
-          }
-        : undefined,
+      check: deps.llm ? themeCheckDeps(deps, deps.llm) : undefined,
     });
     stats.tagsAssigned = assigned.tagsAssigned;
     stats.themesCreated = assigned.themesCreated;

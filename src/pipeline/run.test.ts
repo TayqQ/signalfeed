@@ -906,4 +906,28 @@ describe("themes step with the LLM check", () => {
     expect(outcome.errors).toEqual([]);
     expect(log).toEqual([]);
   });
+
+  it("uses its own check model and falls back to the extraction model when it fails", async () => {
+    await seedBandTags();
+    const gone = Object.assign(new Error("model not found"), { status: 404 });
+    const checkLog: string[] = [];
+    const { llm: checkLlm } = fakeLlm({ log: checkLog, fail: () => gone });
+    const log: string[] = [];
+    const { llm } = fakeLlm({ log });
+    const base = deps(llm, fakeCollector({}));
+    const outcome = await themesStep(
+      {
+        ...base,
+        themeCheckLlm: checkLlm,
+        config: { ...base.config, themeCheckModel: "gpt-5.4-mini" },
+      },
+      { paidAllowed: true },
+    );
+
+    expect(checkLog).toEqual([`llm:${THEME_CHECK_SCHEMA_NAME}`]);
+    expect(log).toEqual([`llm:${THEME_CHECK_SCHEMA_NAME}`]);
+    expect(outcome.errors).toEqual([]);
+    expect(outcome.stats).toMatchObject({ tagsAssigned: 2, themesCreated: 1 });
+    expect(outcome.stats?.providerError).toBeUndefined();
+  });
 });
