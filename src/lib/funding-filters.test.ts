@@ -4,6 +4,7 @@ import {
   effectiveRoundTypes,
   FUNDING_CRITERIA_VERSION,
   parseFundingCriteria,
+  unresolvedNearName,
   parseFundingFilters,
   parseFundingView,
   serialiseFundingCriteria,
@@ -277,6 +278,27 @@ describe("targeting parameters", () => {
       {},
     );
     expect(parseFundingCriteria({ near: "" })).toEqual({});
+  });
+
+  it("resolves near by place name, case-insensitively, to a slug", () => {
+    for (const near of ["leeds", "Leeds", " LEEDS "]) {
+      expect(parseFundingCriteria({ near }).near).toEqual({
+        placeSlug: "leeds",
+        km: 25,
+      });
+    }
+    const named = parseFundingCriteria({ near: "Newcastle upon Tyne" }).near;
+    expect(named?.placeSlug).toBe("newcastle-upon-tyne");
+    expect(
+      serialiseFundingCriteria(parseFundingCriteria({ near: "Leeds" })),
+    ).toBe("near=leeds");
+  });
+
+  it("reports a near name that does not resolve", () => {
+    expect(unresolvedNearName({ near: "Atlantis" })).toBe("Atlantis");
+    expect(unresolvedNearName({ near: "Leeds" })).toBeUndefined();
+    expect(unresolvedNearName({ near: "leeds" })).toBeUndefined();
+    expect(unresolvedNearName({})).toBeUndefined();
   });
 
   it("falls back to 25 km for any radius that is not allowed", () => {

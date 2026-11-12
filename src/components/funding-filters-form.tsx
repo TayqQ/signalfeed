@@ -18,14 +18,27 @@ const checkGridClass =
 const checkLabelClass = "flex items-center gap-2 py-1";
 const hintClass = "mt-1 text-xs text-quiet";
 
-/** Towns and cities worth listing in the "Near" select (about 400 of them). */
-const NEAR_PLACES = UK_PLACES.filter((place) => place.populationBand >= 3)
-  .map((place) => ({ slug: place.slug, name: place.name }))
-  .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
+/**
+ * Suggestions for the town inputs: only the biggest UK places (about 70), so
+ * the page stays small. Any other UK place can still be typed by name.
+ */
+const SUGGESTED_PLACES = UK_PLACES.filter((place) => place.populationBand >= 4)
+  .map((place) => place.name)
+  .sort((a, b) => a.localeCompare(b, "en-GB"));
 
-const TOWN_NAMES = [...new Set(UK_PLACES.map((place) => place.name))].sort(
-  (a, b) => a.localeCompare(b, "en-GB"),
-);
+/**
+ * One shared list of suggestions for the town inputs. Render it once on the
+ * page, because the form can appear twice (mobile and desktop).
+ */
+export function PlaceSuggestions() {
+  return (
+    <datalist id="uk-place-suggestions">
+      {SUGGESTED_PLACES.map((name) => (
+        <option key={name} value={name} />
+      ))}
+    </datalist>
+  );
+}
 
 function majorUnits(minor: number | undefined): string | undefined {
   return minor === undefined ? undefined : String(minor / 100);
@@ -44,13 +57,9 @@ export function FundingFiltersForm({
   themes?: readonly ThemeRef[];
 }) {
   const nearSlug = filters.near?.placeSlug;
-  const nearPlaces =
-    nearSlug && !NEAR_PLACES.some((place) => place.slug === nearSlug)
-      ? [
-          ...NEAR_PLACES,
-          { slug: nearSlug, name: findPlaceBySlug(nearSlug)?.name ?? nearSlug },
-        ]
-      : NEAR_PLACES;
+  const nearName = nearSlug
+    ? (findPlaceBySlug(nearSlug)?.name ?? nearSlug)
+    : undefined;
   const selectedTheme = filters.themes?.[0];
   const themeKnown = themes.some((theme) => theme.slug === selectedTheme);
 
@@ -94,36 +103,34 @@ export function FundingFiltersForm({
           <input
             id="city"
             name="city"
-            list="uk-town-names"
+            type="text"
+            list="uk-place-suggestions"
             autoComplete="off"
             defaultValue={filters.cities?.[0]}
             placeholder="Leeds"
+            aria-describedby="city-hint"
             className={inputClass}
           />
-          <datalist id="uk-town-names">
-            {TOWN_NAMES.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
+          <p id="city-hint" className={hintClass}>
+            Type a UK town, e.g. Leeds.
+          </p>
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
           <div>
             <label htmlFor="near" className={labelClass}>
               Near
             </label>
-            <select
+            <input
               id="near"
               name="near"
-              defaultValue={nearSlug ?? ""}
+              type="text"
+              list="uk-place-suggestions"
+              autoComplete="off"
+              defaultValue={nearName}
+              placeholder="Anywhere"
+              aria-describedby="near-hint"
               className={inputClass}
-            >
-              <option value="">Anywhere</option>
-              {nearPlaces.map((place) => (
-                <option key={place.slug} value={place.slug}>
-                  {place.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label htmlFor="km" className={labelClass}>
@@ -143,9 +150,9 @@ export function FundingFiltersForm({
             </select>
           </div>
         </div>
-        <p className={hintClass}>
-          Distance searches only find companies with a known town or postcode
-          district.
+        <p id="near-hint" className={hintClass}>
+          Type any UK town for a distance search. Distance searches only find
+          companies with a known town or postcode district.
         </p>
       </fieldset>
 

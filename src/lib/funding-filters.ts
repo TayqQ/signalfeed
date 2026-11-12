@@ -19,7 +19,7 @@ import { ROUND_TYPES } from "@/core/enums";
 import type { RoundType } from "@/core/enums";
 import { isSector, SECTORS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
-import { findPlaceBySlug } from "@/lib/geo/uk-places";
+import { findPlaceBySlug, matchUkCity } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { fromMinorUnits, toMinorUnits } from "@/lib/money";
 import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
@@ -187,13 +187,37 @@ function parseThemeSlug(value: string): string | undefined {
   return parseSlug(value.trim());
 }
 
+/**
+ * Resolves a place slug or a place name (any case) to a canonical slug.
+ * Unknown and ambiguous names give undefined.
+ */
+function resolveNearSlug(value: string): string | undefined {
+  const text = value.trim();
+  const lower = text.toLowerCase();
+  if (findPlaceBySlug(lower)) return lower;
+  const match = matchUkCity(text);
+  return match && "place" in match ? match.place.slug : undefined;
+}
+
+/**
+ * The "near" text the visitor typed when it did not resolve to a UK place,
+ * so the page can say so. Undefined when `near` is empty or resolved.
+ */
+export function unresolvedNearName(
+  searchParams: FundingSearchParams,
+): string | undefined {
+  const near = readFirst(searchParams, "near");
+  if (near == null || near.length > MAX_CITY_LENGTH) return undefined;
+  return resolveNearSlug(near) ? undefined : near;
+}
+
 function parseNear(
   near: string | undefined,
   km: string | undefined,
 ): FundingCriteria["near"] {
   if (near == null) return undefined;
-  const placeSlug = near.trim().toLowerCase();
-  if (!findPlaceBySlug(placeSlug)) return undefined;
+  const placeSlug = resolveNearSlug(near);
+  if (!placeSlug) return undefined;
   const radius = km == null ? Number.NaN : Number(km);
   const known = NEAR_RADII_KM.find((value) => value === radius);
   return { placeSlug, km: known ?? DEFAULT_NEAR_KM };
