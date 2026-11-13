@@ -1,0 +1,49 @@
+{
+  "company_name": "KESTREL LANTERN LABS LIMITED",
+  "company_number": "09100417",
+  "company_status": "active",
+  "type": "ltd",
+  "jurisdiction": "england-wales",
+  "date_of_creation": "2010-09-23",
+  "sic_codes": ["72190"],
+  "registered_office_address": {
+    "address_line_1": "4 Marlow Court",
+    "address_line_2": "Tannery Lane",
+    "locality": "Westbridge",
+    "region": "Greater Example",
+    "postal_code": "EX2 4AB",
+    "country": "United Kingdom"
+  },
+  "accounts": {
+    "accounting_reference_date": {
+      "day": "31",
+      "month": "12"
+    },
+    "last_accounts": {
+      "made_up_to": "2025-12-31",
+      "period_end_on": "2025-12-31",
+      "period_start_on": "2025-01-01",
+      "type": "full"
+    },
+    "next_due": "2027-09-30",
+    "overdue": false
+  },
+  "previous_company_names": [
+    {
+      "ceased_on": "2010-11-15",
+      "effective_from": "2010-09-23",
+      "name": "WILLOW PEAK 2022 LIMITED"
+    }
+  ],
+  "has_insolvency_history": false,
+  "has_charges": false,
+  "can_file": true,
+  "registered_office_is_in_dispute": false,
+  "undeliverable_registered_office_address": false,
+  "links": {
+    "self": "/company/09100417",
+    "filing_history": "/company/09100417/filing-history"
+  },
+  "etag": "a8cfb850d2d0c3488d90a1e9a8042be0526afd10",
+  "x_unknown_future_field": "ignored"
+}
