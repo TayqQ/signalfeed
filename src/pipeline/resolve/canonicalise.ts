@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { FxRates, Money } from "@/core/domain";
-import type { DatePrecision, InvestorRole } from "@/core/enums";
+import type { DatePrecision, InvestorRole, RecordKind } from "@/core/enums";
 import type { Db } from "@/db/client";
 import {
   acquisitions,
@@ -19,6 +19,23 @@ import { convertMinor } from "@/lib/money";
 import { getRatesOnOrBefore } from "@/pipeline/store/fx-rates";
 import { resolveInvestor } from "./investor-matcher";
 import { postProcess, type ProcessedEvent } from "./post-process";
+import type { InvestorFacts } from "./types";
+
+/**
+ * The investors an official record names, as lead. A grant event's funder must
+ * stay when reports add their own investors (spec-phase3 section 9.4). It must
+ * match `GRANT_FUNDER` in `grants/resolve-grants.ts`, which creates the event;
+ * a test checks this. Filings never create events, so they name none.
+ */
+export const RECORD_INVESTORS: Readonly<
+  Record<RecordKind, readonly InvestorFacts[]>
+> = {
+  ukri_grant: [
+    { name: "Innovate UK", kind: "government", websiteDomain: null },
+  ],
+  ch_allotment: [],
+  sec_form_d: [],
+};
 
 /** Takes the database so lookups stay inside the caller's transaction. */
 export interface FxLookup {
@@ -185,8 +202,13 @@ async function rewriteInvestors(
   db: Db,
   eventId: number,
   evidence: readonly Evidence[],
+  recordInvestors: readonly InvestorFacts[] = [],
 ): Promise<void> {
   const roles = new Map<number, InvestorRole>();
+  for (const investor of recordInvestors) {
+    const { investorId } = await resolveInvestor(db, investor);
+    roles.set(investorId, "lead");
+  }
   const ordered = [...evidence].sort(compareForTies);
   for (const item of ordered) {
     if (item.event.type !== "funding_round") continue;
@@ -254,11 +276,48 @@ async function convertRecordAmount(
     .where(eq(fundingRounds.eventId, eventId));
 }
 
+async function recordKindsOf(db: Db, eventId: number): Promise<RecordKind[]> {
+  const rows = await db
+    .selectDistinct({ recordKind: eventRecordSources.recordKind })
+    .from(eventRecordSources)
+    .where(eq(eventRecordSources.eventId, eventId))
+    .orderBy(asc(eventRecordSources.recordKind));
+  return rows.map((row) => row.recordKind);
+}
+
+/**
+ * An event from an official record keeps the record's date, precision, round
+ * type, label, amounts and FX fields. Reports attached to it (a news report of
+ * a grant, D56) give only `source_count`, the headline links and investors:
+ * the record's investors as lead, joined by the reports' investors.
+ */
+async function recomputeRecordEvent(
+  db: Db,
+  eventId: number,
+  recordKinds: readonly RecordKind[],
+  evidence: readonly Evidence[],
+  fx: FxLookup,
+  now: Date,
+): Promise<void> {
+  const sourceCount = new Set(evidence.map((item) => item.sourceItemId)).size;
+  await db
+    .update(events)
+    .set({ sourceCount, updatedAt: now })
+    .where(eq(events.id, eventId));
+  await convertRecordAmount(db, eventId, fx);
+  await rewriteInvestors(
+    db,
+    eventId,
+    evidence,
+    recordKinds.flatMap((kind) => RECORD_INVESTORS[kind]),
+  );
+}
+
 /**
  * Rebuilds every canonical field from all linked reports, so the result does
  * not depend on arrival order and new evidence can correct old values (D12).
  * An event with no usable report is left for the caller to delete. An event
- * from an official record keeps its stored facts (see `convertRecordAmount`).
+ * from an official record keeps its stored facts (see `recomputeRecordEvent`).
  */
 export async function recomputeEvent(
   db: Db,
@@ -267,13 +326,17 @@ export async function recomputeEvent(
   now: Date = new Date(),
 ): Promise<void> {
   const evidence = await loadEvidence(db, eventId);
+  const recordKinds = await recordKindsOf(db, eventId);
+  if (recordKinds.length > 0) {
+    await recomputeRecordEvent(db, eventId, recordKinds, evidence, fx, now);
+    return;
+  }
   const sourceCount = new Set(evidence.map((item) => item.sourceItemId)).size;
   if (evidence.length === 0) {
     await db
       .update(events)
       .set({ sourceCount: 0, updatedAt: now })
       .where(eq(events.id, eventId));
-    await convertRecordAmount(db, eventId, fx);
     return;
   }
 

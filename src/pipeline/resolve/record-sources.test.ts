@@ -15,12 +15,15 @@ import { insertExtraction } from "@/pipeline/store/extractions";
 import { upsertRates } from "@/pipeline/store/fx-rates";
 import { insertCollectedItems } from "@/pipeline/store/source-items";
 import { deleteOrphanEvents, recomputeEvent, storedFx } from "./canonicalise";
+import { corroboratesFor, findMatchingEvent } from "./event-matcher";
 import { mergeCompanies } from "./merge-entities";
 import { resolveExtraction } from "./resolve-extraction";
 import { insertCompany, insertInvestor } from "./testing";
 
 // Grant events come from an official record (event_record_sources) and must
 // never be matched, rebuilt or deleted by news resolution (spec-phase2 10.4).
+// The guard is the record source, not `evidence`: a confirmed news event still
+// matches later reports (spec-phase3 9.3).
 
 let testDb: TestDb;
 let db: Db;
@@ -48,7 +51,11 @@ const GRANT_PENCE = 50_000_000;
 /** A grant event as the grant resolver stores it. */
 async function grantEvent(
   companyId: number,
-  options: { announcedOn?: string; amountUsdMinor?: number | null } = {},
+  options: {
+    announcedOn?: string;
+    amountUsdMinor?: number | null;
+    evidence?: "reported" | "confirmed";
+  } = {},
 ): Promise<number> {
   const [event] = await db
     .insert(events)
@@ -57,7 +64,7 @@ async function grantEvent(
       companyId,
       announcedOn: options.announcedOn ?? "2026-06-01",
       datePrecision: "month",
-      evidence: "confirmed",
+      evidence: options.evidence ?? "confirmed",
       sourceCount: 0,
     })
     .returning({ id: events.id });
@@ -337,4 +344,95 @@ describe("recomputeEvent with no extraction evidence", () => {
       .where(eq(fundingRounds.eventId, event!.id));
     expect(round?.amountUsdMinor).toBeNull();
   });
+});
+
+describe("the record-origin guard", () => {
+  async function confirmedNewsRound(companyName: string) {
+    const first = await report(
+      [newsRound(companyName, "seed", "£2m")],
+      "2026-06-10T12:00:00Z",
+    );
+    await resolveExtraction(db, first.extractionId);
+    const [event] = await db.select().from(events);
+    await db
+      .update(events)
+      .set({ evidence: "confirmed" })
+      .where(eq(events.id, event!.id));
+    const [round] = await db
+      .select()
+      .from(fundingRounds)
+      .where(eq(fundingRounds.eventId, event!.id));
+    return { event: event!, round: round! };
+  }
+
+  it("matches a confirmed news round with a second report 10 days later", async () => {
+    const { event } = await confirmedNewsRound("Acme");
+
+    const second = await report(
+      [newsRound("Acme", "seed", "£2m")],
+      "2026-06-20T12:00:00Z",
+    );
+    const outcome = await resolveExtraction(db, second.extractionId);
+
+    expect(outcome.eventsCreated).toBe(0);
+    expect(outcome.eventsUpdated).toBe(1);
+    const rows = await db.select().from(events);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: event.id,
+      evidence: "confirmed",
+      sourceCount: 2,
+    });
+    const links = await db.select().from(eventSources);
+    expect(links.map((link) => link.eventId)).toEqual([event.id, event.id]);
+  });
+
+  it("lets a confirmed news round corroborate a fuzzy company match", async () => {
+    const { event, round } = await confirmedNewsRound("Acme");
+
+    const corroborates = corroboratesFor(db, {
+      type: "funding_round",
+      date: "2026-06-20",
+      roundType: "seed",
+      amount: { amountMinor: round.amountMinor!, currency: round.currency! },
+    });
+
+    expect(await corroborates(event.companyId)).toBe(true);
+  });
+
+  it.each(["confirmed", "reported"] as const)(
+    "never matches a grant event whose evidence is %s",
+    async (evidence) => {
+      const company = await insertCompany(db, {
+        name: "Acme Ltd",
+        countryCode: "GB",
+      });
+      const grant = await grantEvent(company.id, { evidence });
+      const before = await grantSnapshot(grant);
+      const incoming = {
+        type: "funding_round" as const,
+        date: "2026-06-11",
+        roundType: "grant" as const,
+        amount: { amountMinor: GRANT_PENCE, currency: "GBP" },
+      };
+
+      expect(
+        await findMatchingEvent(db, { ...incoming, companyId: company.id }),
+      ).toBeNull();
+      expect(await corroboratesFor(db, incoming)(company.id)).toBe(false);
+
+      const news = await report(
+        [newsRound("Acme", "grant", "£500k")],
+        "2026-06-11T12:00:00Z",
+      );
+      const outcome = await resolveExtraction(db, news.extractionId);
+
+      expect(outcome.eventsCreated).toBe(1);
+      expect(outcome.eventsUpdated).toBe(0);
+      const rows = await db.select().from(events).orderBy(asc(events.id));
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toMatchObject({ evidence: "reported", sourceCount: 1 });
+      expect(await grantSnapshot(grant)).toEqual(before);
+    },
+  );
 });

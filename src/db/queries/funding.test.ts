@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FundingFilters } from "@/core/read-models";
 import type { RoundType } from "@/core/enums";
@@ -6,12 +7,19 @@ import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { normaliseCompanyName, slugify } from "@/lib/normalise";
 import type { Db } from "../client";
 import {
+  chCompanies,
+  chFilings,
   companies,
   companyLocations,
+  companySectors,
   companyThemes,
+  eventConfirmations,
   events,
+  formDFilings,
   fundingRoundMomentum,
   fundingRounds,
+  registryLinks,
+  sources,
   tags,
   themes,
 } from "../schema";
@@ -417,5 +425,381 @@ describe("targeting filters", () => {
     );
     expect(page.items).toHaveLength(2);
     expect(page.total).toBeGreaterThan(2);
+  });
+});
+
+async function addChCompany(
+  db: Db,
+  number: string,
+  accountsType: string | null,
+): Promise<void> {
+  await db.insert(chCompanies).values({
+    companyNumber: number,
+    name: `TEST ${number} LIMITED`,
+    status: "active",
+    companyType: "ltd",
+    incorporatedOn: "2022-01-01",
+    accountsType,
+  });
+}
+
+async function link(
+  db: Db,
+  companyId: number,
+  number: string,
+  status: "linked" | "candidate" | "rejected" = "linked",
+): Promise<void> {
+  await db.insert(registryLinks).values({
+    companyId,
+    registry: "companies_house",
+    registryId: number,
+    registryName: `TEST ${number} LIMITED`,
+    status,
+    method: status === "linked" ? "name_location" : null,
+    reason: "test",
+    decidedBy: "auto",
+  });
+}
+
+describe("Phase 3 filters and confirmations", () => {
+  let test: TestDb;
+  let db: Db;
+
+  beforeEach(async () => {
+    test = await createTestDb();
+    db = test.db;
+  });
+
+  afterEach(async () => {
+    await test.close();
+  });
+
+  it("evidence=confirmed returns only confirmed events", async () => {
+    const a = await addCompany(db, "Confirmed Co");
+    await addRounds(db, a, [
+      { date: "2026-05-01", type: "seed", evidence: "confirmed" },
+    ]);
+    const b = await addCompany(db, "Reported Co");
+    await addRounds(db, b, [{ date: "2026-05-02", type: "seed" }]);
+    const mixed = await addCompany(db, "Mixed Co");
+    await addRounds(db, mixed, [
+      { date: "2026-04-01", type: "seed" },
+      { date: "2026-06-01", type: "series_a", evidence: "confirmed" },
+    ]);
+
+    expect(await names(db, {})).toEqual([
+      "Confirmed Co",
+      "Mixed Co",
+      "Reported Co",
+    ]);
+    const page = await listFundingRounds(
+      db,
+      filters({ evidence: "confirmed" }),
+    );
+    expect(page.total).toBe(2);
+    expect(page.items.every((row) => row.evidence === "confirmed")).toBe(true);
+    // Grants are still hidden unless selected.
+    const grant = await addCompany(db, "Grant Co");
+    await addRounds(db, grant, [
+      { date: "2026-05-03", type: "grant", evidence: "confirmed" },
+    ]);
+    expect(await names(db, { evidence: "confirmed" })).toEqual([
+      "Confirmed Co",
+      "Mixed Co",
+    ]);
+    expect(
+      await names(db, { evidence: "confirmed", roundTypes: ["grant"] }),
+    ).toEqual(["Grant Co"]);
+  });
+
+  describe("cosize", () => {
+    beforeEach(async () => {
+      const cases: Array<[string, string | null]> = [
+        ["Micro Co", "micro-entity"],
+        ["Small Co", "small"],
+        ["Abridged Co", "unaudited-abridged"],
+        ["Medium Co", "medium"],
+        ["Full Co", "full"],
+        ["Group Co", "group"],
+        ["Dormant Co", "dormant"],
+        ["Initial Co", "initial"],
+        ["Blank Co", null],
+        ["Odd Co", "brand-new-type"],
+      ];
+      let n = 0;
+      for (const [name, accountsType] of cases) {
+        n += 1;
+        const number = `0900${String(n).padStart(4, "0")}`;
+        const id = await addCompany(db, name);
+        await addRounds(db, id, [{ date: "2026-05-01", type: "seed" }]);
+        await addChCompany(db, number, accountsType);
+        await link(db, id, number);
+      }
+      const unlinked = await addCompany(db, "Unlinked Co");
+      await addRounds(db, unlinked, [{ date: "2026-05-02", type: "seed" }]);
+      // A candidate and a rejected link never count.
+      const candidate = await addCompany(db, "Candidate Co");
+      await addRounds(db, candidate, [{ date: "2026-05-03", type: "seed" }]);
+      await addChCompany(db, "09000201", "micro-entity");
+      await link(db, candidate, "09000201", "candidate");
+      const rejected = await addCompany(db, "Rejected Co");
+      await addRounds(db, rejected, [{ date: "2026-05-04", type: "seed" }]);
+      await addChCompany(db, "09000202", "micro-entity");
+      await link(db, rejected, "09000202", "rejected");
+    });
+
+    it("matches micro", async () => {
+      expect(await names(db, { companySizes: ["micro"] })).toEqual([
+        "Micro Co",
+      ]);
+    });
+
+    it("matches small, including exemption and abridged types", async () => {
+      expect(await names(db, { companySizes: ["small"] })).toEqual([
+        "Abridged Co",
+        "Small Co",
+      ]);
+    });
+
+    it("matches medium", async () => {
+      expect(await names(db, { companySizes: ["medium"] })).toEqual([
+        "Medium Co",
+      ]);
+    });
+
+    it("matches full accounts, and treats an unknown type the same way", async () => {
+      expect(await names(db, { companySizes: ["full_accounts"] })).toEqual([
+        "Full Co",
+        "Group Co",
+        "Odd Co",
+      ]);
+    });
+
+    it("matches dormant", async () => {
+      expect(await names(db, { companySizes: ["dormant"] })).toEqual([
+        "Dormant Co",
+      ]);
+    });
+
+    it("matches no accounts yet, including a blank type", async () => {
+      expect(await names(db, { companySizes: ["no_accounts_yet"] })).toEqual([
+        "Blank Co",
+        "Initial Co",
+      ]);
+    });
+
+    it("matches any of several bands", async () => {
+      expect(await names(db, { companySizes: ["micro", "dormant"] })).toEqual([
+        "Dormant Co",
+        "Micro Co",
+      ]);
+    });
+
+    it("never matches a company with no linked record", async () => {
+      const every = await names(db, {
+        companySizes: [
+          "micro",
+          "small",
+          "medium",
+          "full_accounts",
+          "dormant",
+          "no_accounts_yet",
+        ],
+      });
+      expect(every).not.toContain("Unlinked Co");
+      expect(every).not.toContain("Candidate Co");
+      expect(every).not.toContain("Rejected Co");
+      expect(every).toHaveLength(10);
+    });
+
+    it("agrees with the TypeScript mapping for every known accounts type", async () => {
+      const { knownAccountsTypes, sizeBandForAccounts } =
+        await import("@/lib/registry/company-size");
+      let n = 0;
+      for (const type of knownAccountsTypes()) {
+        n += 1;
+        const number = `0800${String(n).padStart(4, "0")}`;
+        const id = await addCompany(db, `Table ${type}`);
+        await addRounds(db, id, [{ date: "2026-05-05", type: "seed" }]);
+        await addChCompany(db, number, type);
+        await link(db, id, number);
+        const band = sizeBandForAccounts(type);
+        const found = await names(db, { companySizes: [band] });
+        expect(found, type).toContain(`Table ${type}`);
+      }
+    });
+  });
+
+  describe("sector filter", () => {
+    it("falls back to the theme join while company_sectors is empty", async () => {
+      const themed = await addCompany(db, "Themed Co");
+      await addRounds(db, themed, [{ date: "2026-05-01", type: "seed" }]);
+      const theme = await addTheme(db, "health-ai", {
+        sector: "health-life-sciences",
+      });
+      await linkTheme(db, themed, theme);
+      const other = await addCompany(db, "Other Co");
+      await addRounds(db, other, [{ date: "2026-05-02", type: "seed" }]);
+
+      expect(await names(db, { sectors: ["health-life-sciences"] })).toEqual([
+        "Themed Co",
+      ]);
+    });
+
+    it("also matches company_sectors, with or without a theme", async () => {
+      const themed = await addCompany(db, "Themed Co");
+      await addRounds(db, themed, [{ date: "2026-05-01", type: "seed" }]);
+      const theme = await addTheme(db, "health-ai", {
+        sector: "health-life-sciences",
+      });
+      await linkTheme(db, themed, theme);
+      const sic = await addCompany(db, "Sic Co");
+      await addRounds(db, sic, [{ date: "2026-05-02", type: "seed" }]);
+      await db.insert(companySectors).values({
+        companyId: sic,
+        sector: "health-life-sciences",
+        source: "sic",
+      });
+      const wrong = await addCompany(db, "Wrong Co");
+      await addRounds(db, wrong, [{ date: "2026-05-03", type: "seed" }]);
+      await db.insert(companySectors).values({
+        companyId: wrong,
+        sector: "education",
+        source: "sic",
+      });
+
+      expect(await names(db, { sectors: ["health-life-sciences"] })).toEqual([
+        "Sic Co",
+        "Themed Co",
+      ]);
+      expect(await names(db, { sectors: ["education"] })).toEqual(["Wrong Co"]);
+    });
+  });
+
+  describe("confirmation on each row", () => {
+    async function addSh01(
+      number: string,
+      transactionId: string,
+      actionDate: string,
+    ): Promise<number> {
+      const [row] = await db
+        .insert(chFilings)
+        .values({
+          companyNumber: number,
+          transactionId,
+          type: "SH01",
+          category: "capital",
+          filedOn: actionDate,
+          actionDate,
+        })
+        .returning({ id: chFilings.id });
+      if (!row) throw new Error("Filing insert failed");
+      return row.id;
+    }
+
+    async function confirm(
+      eventId: number,
+      recordKind: "ch_allotment" | "sec_form_d",
+      recordId: number,
+      recordDate: string,
+    ): Promise<void> {
+      await db.insert(eventConfirmations).values({
+        eventId,
+        recordKind,
+        recordId,
+        rule: "test",
+        recordDate,
+      });
+    }
+
+    it("uses the closest record, with its wording", async () => {
+      const id = await addCompany(db, "Ledger Co");
+      const [eventId] = await addRounds(db, id, [
+        { date: "2026-03-10", type: "seed", evidence: "confirmed" },
+      ]);
+      if (eventId == null) throw new Error("No event");
+      const far = await addSh01("09000301", "T-FAR", "2026-02-02");
+      const near = await addSh01("09000301", "T-NEAR", "2026-03-05");
+      await confirm(eventId, "ch_allotment", far, "2026-02-02");
+      await confirm(eventId, "ch_allotment", near, "2026-03-05");
+
+      const page = await listFundingRounds(db, filters());
+      expect(page.items[0]?.confirmation).toEqual({
+        kind: "ch_allotment",
+        recordDate: "2026-03-05",
+        confirmsAmount: false,
+        text: "Confirmed: shares allotted on 5 March 2026 (Companies House SH01)",
+      });
+    });
+
+    it("breaks a tie by record kind, then id", async () => {
+      const id = await addCompany(db, "Tie Co", { country: "US" });
+      const [eventId] = await addRounds(db, id, [
+        { date: "2026-03-10", type: "seed", evidence: "confirmed" },
+      ]);
+      if (eventId == null) throw new Error("No event");
+      const [edgar] = await db
+        .insert(sources)
+        .values({
+          slug: "sec-edgar",
+          name: "SEC EDGAR",
+          kind: "sec_edgar",
+          url: "https://www.sec.gov/edgar",
+        })
+        .returning({ id: sources.id });
+      if (!edgar) throw new Error("Source insert failed");
+      const [form] = await db
+        .insert(formDFilings)
+        .values({
+          sourceId: edgar.id,
+          accessionNumber: "0009000002-26-000001",
+          cik: "9000002",
+          issuerName: "Tie Inc.",
+          isAmendment: false,
+          dateOfFirstSale: "2026-03-01",
+          totalSoldUsdMinor: 440_000_000,
+          filedOn: "2026-03-02",
+          companyId: id,
+        })
+        .returning({ id: formDFilings.id });
+      if (!form) throw new Error("Form D insert failed");
+      const sh01 = await addSh01("09000302", "T-TIE", "2026-03-01");
+      await confirm(eventId, "sec_form_d", form.id, "2026-03-01");
+      await confirm(eventId, "ch_allotment", sh01, "2026-03-01");
+
+      const first = (await listFundingRounds(db, filters())).items[0];
+      expect(first?.confirmation?.kind).toBe("ch_allotment");
+
+      // Without the SH01, the Form D text shows the amount sold.
+      await db
+        .delete(eventConfirmations)
+        .where(eq(eventConfirmations.recordKind, "ch_allotment"));
+      const only = (await listFundingRounds(db, filters())).items[0];
+      expect(only?.confirmation?.text).toBe(
+        "Confirmed: Form D, $4.4M sold, first sale 1 March 2026 (SEC)",
+      );
+    });
+
+    it("gives a confirmed grant with no confirmation row a grant line", async () => {
+      const id = await addCompany(db, "Grant Co");
+      await addRounds(db, id, [
+        { date: "2026-05-03", type: "grant", evidence: "confirmed" },
+      ]);
+      const page = await listFundingRounds(
+        db,
+        filters({ roundTypes: ["grant"] }),
+      );
+      expect(page.items[0]?.confirmation?.text).toBe(
+        "Confirmed: Innovate UK grant (UKRI Gateway to Research)",
+      );
+      expect(page.items[0]?.confirmation?.kind).toBe("ukri_grant");
+    });
+
+    it("has no confirmation on a reported event", async () => {
+      const id = await addCompany(db, "Reported Co");
+      await addRounds(db, id, [{ date: "2026-05-03", type: "seed" }]);
+      const page = await listFundingRounds(db, filters());
+      expect(page.items[0]?.confirmation).toBeNull();
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { FundingCriteria } from "@/core/read-models";
+import type { CompanySizeBand } from "@/core/registry";
 import { SECTOR_LABELS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
 import { formatMoneyCompact, formatRoundType } from "@/lib/format";
@@ -29,6 +30,14 @@ function upperFirst(text: string): string {
 
 function roundPhrase(criteria: FundingCriteria): string {
   const types = criteria.roundTypes ?? [];
+  if (criteria.evidence === "confirmed") {
+    if (types.length === 0) return "Confirmed funding rounds";
+    const labels = types.map((type) => {
+      const label = formatRoundType(type);
+      return lowerFirst(label);
+    });
+    return `Confirmed ${joinWords(labels, "and")} rounds`;
+  }
   if (types.length === 0) return "All funding rounds";
   const labels = types.map((type, index) => {
     const label = formatRoundType(type);
@@ -55,6 +64,37 @@ function sizePhrases(criteria: FundingCriteria): string[] {
     phrases.push(`of up to ${money(max)}`);
   }
   return phrases;
+}
+
+const COMPANY_SIZE_ADJECTIVES: Readonly<
+  Partial<Record<CompanySizeBand, string>>
+> = {
+  micro: "micro",
+  small: "small",
+  medium: "medium",
+  dormant: "dormant",
+};
+
+/** "at micro and small companies", or null when no company size is chosen. */
+function companySizePhrase(criteria: FundingCriteria): string | null {
+  const bands = criteria.companySizes ?? [];
+  if (bands.length === 0) return null;
+  const adjectives: string[] = [];
+  for (const band of bands) {
+    const word = COMPANY_SIZE_ADJECTIVES[band];
+    if (word) adjectives.push(word);
+  }
+  const parts: string[] = [];
+  if (adjectives.length > 0) {
+    parts.push(`${joinWords(adjectives, "and")} companies`);
+  }
+  if (bands.includes("full_accounts")) {
+    parts.push("companies filing full accounts");
+  }
+  if (bands.includes("no_accounts_yet")) {
+    parts.push("companies with no accounts filed yet");
+  }
+  return `at ${joinWords(parts, "or")}`;
 }
 
 function countryName(code: string): string {
@@ -121,7 +161,13 @@ export function describeFundingCriteria(
   criteria: FundingCriteria,
   names: FundingCriteriaNames = {},
 ): string {
-  const head = [roundPhrase(criteria), ...sizePhrases(criteria)].join(" ");
+  const head = [
+    roundPhrase(criteria),
+    ...sizePhrases(criteria),
+    companySizePhrase(criteria),
+  ]
+    .filter((part): part is string => part != null)
+    .join(" ");
   const clauses: string[] = [];
 
   if (!criteria.roundTypes || criteria.roundTypes.length === 0) {

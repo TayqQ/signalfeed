@@ -1,0 +1,22 @@
+Description:           Daily Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    Nov 10, 2026
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+ 
+ 
+ 
+ 
+Form Type   Company Name                                                  CIK
+      Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+1-A/A            Example Screen Works, Inc                                     1999101     20261110    edgar/data/1999101/0001999101-26-000011.txt                                                
+10-K             EXAMPLE ACQUISITION CORP                                      1999102     20261110    edgar/data/1999102/0001999102-26-000012.txt                                                
+8-K              Example Holdings, Inc.                                        1999103     20261110    edgar/data/1999103/0001999103-26-000013.txt                                                
+D                Example Meridian Labs, Inc.                                   1999001     20261110    edgar/data/1999001/0001999001-26-000001.txt                                                
+D                Example Ridge Venture Fund II LP                              1999003     20261110    edgar/data/1999003/0001999003-26-000001.txt                                                
+D                Example Cedar Series 7, a Series of Example Master LLC        1999104     20261110    edgar/data/1999104/0001999104-26-000002.txt                                                
+D/A              Example Harbor Medical Inc.                                   1999002     20261110    edgar/data/1999002/0001999002-26-000003.txt                                                
+D/A              Example Quarry Fund III, L.P.                                 1999105     20261110    edgar/data/1999105/0001999105-26-000004.txt                                                
+DEF 14A          Example Proxy Corp                                            1999106     20261110    edgar/data/1999106/0001999106-26-000014.txt                                                
+DRS              Example Draft Registration Inc.                               1999107     20261110    edgar/data/1999107/0001999107-26-000015.txt                                                
+X-17A-5          EXAMPLE BROKER LLC                                            1999108     20261110    edgar/data/1999108/0001999108-26-000016.txt                                                

@@ -1,0 +1,138 @@
+{
+  "kind": "search#companies",
+  "items_per_page": 100,
+  "page_number": 1,
+  "start_index": 0,
+  "total_results": 5,
+  "items": [
+    {
+      "title": "KESTREL LANTERN LABS LIMITED",
+      "company_number": "09100417",
+      "company_status": "active",
+      "company_type": "ltd",
+      "date_of_creation": "2019-08-30",
+      "address": {
+        "premises": "4",
+        "address_line_1": "Tannery Lane",
+        "locality": "Westbridge",
+        "postal_code": "EX2 4AB",
+        "country": "United Kingdom"
+      },
+      "address_snippet": "4 Tannery Lane, Westbridge, United Kingdom, EX2 4AB",
+      "description": "09100417 - Incorporated on 30 August 2019",
+      "description_identifier": ["incorporated-on"],
+      "kind": "searchresults#company",
+      "links": {
+        "self": "/company/09100417"
+      },
+      "matches": {
+        "title": [1, 7]
+      },
+      "snippet": ""
+    },
+    {
+      "title": "KESTREL LANTERN HOLDINGS LIMITED",
+      "company_number": "09100431",
+      "company_status": "dissolved",
+      "company_type": "ltd",
+      "date_of_creation": "2025-01-24",
+      "address": {
+        "premises": "4",
+        "address_line_1": "Tannery Lane",
+        "locality": "Westbridge",
+        "postal_code": "EX2 4AB",
+        "country": "United Kingdom"
+      },
+      "address_snippet": "4 Tannery Lane, Westbridge, United Kingdom, EX2 4AB",
+      "description": "09100431 - Dissolved on 21 July 2026",
+      "description_identifier": ["dissolved-on"],
+      "kind": "searchresults#company",
+      "links": {
+        "self": "/company/09100431"
+      },
+      "matches": {
+        "title": [1, 7]
+      },
+      "snippet": "",
+      "date_of_cessation": "2026-07-21"
+    },
+    {
+      "title": "KESTREL LANTERN MARKETING LTD",
+      "company_number": "09100449",
+      "company_status": "dissolved",
+      "company_type": "ltd",
+      "date_of_creation": "2016-04-10",
+      "address": {
+        "premises": "7",
+        "address_line_1": "Harbour Row",
+        "locality": "Westbridge",
+        "postal_code": "EX9 1ZZ",
+        "country": "United Kingdom"
+      },
+      "address_snippet": "7 Harbour Row, Westbridge, United Kingdom, EX9 1ZZ",
+      "description": "09100449 - Dissolved on 4 February 2025",
+      "description_identifier": ["dissolved-on"],
+      "kind": "searchresults#company",
+      "links": {
+        "self": "/company/09100449"
+      },
+      "matches": {
+        "title": [1, 7]
+      },
+      "snippet": "",
+      "date_of_cessation": "2025-02-04"
+    },
+    {
+      "title": "KESTREL LANTERN GLOBAL LIMITED",
+      "company_number": "09100466",
+      "company_status": "dissolved",
+      "company_type": "private-limited-guarant-nsc",
+      "date_of_creation": "2019-08-30",
+      "address": {
+        "premises": "12",
+        "address_line_1": "Foundry Walk",
+        "locality": "Westbridge",
+        "postal_code": "EX5 8QT",
+        "country": "United Kingdom"
+      },
+      "address_snippet": "12 Foundry Walk, Westbridge, United Kingdom, EX5 8QT",
+      "description": "09100466 - Dissolved on 10 March 2025",
+      "description_identifier": ["dissolved-on"],
+      "kind": "searchresults#company",
+      "links": {
+        "self": "/company/09100466"
+      },
+      "matches": {
+        "title": [1, 7]
+      },
+      "snippet": "",
+      "date_of_cessation": "2025-03-10"
+    },
+    {
+      "title": "KESTREL LANTERN LABORATORY LIMITED",
+      "company_number": "09100474",
+      "company_status": "dissolved",
+      "company_type": "ltd",
+      "date_of_creation": "2016-11-18",
+      "address": {
+        "premises": "3",
+        "address_line_1": "Quarry Close",
+        "locality": "Westbridge",
+        "postal_code": "EX7 3LP",
+        "country": "United Kingdom"
+      },
+      "address_snippet": "3 Quarry Close, Westbridge, United Kingdom, EX7 3LP",
+      "description": "09100474 - Dissolved on 26 June 2018",
+      "description_identifier": ["dissolved-on"],
+      "kind": "searchresults#company",
+      "links": {
+        "self": "/company/09100474"
+      },
+      "matches": {
+        "title": [1, 7]
+      },
+      "snippet": "",
+      "date_of_cessation": "2018-06-26"
+    }
+  ]
+}

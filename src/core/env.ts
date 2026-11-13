@@ -26,6 +26,12 @@ export const pipelineEnvSchema = z.object({
   THEME_CHECK_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   /** Raises the GitHub API rate limit for star snapshots. Optional. */
   GITHUB_TOKEN: z.string().min(1).optional(),
+  // Phase 3
+  /** Companies House API key. The registry step is skipped without it. Never given to the web app. */
+  COMPANIES_HOUSE_API_KEY: z.string().min(1).optional(),
+  MAX_CH_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(2000),
+  MAX_EDGAR_DAYS_PER_RUN: z.coerce.number().int().positive().default(10),
+  MAX_EDGAR_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(3000),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 
@@ -33,7 +39,7 @@ export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
  * The same settings with no LLM key. Collecting costs nothing, and history can
  * only accumulate from the day collection starts, so a run without a key still
  * stores new items and leaves them pending for extraction later. It inherits
- * every other setting, Phase 2 limits included.
+ * every other setting, Phase 2 and Phase 3 limits included.
  */
 export const noLlmPipelineEnvSchema = pipelineEnvSchema.extend({
   OPENAI_API_KEY: z.string().min(1).optional(),

@@ -1,24 +1,32 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { LaunchKind, RoundType } from "@/core/enums";
 import type {
   CompanyDetail,
   CompanyEvent,
+  CompanyRegistryView,
   CompanyLocationView,
   EventInvestor,
   EventSourceLink,
   RoundMomentum,
   ThemeRef,
 } from "@/core/read-models";
-import { isSector, type Sector } from "@/core/sectors";
+import { companiesHouseUrl, edgarCompanyUrl } from "@/core/registry";
+import { isSector, SECTORS, type Sector } from "@/core/sectors";
 import { roundsInLastMonths } from "@/lib/company-momentum";
 import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { ukRegionByCode } from "@/lib/geo/uk-regions";
+import { companyStatusLabel, companyTypeLabel } from "@/lib/registry/ch-labels";
+import { sizeBandForAccounts } from "@/lib/registry/company-size";
+import { sicLabel } from "@/lib/registry/sic-codes";
 import type { Db } from "../client";
+import { loadConfirmations } from "./funding";
 import {
   acquisitions,
+  chCompanies,
   companies,
   companyLocations,
+  companySectors,
   companyTags,
   companyThemes,
   eventInvestors,
@@ -27,6 +35,7 @@ import {
   fundingRounds,
   investors,
   launches,
+  registryLinks,
   sourceItems,
   sources,
   tags,
@@ -106,6 +115,81 @@ function groupBy<T>(rows: T[], key: (row: T) => number): Map<number, T[]> {
 }
 
 /**
+ * Linked registry records only. Candidate and rejected links are never read.
+ * The full registered office postcode is never selected: only the district.
+ */
+async function loadRegistry(
+  db: Db,
+  companyId: number,
+): Promise<CompanyRegistryView | null> {
+  const links = await db
+    .select({
+      registry: registryLinks.registry,
+      registryId: registryLinks.registryId,
+    })
+    .from(registryLinks)
+    .where(
+      and(
+        eq(registryLinks.companyId, companyId),
+        eq(registryLinks.status, "linked"),
+      ),
+    )
+    .orderBy(asc(registryLinks.id));
+
+  const chLink = links.find((link) => link.registry === "companies_house");
+  const secLink = links.find((link) => link.registry === "sec_edgar");
+
+  let companiesHouse: CompanyRegistryView["companiesHouse"] = null;
+  if (chLink) {
+    const [row] = await db
+      .select({
+        companyNumber: chCompanies.companyNumber,
+        name: chCompanies.name,
+        status: chCompanies.status,
+        statusDetail: chCompanies.statusDetail,
+        companyType: chCompanies.companyType,
+        incorporatedOn: chCompanies.incorporatedOn,
+        ceasedOn: chCompanies.ceasedOn,
+        sicCodes: chCompanies.sicCodes,
+        accountsType: chCompanies.accountsType,
+        accountsMadeUpTo: chCompanies.accountsMadeUpTo,
+        officeOutcode: chCompanies.officeOutcode,
+      })
+      .from(chCompanies)
+      .where(eq(chCompanies.companyNumber, chLink.registryId))
+      .limit(1);
+    if (row) {
+      companiesHouse = {
+        companyNumber: row.companyNumber,
+        url: companiesHouseUrl(row.companyNumber),
+        name: row.name,
+        statusLabel:
+          companyStatusLabel(row.status, row.statusDetail) ?? row.status,
+        typeLabel: companyTypeLabel(row.companyType) ?? row.companyType,
+        incorporatedOn: calendarDate(row.incorporatedOn),
+        ceasedOn: row.ceasedOn == null ? null : calendarDate(row.ceasedOn),
+        sicCodes: row.sicCodes.map((code) => ({
+          code,
+          label: sicLabel(code),
+        })),
+        sizeBand: sizeBandForAccounts(row.accountsType),
+        accountsMadeUpTo:
+          row.accountsMadeUpTo == null
+            ? null
+            : calendarDate(row.accountsMadeUpTo),
+        officeOutcode: trimOrNull(row.officeOutcode),
+      };
+    }
+  }
+
+  const sec = secLink
+    ? { cik: secLink.registryId, url: edgarCompanyUrl(secLink.registryId) }
+    : null;
+  if (!companiesHouse && !sec) return null;
+  return { companiesHouse, sec };
+}
+
+/**
  * `now` is the date "rounds in the last 24 months" is counted against. Pages
  * leave it out; tests pass a fixed date.
  */
@@ -146,6 +230,8 @@ export async function getCompanyDetail(
     themeRows,
     locationRows,
     momentumRows,
+    sectorRows,
+    registry,
   ] = await Promise.all([
     redirectSlug(db, company.mergedIntoId),
     db
@@ -197,6 +283,11 @@ export async function getCompanyDetail(
         eq(basisEvent.id, fundingRoundMomentum.stepUpBasisEventId),
       )
       .where(eq(fundingRoundMomentum.companyId, company.id)),
+    db
+      .select({ sector: companySectors.sector })
+      .from(companySectors)
+      .where(eq(companySectors.companyId, company.id)),
+    loadRegistry(db, company.id),
   ]);
 
   const momentumByEvent = new Map<number, RoundMomentum>(
@@ -224,10 +315,18 @@ export async function getCompanyDetail(
     name: row.name,
     sector: row.sector != null && isSector(row.sector) ? row.sector : null,
   }));
+  // company_sectors when it has rows, else the theme sectors as before.
   const sectors: Sector[] = [];
-  for (const theme of themeRefs) {
-    if (theme.sector && !sectors.includes(theme.sector)) {
-      sectors.push(theme.sector);
+  const stored = new Set(sectorRows.map((row) => row.sector));
+  if (stored.size > 0) {
+    for (const sector of SECTORS) {
+      if (stored.has(sector)) sectors.push(sector);
+    }
+  } else {
+    for (const theme of themeRefs) {
+      if (theme.sector && !sectors.includes(theme.sector)) {
+        sectors.push(theme.sector);
+      }
     }
   }
   const fundingEvents = companyEvents.flatMap((event) =>
@@ -257,6 +356,7 @@ export async function getCompanyDetail(
     themes: themeRefs,
     sectors,
     location: toLocationView(locationRows[0], company.city),
+    registry,
     roundsInLast24Months: roundsInLastMonths(
       fundingEvents.map((event) => ({
         announcedOn: event.announcedOn,
@@ -385,6 +485,16 @@ async function loadEvents(
   const investorsByEvent = groupBy(investorRows, (row) => row.eventId);
   const sourcesByEvent = groupBy(sourceRows, (row) => row.eventId);
 
+  const confirmationsByEvent = await loadConfirmations(
+    db,
+    eventRows.map((event) => ({
+      eventId: event.id,
+      announcedOn: event.announcedOn,
+      evidence: event.evidence,
+      isGrant: fundingByEvent.get(event.id)?.roundType === "grant",
+    })),
+  );
+
   const loaded: CompanyEvent[] = [];
   for (const event of eventRows) {
     const built = toCompanyEvent(
@@ -395,7 +505,12 @@ async function loadEvents(
       investorsByEvent.get(event.id) ?? [],
       sourcesFor(sourcesByEvent.get(event.id) ?? []),
     );
-    if (built) loaded.push(built);
+    if (built) {
+      loaded.push({
+        ...built,
+        confirmations: confirmationsByEvent.get(event.id) ?? [],
+      });
+    }
   }
   return loaded;
 }

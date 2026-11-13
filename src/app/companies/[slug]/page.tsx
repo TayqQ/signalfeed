@@ -3,6 +3,10 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describeCompanyLocation } from "@/components/company-location";
 import { CompanyMomentum } from "@/components/company-momentum";
+import {
+  CompanyRegistry,
+  registryStatusFact,
+} from "@/components/company-registry";
 import { EventTimeline } from "@/components/event-timeline";
 import { TagList } from "@/components/tag-list";
 import { SECTOR_LABELS } from "@/core/sectors";
@@ -54,6 +58,7 @@ export default async function CompanyPage({ params }: Params) {
     foundedFact(company.foundedYear),
     company.status === "acquired" ? "Acquired" : null,
     company.status === "closed" ? "Closed" : null,
+    registryStatusFact(company.registry),
   ].filter((fact): fact is string => Boolean(fact));
 
   return (
@@ -117,6 +122,8 @@ export default async function CompanyPage({ params }: Params) {
         events={company.events}
         roundsInLast24Months={company.roundsInLast24Months}
       />
+
+      <CompanyRegistry registry={company.registry} />
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">History</h2>

@@ -129,6 +129,14 @@ const CRITERIA_TABLE: FundingCriteria[] = [
   { tag: "robotics", investorSlug: "northstar-capital" },
   { momentum: "first" },
   { momentum: "repeat" },
+  { evidence: "confirmed" },
+  { companySizes: ["micro", "small"] },
+  { companySizes: ["full_accounts", "dormant", "no_accounts_yet"] },
+  {
+    evidence: "confirmed",
+    companySizes: ["micro", "medium"],
+    sectors: ["software-ai"],
+  },
   {
     q: "Acme & Sons",
     roundTypes: ["pre_seed", "seed", "grant"],
@@ -145,12 +153,14 @@ const CRITERIA_TABLE: FundingCriteria[] = [
     tag: "biotech",
     investorSlug: "x",
     momentum: "first",
+    evidence: "confirmed",
+    companySizes: ["small", "no_accounts_yet"],
   },
 ];
 
 describe("canonical criteria serialisation", () => {
-  it("is version 2", () => {
-    expect(FUNDING_CRITERIA_VERSION).toBe(2);
+  it("is version 3", () => {
+    expect(FUNDING_CRITERIA_VERSION).toBe(3);
   });
 
   it.each(CRITERIA_TABLE.map((c, i) => [i, c] as const))(
@@ -165,6 +175,8 @@ describe("canonical criteria serialisation", () => {
 
   it("uses the fixed key order", () => {
     const text = serialiseFundingCriteria({
+      companySizes: ["small"],
+      evidence: "confirmed",
       momentum: "first",
       investorSlug: "inv",
       tag: "t",
@@ -203,6 +215,8 @@ describe("canonical criteria serialisation", () => {
       "tag",
       "investor",
       "momentum",
+      "evidence",
+      "cosize",
     ]);
   });
 
@@ -248,6 +262,74 @@ describe("canonical criteria serialisation", () => {
     ).toBe(
       "round=seed&momentum=repeat&sort=amount&dir=desc&page=3&pageSize=50",
     );
+  });
+});
+
+describe("Phase 3 parameters (version 3)", () => {
+  it("parses evidence and cosize slugs", () => {
+    expect(
+      parseFundingCriteria(
+        new URLSearchParams(
+          "evidence=confirmed&cosize=no-accounts-yet&cosize=micro&cosize=full-accounts",
+        ),
+      ),
+    ).toEqual({
+      evidence: "confirmed",
+      companySizes: ["micro", "full_accounts", "no_accounts_yet"],
+    });
+  });
+
+  it("serialises bands as slugs, in band order, de-duplicated", () => {
+    expect(
+      serialiseFundingCriteria({
+        evidence: "confirmed",
+        companySizes: ["no_accounts_yet", "micro", "micro", "full_accounts"],
+      }),
+    ).toBe(
+      "evidence=confirmed&cosize=micro&cosize=full-accounts&cosize=no-accounts-yet",
+    );
+  });
+
+  it("accepts comma lists and any case", () => {
+    expect(
+      parseFundingCriteria(
+        new URLSearchParams("evidence=CONFIRMED&cosize=Small,DORMANT"),
+      ),
+    ).toEqual({ evidence: "confirmed", companySizes: ["small", "dormant"] });
+  });
+
+  it("drops invalid values", () => {
+    expect(
+      parseFundingCriteria(
+        new URLSearchParams(
+          "evidence=reported&cosize=huge&cosize=full_accounts&cosize=",
+        ),
+      ),
+    ).toEqual({});
+    expect(
+      parseFundingCriteria(new URLSearchParams("evidence=&cosize=large,micro")),
+    ).toEqual({ companySizes: ["micro"] });
+  });
+
+  it("leaves version 2 URLs unchanged", () => {
+    const url =
+      "round=seed&round=grant&size=1m-5m&near=leeds&km=50&sector=software-ai&momentum=first";
+    const criteria = parseFundingCriteria(new URLSearchParams(url));
+    expect(criteria.evidence).toBeUndefined();
+    expect(criteria.companySizes).toBeUndefined();
+    expect(serialiseFundingCriteria(criteria)).toBe(url);
+  });
+
+  it("puts the new keys after the version 2 keys", () => {
+    expect(
+      serialiseFundingFilters({
+        page: 2,
+        pageSize: 25,
+        companySizes: ["micro"],
+        evidence: "confirmed",
+        momentum: "first",
+      }),
+    ).toBe("momentum=first&evidence=confirmed&cosize=micro&page=2");
   });
 });
 

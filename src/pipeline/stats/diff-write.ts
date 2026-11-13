@@ -4,6 +4,7 @@ import type { DiffCounts } from "@/core/domain";
 import type { Db } from "@/db/client";
 import {
   companyLocations,
+  companySectors,
   companyThemes,
   fundingRoundMomentum,
   themeWeeklyStats,
@@ -26,6 +27,7 @@ export const DERIVED_TABLES = [
   weeklyTotals,
   fundingRoundMomentum,
   companyLocations,
+  companySectors,
 ] as const;
 
 export type DerivedTable = (typeof DERIVED_TABLES)[number];

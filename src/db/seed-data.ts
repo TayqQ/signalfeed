@@ -12,6 +12,9 @@ import type {
   LlmPurpose,
   LocationPrecision,
   LocationSource,
+  RecordKind,
+  RegistryKind,
+  RegistryLinkMethod,
   RoundType,
   SourceItemStatus,
   SourceKind,
@@ -19,6 +22,7 @@ import type {
   ThemeNameSource,
 } from "@/core/enums";
 import { LAUNCH_KINDS, ROUND_TYPES } from "@/core/enums";
+import type { CapitalAmount } from "@/core/registry";
 import type { Sector } from "@/core/sectors";
 import { slugify } from "@/lib/normalise";
 import { addWeeks, lastCompleteWeek, toUtcDay, weekStart } from "@/lib/weeks";
@@ -249,6 +253,84 @@ export interface SeedLocation {
   source: LocationSource;
 }
 
+// Phase 3 registry rows. Every number below is invented: the Companies House
+// numbers and CIKs are in the real format but belong to nobody, and no row
+// holds the name of a person.
+
+export interface SeedChCompany {
+  companyNumber: string;
+  name: string;
+  status: string;
+  statusDetail: string | null;
+  companyType: string;
+  incorporatedOn: string;
+  ceasedOn: string | null;
+  sicCodes: string[];
+  officePostcode: string | null;
+  officeOutcode: string | null;
+  officeLocality: string | null;
+  accountsType: string | null;
+  accountsMadeUpTo: string | null;
+}
+
+export interface SeedRegistryLink {
+  companySlug: string;
+  registry: RegistryKind;
+  registryId: string;
+  registryName: string;
+  method: RegistryLinkMethod;
+  reason: string;
+}
+
+export interface SeedChFiling {
+  companyNumber: string;
+  transactionId: string;
+  type: string;
+  category: string;
+  filedOn: string;
+  actionDate: string | null;
+  capital: CapitalAmount[] | null;
+}
+
+export interface SeedFormDFiling {
+  accessionNumber: string;
+  cik: string;
+  issuerName: string;
+  entityType: string;
+  jurisdiction: string;
+  issuerState: string;
+  issuerCity: string;
+  industryGroup: string;
+  dateOfFirstSale: string;
+  totalOfferingUsdMinor: number;
+  totalSoldUsdMinor: number;
+  investorCount: number;
+  filedOn: string;
+  companySlug: string;
+}
+
+/** Points at the event and the filing by their natural keys, so the seed can resolve ids. */
+export interface SeedConfirmation {
+  /** Index into `SeedDataset.events`. */
+  eventIndex: number;
+  recordKind: RecordKind;
+  /** A `SeedChFiling.transactionId` or a `SeedFormDFiling.accessionNumber`. */
+  recordKey: string;
+  rule: string;
+  recordDate: string;
+  confirmsAmount: boolean;
+}
+
+export interface SeedRegistry {
+  chCompanies: SeedChCompany[];
+  links: SeedRegistryLink[];
+  chFilings: SeedChFiling[];
+  formDFilings: SeedFormDFiling[];
+  confirmations: SeedConfirmation[];
+  /** The `sources` row the Form D filings belong to. */
+  edgarSource: SeedSource;
+}
+
 export interface SeedDataset {
   companies: SeedCompany[];
   aliases: SeedAlias[];
@@ -266,6 +348,7 @@ export interface SeedDataset {
   themeWeeklyStats: SeedThemeWeek[];
   weeklyTotals: SeedWeeklyTotal[];
   locations: SeedLocation[];
+  registry: SeedRegistry;
 }
 
 interface CompanySpec {
@@ -300,12 +383,14 @@ const COMPANY_SPECS: CompanySpec[] = [
     country: "GB",
     city: "Manchester",
     tags: ["fintech"],
+    ukCompanyNumber: "09000001",
   },
   {
     name: "Cotswold Carbon",
     country: "GB",
     city: "Bristol",
     tags: ["climate"],
+    ukCompanyNumber: "09000002",
   },
   {
     name: "Pennywhistle Health",
@@ -1237,6 +1322,172 @@ function deriveWeeklyStats(
   };
 }
 
+function isoDaysBefore(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(
+    Date.UTC(year ?? 1970, (month ?? 1) - 1, (day ?? 1) - days),
+  );
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Registry rows for three states the pages show: a linked UK company with an
+ * SH01 confirmation, a dormant UK company, and a US company with a Form D
+ * confirmation. The two confirmed events are marked `confirmed` here, as the
+ * confirm step would. Returns the events with that change.
+ */
+function buildRegistry(events: SeedEvent[]): {
+  registry: SeedRegistry;
+  events: SeedEvent[];
+} {
+  const firstEquity = (companyName: string): number => {
+    const slug = slugify(companyName);
+    return events.findIndex(
+      (event) =>
+        event.companySlug === slug &&
+        event.type === "funding_round" &&
+        event.roundType !== "grant" &&
+        event.roundType !== "debt",
+    );
+  };
+  const ukIndex = firstEquity("Harbour Ledger");
+  // The first US seed company that has an equity round.
+  const usName =
+    ["Hudson Yarn", "Cascadia Drift", "Mesa Foundry"].find(
+      (name) => firstEquity(name) >= 0,
+    ) ?? "";
+  const usIndex = firstEquity(usName);
+  if (ukIndex < 0 || usIndex < 0) throw new Error("No equity round to confirm");
+  const ukEvent = events[ukIndex];
+  const usEvent = events[usIndex];
+  if (!ukEvent || !usEvent) throw new Error("Missing registry seed events");
+
+  const allotted = isoDaysBefore(ukEvent.announcedOn, 36);
+  const firstSale = isoDaysBefore(usEvent.announcedOn, 40);
+
+  const registry: SeedRegistry = {
+    chCompanies: [
+      {
+        companyNumber: "09000001",
+        name: "HARBOUR LEDGER LIMITED",
+        status: "active",
+        statusDetail: null,
+        companyType: "ltd",
+        incorporatedOn: "2021-03-15",
+        ceasedOn: null,
+        sicCodes: ["62012", "64999"],
+        officePostcode: "M1 0AA",
+        officeOutcode: "M1",
+        officeLocality: "Manchester",
+        accountsType: "micro-entity",
+        accountsMadeUpTo: "2025-03-31",
+      },
+      {
+        companyNumber: "09000002",
+        name: "COTSWOLD CARBON LIMITED",
+        status: "active",
+        statusDetail: null,
+        companyType: "ltd",
+        incorporatedOn: "2019-07-01",
+        ceasedOn: null,
+        sicCodes: ["99999"],
+        officePostcode: "BS1 0AA",
+        officeOutcode: "BS1",
+        officeLocality: "Bristol",
+        accountsType: "dormant",
+        accountsMadeUpTo: "2025-07-31",
+      },
+    ],
+    links: [
+      {
+        companySlug: slugify("Harbour Ledger"),
+        registry: "companies_house",
+        registryId: "09000001",
+        registryName: "HARBOUR LEDGER LIMITED",
+        method: "name_location",
+        reason: "Seed data: exact name and a matching town",
+      },
+      {
+        companySlug: slugify("Cotswold Carbon"),
+        registry: "companies_house",
+        registryId: "09000002",
+        registryName: "COTSWOLD CARBON LIMITED",
+        method: "name_location",
+        reason: "Seed data: exact name and a matching town",
+      },
+      {
+        companySlug: slugify(usName),
+        registry: "sec_edgar",
+        registryId: "9000001",
+        registryName: `${usName} Inc.`,
+        method: "form_d_round",
+        reason: "Seed data: exact name and a Form D close to the round",
+      },
+    ],
+    chFilings: [
+      {
+        companyNumber: "09000001",
+        transactionId: "SEED-SH01-0001",
+        type: "SH01",
+        category: "capital",
+        filedOn: isoDaysBefore(ukEvent.announcedOn, 30),
+        actionDate: allotted,
+        capital: [{ currency: "GBP", figure: "1,250.00" }],
+      },
+    ],
+    formDFilings: [
+      {
+        accessionNumber: "0009000001-26-000001",
+        cik: "9000001",
+        issuerName: `${usName} Inc.`,
+        entityType: "Corporation",
+        jurisdiction: "DE",
+        issuerState: "NY",
+        issuerCity: "New York",
+        industryGroup: "Other",
+        dateOfFirstSale: firstSale,
+        totalOfferingUsdMinor: 500_000_000,
+        totalSoldUsdMinor: 440_000_000,
+        investorCount: 7,
+        filedOn: isoDaysBefore(usEvent.announcedOn, 25),
+        companySlug: slugify(usName),
+      },
+    ],
+    confirmations: [
+      {
+        eventIndex: ukIndex,
+        recordKind: "ch_allotment",
+        recordKey: "SEED-SH01-0001",
+        rule: "ch_allotment_window",
+        recordDate: allotted,
+        confirmsAmount: false,
+      },
+      {
+        eventIndex: usIndex,
+        recordKind: "sec_form_d",
+        recordKey: "0009000001-26-000001",
+        rule: "form_d_window",
+        recordDate: firstSale,
+        confirmsAmount: false,
+      },
+    ],
+    edgarSource: {
+      slug: "sec-edgar",
+      name: "SEC EDGAR",
+      kind: "sec_edgar",
+      url: "https://www.sec.gov/edgar",
+      priority: 5,
+    },
+  };
+
+  const confirmed = events.map((event, index) =>
+    index === ukIndex || index === usIndex
+      ? { ...event, evidence: "confirmed" as const }
+      : event,
+  );
+  return { registry, events: confirmed };
+}
+
 export function buildSeedDataset(now = new Date()): SeedDataset {
   let articleSeq = 0;
   const article = (title: string, announcedOn: string): SeedArticle => {
@@ -1558,12 +1809,13 @@ export function buildSeedDataset(now = new Date()): SeedDataset {
     ...phase2.investors.map((investor) => investor.slug),
   ]);
   const allCompanies = [...companies, ...phase2.companies];
-  const allEvents = [
+  const unconfirmedEvents = [
     ...funding,
     ...acquisitions,
     ...launches,
     ...phase2.events,
   ];
+  const { registry, events: allEvents } = buildRegistry(unconfirmedEvents);
   const themesOfCompany = new Map<string, string[]>();
   for (const link of phase2.companyThemes) {
     const list = themesOfCompany.get(link.companySlug) ?? [];
@@ -1627,5 +1879,6 @@ export function buildSeedDataset(now = new Date()): SeedDataset {
     themeWeeklyStats: stats.themeWeeks,
     weeklyTotals: stats.totals,
     locations: phase2.locations,
+    registry,
   };
 }

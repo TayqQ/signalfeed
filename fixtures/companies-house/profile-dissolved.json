@@ -1,0 +1,38 @@
+{
+  "company_name": "PEBBLE ORCHARD SYSTEMS LTD",
+  "company_number": "09100558",
+  "company_status": "dissolved",
+  "type": "ltd",
+  "jurisdiction": "england-wales",
+  "date_of_creation": "2016-04-12",
+  "date_of_cessation": "2023-06-06",
+  "sic_codes": ["62020"],
+  "registered_office_address": {
+    "address_line_1": "Unit 7",
+    "address_line_2": "Harbour Row",
+    "locality": "Northcombe",
+    "postal_code": "EX9 1ZZ",
+    "country": "England"
+  },
+  "accounts": {
+    "accounting_reference_date": {
+      "day": "30",
+      "month": "04"
+    },
+    "last_accounts": {
+      "made_up_to": "2022-04-30",
+      "period_end_on": "2022-04-30",
+      "type": "dormant"
+    }
+  },
+  "has_insolvency_history": false,
+  "has_charges": false,
+  "can_file": false,
+  "registered_office_is_in_dispute": false,
+  "undeliverable_registered_office_address": false,
+  "links": {
+    "self": "/company/09100558",
+    "filing_history": "/company/09100558/filing-history"
+  },
+  "etag": "a8cfb850d2d0c3488d90a1e9a8042be0526afd10"
+}

@@ -59,4 +59,40 @@ describe("describeFundingCriteria", () => {
       "Pre-seed rounds of £50K to £2M, in London, Leeds or San Francisco, in the AI drug discovery theme, first recorded equity round, from 1 January 2026 to 30 June 2026",
     );
   });
+
+  it("covers confirmed rounds and company size", () => {
+    expect(
+      describeFundingCriteria({
+        evidence: "confirmed",
+        roundTypes: ["seed"],
+        companySizes: ["micro", "small"],
+      }),
+    ).toBe("Confirmed seed rounds at micro and small companies");
+    expect(describeFundingCriteria({ evidence: "confirmed" })).toBe(
+      "Confirmed funding rounds, excluding grants",
+    );
+    expect(
+      describeFundingCriteria(
+        {
+          evidence: "confirmed",
+          roundTypes: ["seed", "series_a"],
+          sizeBands: ["under-1m"],
+          companySizes: ["micro", "full_accounts", "no_accounts_yet"],
+          near: { placeSlug: "leeds", km: 25 },
+        },
+        names,
+      ),
+    ).toBe(
+      "Confirmed seed and Series A rounds under £1M at micro companies, companies filing full accounts or companies with no accounts filed yet, within 25 km of Leeds",
+    );
+  });
+
+  it("describes company size without the confirmed marker", () => {
+    expect(
+      describeFundingCriteria({
+        roundTypes: ["grant"],
+        companySizes: ["dormant"],
+      }),
+    ).toBe("Grant rounds at dormant companies");
+  });
 });

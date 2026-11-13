@@ -387,6 +387,137 @@ export default function AboutPage() {
         </p>
       </section>
 
+      <section id="companies-house" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl font-semibold">Companies House links</h2>
+        <p className="mt-3 text-zinc-700">
+          For UK companies, we try to match the company to its entry on the{" "}
+          <a
+            href="https://find-and-update.company-information.service.gov.uk/"
+            className={LINK_CLASS}
+            rel="noopener noreferrer"
+          >
+            Companies House register
+          </a>
+          . A link is made only when the name matches exactly and something else
+          supports it. That might be a grant postcode, a registered office near
+          the town named in the news, or a share allotment filed near a reported
+          round. A name alone is never enough, because many unrelated companies
+          share short names.
+        </p>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-zinc-700">
+          <li>
+            Close matches, such as a trading name that is only the start of the
+            registered name, go to a review queue. A person decides. Until then
+            the company stays unlinked.
+          </li>
+          <li>
+            A missed link leaves a gap. A wrong link would put another
+            company&rsquo;s facts on the page, so we prefer gaps. Many UK
+            companies are not linked.
+          </li>
+          <li>
+            A link can still be wrong. If you spot one,{" "}
+            <a
+              href={GITHUB_ISSUES_URL}
+              className={LINK_CLASS}
+              rel="noopener noreferrer"
+            >
+              report it on GitHub
+            </a>
+            .
+          </li>
+          <li>
+            We never store the names of officers, directors, shareholders or
+            people with significant control. We do not request that data from
+            Companies House. No personal data from registries is stored.
+          </li>
+        </ul>
+      </section>
+
+      <section id="confirmed" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl font-semibold">Confirmed raises</h2>
+        <p className="mt-3 text-zinc-700">
+          &ldquo;Confirmed&rdquo; means an official filing falls within the
+          raise&rsquo;s date window. For a UK company that is a share allotment
+          (form SH01) at Companies House. For a US company it is an SEC Form D.
+          Both are checked against the date of the news report.
+        </p>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-zinc-700">
+          <li>
+            The filing confirms that shares were issued, or that an offering was
+            filed, at about that time. It does not confirm the exact amount.
+          </li>
+          <li>
+            Amounts stay as the news reported them. A Form D amount is often the
+            whole offering, not what was raised. Only when the marker says the
+            amount agrees has a Form D matched it.
+          </li>
+          <li>
+            An SH01 can also record option exercises or a share swap, so a match
+            is strong evidence, not proof of a funding round. Round type and
+            investors always come from the news.
+          </li>
+          <li>
+            A filing never creates a raise on its own. Raises without a matching
+            filing are not wrong, only unconfirmed. Filings can also arrive
+            late.
+          </li>
+        </ul>
+      </section>
+
+      <section id="company-facts" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl font-semibold">Company facts</h2>
+        <p className="mt-3 text-zinc-700">
+          For linked companies, the company page shows facts from the register
+          beside the facts from the news.
+        </p>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-zinc-700">
+          <li>
+            <strong className="font-medium text-zinc-900">
+              Incorporation date and founded year.
+            </strong>{" "}
+            A company often incorporates a new holding company for a round, so
+            the register date can be later than the real founding. When news and
+            the registry disagree, the page shows the incorporation year. The
+            year the news gave stays stored. Read the incorporation year as the
+            age of the legal entity, not always of the business.
+          </li>
+          <li>
+            <strong className="font-medium text-zinc-900">Sectors.</strong> SIC
+            codes give a sector only to companies that have no theme. Startups
+            often choose generic codes, so they would blur the sectors that
+            themes already give.
+          </li>
+          <li>
+            <strong className="font-medium text-zinc-900">Size bands.</strong>{" "}
+            The band comes from the type of the latest accounts filed: micro,
+            small, medium, dormant, or none filed yet. &ldquo;Full accounts
+            (size not stated)&rdquo; does not mean a large company, because
+            small companies may file full accounts. We do not know headcount.
+          </li>
+          <li>
+            <strong className="font-medium text-zinc-900">
+              Registered office.
+            </strong>{" "}
+            We use only the postcode district, such as &ldquo;LS1&rdquo;, and
+            only when the news names no town. Many companies register at an
+            accountant or a formation agent, so an address shared by 20 or more
+            companies is ignored.
+          </li>
+        </ul>
+      </section>
+
+      <section id="registry-attribution" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl font-semibold">Registry attribution</h2>
+        <p className="mt-3 text-zinc-700">
+          Source: Companies House. Contains public sector information from the
+          Companies House register.
+        </p>
+        <p className="mt-3 text-zinc-700">
+          Source: U.S. Securities and Exchange Commission, EDGAR (Form D).
+        </p>
+      </section>
+
       <section className="mt-10">
         <h2 className="text-xl font-semibold">How quality is measured</h2>
         <p className="mt-3 text-zinc-700">

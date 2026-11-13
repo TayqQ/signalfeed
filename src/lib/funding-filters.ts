@@ -16,6 +16,12 @@ import type {
   SortDirection,
 } from "@/core/read-models";
 import { ROUND_TYPES } from "@/core/enums";
+import {
+  COMPANY_SIZE_BANDS,
+  companySizeBandFromSlug,
+  companySizeBandSlug,
+} from "@/core/registry";
+import type { CompanySizeBand } from "@/core/registry";
 import type { RoundType } from "@/core/enums";
 import { isSector, SECTORS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
@@ -39,8 +45,11 @@ const MAX_CITIES = 10;
  * - 2: grants are excluded unless `round=grant` is selected (D44), and the
  *   targeting parameters `theme`, `sector`, `ukregion`, `city`, `near`, `km`
  *   and `momentum` were added. Serialisation became canonical.
+ * - 3: Phase 3 added `evidence` (only `confirmed`) and `cosize` (company size
+ *   bands, D60). Both default to "no filter", so version 2 URLs parse to the
+ *   same criteria. The new keys come after the version 2 keys.
  */
-export const FUNDING_CRITERIA_VERSION = 2;
+export const FUNDING_CRITERIA_VERSION = 3;
 
 const roundSchema = z.enum(ROUND_TYPES);
 const sortSchema = z.enum(FUNDING_SORTS);
@@ -223,6 +232,14 @@ function parseNear(
   return { placeSlug, km: known ?? DEFAULT_NEAR_KM };
 }
 
+function parseEvidence(value: string | undefined): "confirmed" | undefined {
+  return value?.toLowerCase() === "confirmed" ? "confirmed" : undefined;
+}
+
+function parseCompanySize(value: string): CompanySizeBand | undefined {
+  return companySizeBandFromSlug(value.trim().toLowerCase()) ?? undefined;
+}
+
 function parseMomentum(value: string | undefined): MomentumFilter | undefined {
   if (value == null) return undefined;
   const lower = value.toLowerCase();
@@ -361,6 +378,20 @@ export function parseFundingCriteria(
   const momentum = parseMomentum(readFirst(searchParams, "momentum"));
   if (momentum) criteria.momentum = momentum;
 
+  const evidence = parseEvidence(readFirst(searchParams, "evidence"));
+  if (evidence) criteria.evidence = evidence;
+
+  const companySizes = uniqueParsed(
+    readMany(searchParams, "cosize"),
+    parseCompanySize,
+  );
+  if (companySizes) {
+    criteria.companySizes = canonical(
+      companySizes,
+      orderBy(COMPANY_SIZE_BANDS),
+    );
+  }
+
   return criteria;
 }
 
@@ -433,6 +464,13 @@ function appendCriteria(
   if (criteria.tag) params.set("tag", criteria.tag);
   if (criteria.investorSlug) params.set("investor", criteria.investorSlug);
   if (criteria.momentum) params.set("momentum", criteria.momentum);
+  if (criteria.evidence === "confirmed") params.set("evidence", "confirmed");
+  for (const band of canonical(
+    criteria.companySizes ?? [],
+    orderBy(COMPANY_SIZE_BANDS),
+  )) {
+    params.append("cosize", companySizeBandSlug(band));
+  }
 }
 
 /**

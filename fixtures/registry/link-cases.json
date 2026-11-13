@@ -1,0 +1,2227 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "ch-01",
+      "kind": "companies_house",
+      "tags": ["worked-example", "filing", "location"],
+      "note": "Spec worked example 1. Exact name with an SH01 36 days before the seed and an office in Leeds. The prefix match is not considered.",
+      "company": {
+        "names": ["Brightwell Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-10",
+            "amountUsdMinor": 265000000
+          }
+        ],
+        "location": { "label": "Leeds", "lat": 53.8016, "lon": -1.5472 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13579246",
+            "name": "BRIGHTWELL ROBOTICS LTD",
+            "incorporatedOn": "2022-06-01",
+            "officePostcode": "LS1 4AP",
+            "accountsType": "micro-entity",
+            "accountsMadeUpTo": "2025-06-30"
+          },
+          "filings": [{ "actionDate": "2026-02-02", "filedOn": "2026-02-16" }]
+        },
+        {
+          "profile": {
+            "companyNumber": "14002211",
+            "name": "BRIGHTWELL ROBOTICS SERVICES LTD",
+            "incorporatedOn": "2023-03-10",
+            "officePostcode": "LS11 5DR"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "13579246" }
+    },
+    {
+      "id": "ch-02",
+      "kind": "companies_house",
+      "tags": ["worked-example", "short-name", "dormant"],
+      "note": "Spec worked example 2. A short brand name matching an old company with dormant accounts that end before the round. No signal.",
+      "company": {
+        "names": ["Nova"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-05-01",
+            "amountUsdMinor": 63000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "06812345",
+            "name": "NOVA LTD",
+            "incorporatedOn": "2009-02-11",
+            "officePostcode": "BS1 4DJ",
+            "accountsType": "dormant",
+            "accountsMadeUpTo": "2026-03-31"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-03",
+      "kind": "companies_house",
+      "tags": ["worked-example", "too-young"],
+      "note": "Spec worked example 3. The only exact match was incorporated after the first event.",
+      "company": {
+        "names": ["Kestrel AI"],
+        "foundedYear": 2023,
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2024-11-12",
+            "amountUsdMinor": 150000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "15876543",
+            "name": "KESTREL AI LTD",
+            "incorporatedOn": "2025-08-01",
+            "officePostcode": "WC2H 9JQ"
+          },
+          "filings": [{ "actionDate": "2025-09-01" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-04",
+      "kind": "companies_house",
+      "tags": ["worked-example", "grant-postcode"],
+      "note": "Spec worked example 4. The grant participant's postcode is the registered office postcode.",
+      "company": {
+        "names": ["Fenwick Thermal", "Fenwick Thermal Ltd"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-06-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 38000000
+          }
+        ],
+        "grantPostcodes": ["NE1 5DL"]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11223344",
+            "name": "FENWICK THERMAL LTD",
+            "incorporatedOn": "2019-04-02",
+            "officePostcode": "NE1 5DL",
+            "accountsType": "small",
+            "accountsMadeUpTo": "2025-04-30"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "11223344" }
+    },
+    {
+      "id": "ch-05",
+      "kind": "companies_house",
+      "tags": ["worked-example", "trading-name", "prefix", "holdings"],
+      "note": "Spec worked example 5. No exact match; the platform company has both the location and the filing. Labelled as that company, but D61 sends prefix matches to review, so this counts against recall.",
+      "company": {
+        "names": ["Tidewell"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-01-20",
+            "amountUsdMinor": 380000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12456780",
+            "name": "TIDEWELL PLATFORM LTD",
+            "incorporatedOn": "2021-10-04",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2025-12-15" }]
+        },
+        {
+          "profile": {
+            "companyNumber": "12456781",
+            "name": "TIDEWELL HOLDINGS LTD",
+            "incorporatedOn": "2021-10-04",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12456780" }
+    },
+    {
+      "id": "ch-06",
+      "kind": "companies_house",
+      "tags": ["worked-example", "taken", "duplicate"],
+      "note": "Spec worked example 6. The number is already linked to another company with the same name written with a space. A merge candidate, not a link.",
+      "company": {
+        "names": ["AcmeBio"],
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-04-02",
+            "amountUsdMinor": 1200000000
+          }
+        ],
+        "location": { "label": "Cambridge", "lat": 52.2054, "lon": 0.123 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09876543",
+            "name": "ACME BIO LTD",
+            "incorporatedOn": "2015-09-21",
+            "officePostcode": "CB4 0WS"
+          },
+          "filings": [{ "actionDate": "2026-03-01" }]
+        }
+      ],
+      "linkedToOthers": ["09876543"],
+      "expected": { "outcome": "none", "mergeCandidate": "09876543" }
+    },
+    {
+      "id": "ch-07",
+      "kind": "companies_house",
+      "tags": ["same-name-different-company"],
+      "note": "Same name, but the registry company is an old consultancy in Cheltenham, 140 km from the startup's town, with no allotment near the round.",
+      "company": {
+        "names": ["Larkspur Analytics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-14",
+            "amountUsdMinor": 190000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "08123456",
+            "name": "LARKSPUR ANALYTICS LTD",
+            "incorporatedOn": "2012-05-01",
+            "officePostcode": "GL50 1HX",
+            "accountsType": "total-exemption-full",
+            "accountsMadeUpTo": "2025-05-31"
+          },
+          "filings": [{ "actionDate": "2017-03-03" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-08",
+      "kind": "companies_house",
+      "tags": ["same-name-different-company", "several-exact"],
+      "note": "Two exact matches once 'Technologies' is removed. The second has the allotment and a Manchester office and is the right one, but several exact candidates always go to review.",
+      "company": {
+        "names": ["Quarry Labs"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-10",
+            "amountUsdMinor": 250000000
+          }
+        ],
+        "location": { "label": "Manchester", "lat": 53.4798, "lon": -2.2424 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "07345612",
+            "name": "QUARRY LABS LTD",
+            "incorporatedOn": "2010-07-19",
+            "officePostcode": "M1 3BE"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "13098765",
+            "name": "QUARRY LABS TECHNOLOGIES LTD",
+            "incorporatedOn": "2021-01-12",
+            "officePostcode": "M4 2AH"
+          },
+          "filings": [{ "actionDate": "2026-01-15" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "13098765" }
+    },
+    {
+      "id": "ch-09",
+      "kind": "companies_house",
+      "tags": ["dissolved-namesake", "re-registered", "filing"],
+      "note": "A dissolved company held the name until 2019. The name was reused by a new company in 2024, which has an allotment before the seed.",
+      "company": {
+        "names": ["Pellucid Bio"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2025-09-03",
+            "amountUsdMinor": 320000000
+          },
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-06-18",
+            "amountUsdMinor": 1500000000
+          }
+        ],
+        "location": { "label": "Cambridge", "lat": 52.2054, "lon": 0.123 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09011223",
+            "name": "PELLUCID BIO LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2014-03-12",
+            "ceasedOn": "2019-07-02",
+            "officePostcode": "CB2 1TN"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "16011224",
+            "name": "PELLUCID BIO LTD",
+            "incorporatedOn": "2024-11-05",
+            "officePostcode": "CB4 0WS",
+            "accountsType": null
+          },
+          "filings": [{ "actionDate": "2025-08-20" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "16011224" }
+    },
+    {
+      "id": "ch-10",
+      "kind": "companies_house",
+      "tags": ["dissolved-namesake"],
+      "note": "The only exact match was dissolved six years before the round.",
+      "company": {
+        "names": ["Corvane"],
+        "events": [
+          {
+            "roundType": "pre_seed",
+            "announcedOn": "2026-03-02",
+            "amountUsdMinor": 60000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "07654320",
+            "name": "CORVANE LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2011-05-23",
+            "ceasedOn": "2020-01-14",
+            "officePostcode": "SE1 9PZ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-11",
+      "kind": "companies_house",
+      "tags": ["trading-name", "prefix"],
+      "note": "The D61 example. A trading-name prefix match with the location only.",
+      "company": {
+        "names": ["Voltmoss"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-26",
+            "amountUsdMinor": 210000000
+          }
+        ],
+        "location": { "label": "Bristol", "lat": 51.4535, "lon": -2.5983 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12987001",
+            "name": "VOLTMOSS ENERGY SYSTEMS LTD",
+            "incorporatedOn": "2020-11-30",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-12",
+      "kind": "companies_house",
+      "tags": ["trading-name", "prefix", "filing", "location"],
+      "note": "A trading-name prefix match with both the location and an allotment before the round. Labelled as linked, because a careful person would be sure; D61 sends it to review, so it counts against recall.",
+      "company": {
+        "names": ["Voltmoss"],
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-09-14",
+            "amountUsdMinor": 900000000
+          }
+        ],
+        "location": { "label": "Bristol", "lat": 51.4535, "lon": -2.5983 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12987001",
+            "name": "VOLTMOSS ENERGY SYSTEMS LTD",
+            "incorporatedOn": "2020-11-30",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": [{ "actionDate": "2026-08-08" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12987001" }
+    },
+    {
+      "id": "ch-13",
+      "kind": "companies_house",
+      "tags": ["holdings", "same-name-different-company"],
+      "note": "The exact match is an old company in Guildford, 42 km away. The holdings company in London has the allotment, but an exact candidate decides, and it has no signal.",
+      "company": {
+        "names": ["Halyard"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-05-12",
+            "amountUsdMinor": 280000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "06540987",
+            "name": "HALYARD LTD",
+            "incorporatedOn": "2008-04-17",
+            "officePostcode": "GU1 4RA",
+            "accountsType": "micro-entity",
+            "accountsMadeUpTo": "2025-04-30"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "14550031",
+            "name": "HALYARD HOLDINGS LTD",
+            "incorporatedOn": "2022-12-01",
+            "officePostcode": "EC1V 4PW"
+          },
+          "filings": [{ "actionDate": "2026-04-02" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-14",
+      "kind": "companies_house",
+      "tags": ["dormant"],
+      "note": "Dormant accounts for the year that holds the round: a company that allotted shares for cash is not dormant.",
+      "company": {
+        "names": ["Sorrel Health"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2025-11-04",
+            "amountUsdMinor": 170000000
+          }
+        ],
+        "location": { "label": "Edinburgh", "lat": 55.9548, "lon": -3.1863 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC512340",
+            "name": "SORREL HEALTH LTD",
+            "incorporatedOn": "2015-08-03",
+            "officePostcode": "EH3 9EH",
+            "accountsType": "dormant",
+            "accountsMadeUpTo": "2026-03-31"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-15",
+      "kind": "companies_house",
+      "tags": ["dormant", "filing", "location"],
+      "note": "Dormant until the year before the round, which is normal for a company formed ahead of its first raise. Allotment 21 days before the seed.",
+      "company": {
+        "names": ["Cindervale Grid"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-07-01",
+            "amountUsdMinor": 240000000
+          }
+        ],
+        "location": { "label": "Glasgow", "lat": 55.8651, "lon": -4.2343 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC701122",
+            "name": "CINDERVALE GRID LTD",
+            "incorporatedOn": "2023-05-09",
+            "officePostcode": "G1 3SL",
+            "accountsType": "dormant",
+            "accountsMadeUpTo": "2025-12-31"
+          },
+          "filings": [{ "actionDate": "2026-06-10" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "SC701122" }
+    },
+    {
+      "id": "ch-16",
+      "kind": "companies_house",
+      "tags": ["too-young", "month-precision"],
+      "note": "Incorporated during the month of the first (month-precision) event. That is not 'too young': the event may have been late in the month.",
+      "company": {
+        "names": ["Thimble Bio"],
+        "events": [
+          {
+            "type": "launch",
+            "roundType": null,
+            "announcedOn": "2024-03-01",
+            "datePrecision": "month"
+          },
+          {
+            "roundType": "seed",
+            "announcedOn": "2025-06-10",
+            "amountUsdMinor": 200000000
+          }
+        ],
+        "location": { "label": "Oxford", "lat": 51.7524, "lon": -1.2547 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "15550012",
+            "name": "THIMBLE BIO LTD",
+            "incorporatedOn": "2024-03-20",
+            "officePostcode": "OX4 2JZ"
+          },
+          "filings": [{ "actionDate": "2025-05-01" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "15550012" }
+    },
+    {
+      "id": "ch-17",
+      "kind": "companies_house",
+      "tags": ["founded-year"],
+      "note": "News says founded 2021; the exact match was incorporated in 2015. Even with an allotment, a careful person would not be sure.",
+      "company": {
+        "names": ["Rookwise Data"],
+        "foundedYear": 2021,
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-02",
+            "amountUsdMinor": 150000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09512377",
+            "name": "ROOKWISE DATA LTD",
+            "incorporatedOn": "2015-04-01",
+            "officePostcode": "N1 7GU"
+          },
+          "filings": [{ "actionDate": "2026-01-10" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-18",
+      "kind": "companies_house",
+      "tags": ["founded-year", "filing"],
+      "note": "News founded year one year after incorporation: within the tolerance. Allotment 19 days before the round.",
+      "company": {
+        "names": ["Larchmont Freight"],
+        "foundedYear": 2020,
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-03-23",
+            "amountUsdMinor": 1100000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12233441",
+            "name": "LARCHMONT FREIGHT LIMITED",
+            "incorporatedOn": "2019-09-16",
+            "officePostcode": "B3 2PA"
+          },
+          "filings": [{ "actionDate": "2026-03-04" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12233441" }
+    },
+    {
+      "id": "ch-19",
+      "kind": "companies_house",
+      "tags": ["shared-address", "same-name-different-company"],
+      "note": "The namesake is registered at a Manchester accountant's address shared by many companies. Without the shared-address check, location would wrongly support it.",
+      "company": {
+        "names": ["Pinemark Studio"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-15",
+            "amountUsdMinor": 90000000
+          }
+        ],
+        "location": { "label": "Manchester", "lat": 53.4798, "lon": -2.2424 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11765430",
+            "name": "PINEMARK STUDIO LTD",
+            "incorporatedOn": "2018-12-12",
+            "officePostcode": "M1 3BE",
+            "accountsType": "micro-entity",
+            "accountsMadeUpTo": "2025-12-31"
+          },
+          "filings": [],
+          "officePostcodeShared": true
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-20",
+      "kind": "companies_house",
+      "tags": ["shared-address", "filing"],
+      "note": "A Leeds startup registered at a London formation agent. The location does not count, but the allotment does.",
+      "company": {
+        "names": ["Quillfeather Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-05-20",
+            "amountUsdMinor": 310000000
+          }
+        ],
+        "location": { "label": "Leeds", "lat": 53.8016, "lon": -1.5472 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14876001",
+            "name": "QUILLFEATHER ROBOTICS LTD",
+            "incorporatedOn": "2023-02-14",
+            "officePostcode": "EC1V 2NX"
+          },
+          "filings": [{ "actionDate": "2026-04-28" }],
+          "officePostcodeShared": true
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "14876001" }
+    },
+    {
+      "id": "ch-21",
+      "kind": "companies_house",
+      "tags": ["taken", "duplicate", "alias"],
+      "note": "Two SignalFeed companies want one number: another company is already linked to it. This one, matched by its alias, becomes a merge candidate.",
+      "company": {
+        "names": ["Brindle Payments", "Brindle Pay"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-06-08",
+            "amountUsdMinor": 400000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13344556",
+            "name": "BRINDLE PAY LTD",
+            "incorporatedOn": "2021-03-03",
+            "officePostcode": "E1 6RF"
+          },
+          "filings": [{ "actionDate": "2026-05-15" }]
+        }
+      ],
+      "linkedToOthers": ["13344556"],
+      "expected": { "outcome": "none", "mergeCandidate": "13344556" }
+    },
+    {
+      "id": "ch-22",
+      "kind": "companies_house",
+      "tags": ["previous-name", "filing", "short-name"],
+      "note": "The company was renamed. Its previous name matches exactly, and an allotment falls 21 days before the round.",
+      "company": {
+        "names": ["Copperwick"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-20",
+            "amountUsdMinor": 180000000
+          }
+        ],
+        "location": { "label": "Bristol", "lat": 51.4535, "lon": -2.5983 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13900123",
+            "name": "SALTMARSH ENERGY LTD",
+            "previousNames": ["COPPERWICK LTD"],
+            "incorporatedOn": "2022-01-17",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": [{ "actionDate": "2026-03-30" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "13900123" }
+    },
+    {
+      "id": "ch-23",
+      "kind": "companies_house",
+      "tags": ["previous-name", "prefix"],
+      "note": "A previous name that only starts with the company's name. Previous names count for exact matches only.",
+      "company": {
+        "names": ["Driftlight"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-12",
+            "amountUsdMinor": 100000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "10088776",
+            "name": "FERNHOLLOW LTD",
+            "previousNames": ["DRIFTLIGHT MEDIA LTD"],
+            "incorporatedOn": "2016-02-29",
+            "officePostcode": "SE1 9PZ"
+          },
+          "filings": [{ "actionDate": "2026-01-20" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-24",
+      "kind": "companies_house",
+      "tags": ["scottish", "filing", "location"],
+      "note": "A Scottish (SC) number with an allotment and an Edinburgh office.",
+      "company": {
+        "names": ["Thistledown Genomics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-01-28",
+            "amountUsdMinor": 420000000
+          }
+        ],
+        "location": { "label": "Edinburgh", "lat": 55.9548, "lon": -3.1863 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC612345",
+            "name": "THISTLEDOWN GENOMICS LTD",
+            "incorporatedOn": "2019-11-11",
+            "officePostcode": "EH3 9EH"
+          },
+          "filings": [{ "actionDate": "2025-12-19" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "SC612345" }
+    },
+    {
+      "id": "ch-25",
+      "kind": "companies_house",
+      "tags": ["northern-irish", "filing"],
+      "note": "A Northern Irish (NI) number. BT districts have no open centroid, so location cannot help; the allotment can.",
+      "company": {
+        "names": ["Lagan Circuit"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-01-22",
+            "amountUsdMinor": 160000000
+          }
+        ],
+        "location": { "label": "Belfast", "lat": 54.5993, "lon": -5.9295 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "NI678901",
+            "name": "LAGAN CIRCUIT LTD",
+            "incorporatedOn": "2021-06-30",
+            "officePostcode": "BT3 9DT"
+          },
+          "filings": [{ "actionDate": "2025-12-01" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "NI678901" }
+    },
+    {
+      "id": "ch-26",
+      "kind": "companies_house",
+      "tags": ["northern-irish", "no-signal"],
+      "note": "A Northern Irish company with no allotment near the round. Location cannot be checked in BT districts, so it goes to review.",
+      "company": {
+        "names": ["Gortmore Analytics"],
+        "events": [
+          {
+            "roundType": "pre_seed",
+            "announcedOn": "2026-08-04",
+            "amountUsdMinor": 50000000
+          }
+        ],
+        "location": { "label": "Belfast", "lat": 54.5993, "lon": -5.9295 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "NI690012",
+            "name": "GORTMORE ANALYTICS LIMITED",
+            "incorporatedOn": "2022-10-10",
+            "officePostcode": "BT3 9DT"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-27",
+      "kind": "companies_house",
+      "tags": ["ltd-limited", "location"],
+      "note": "'Limited' in the news and the registry: a two-word name with the office in the same town and no allotment yet.",
+      "company": {
+        "names": ["Harbourline Systems Limited"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-07-15",
+            "amountUsdMinor": 220000000
+          }
+        ],
+        "location": { "label": "Reading", "lat": 51.4542, "lon": -0.9707 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11900456",
+            "name": "HARBOURLINE SYSTEMS LIMITED",
+            "incorporatedOn": "2019-03-25",
+            "officePostcode": "RG1 3BD"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "11900456" }
+    },
+    {
+      "id": "ch-28",
+      "kind": "companies_house",
+      "tags": ["punctuation", "filing"],
+      "note": "An ampersand in the news name and 'AND' in the registry.",
+      "company": {
+        "names": ["Kite & Kettle"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-30",
+            "amountUsdMinor": 130000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12777001",
+            "name": "KITE AND KETTLE LTD",
+            "incorporatedOn": "2020-08-08",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2026-02-27" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12777001" }
+    },
+    {
+      "id": "ch-29",
+      "kind": "companies_house",
+      "tags": ["punctuation", "filing", "location"],
+      "note": "A hyphen in the news name ('Re-Frame Labs') and none in the registry ('REFRAME LABS LTD').",
+      "company": {
+        "names": ["Re-Frame Labs"],
+        "events": [
+          {
+            "roundType": "pre_seed",
+            "announcedOn": "2026-05-05",
+            "amountUsdMinor": 75000000
+          }
+        ],
+        "location": { "label": "Brighton", "outcode": "BN1" }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14200333",
+            "name": "REFRAME LABS LTD",
+            "incorporatedOn": "2022-07-01",
+            "officePostcode": "BN1 4GH"
+          },
+          "filings": [{ "actionDate": "2026-04-11" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "14200333" }
+    },
+    {
+      "id": "ch-30",
+      "kind": "companies_house",
+      "tags": ["short-name", "same-name-different-company", "location"],
+      "note": "A short common brand name. ATLAS LTD has a London office, but it is an old unrelated firm. Location alone does not link a single-word name.",
+      "company": {
+        "names": ["Atlas"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-06-02",
+            "amountUsdMinor": 500000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "03456789",
+            "name": "ATLAS LTD",
+            "incorporatedOn": "1998-01-20",
+            "officePostcode": "WC2H 9JQ",
+            "accountsType": "small",
+            "accountsMadeUpTo": "2025-12-31"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-31",
+      "kind": "companies_house",
+      "tags": ["short-name", "several-exact"],
+      "note": "A short name with two exact matches once 'Technologies' is removed. Both go to review.",
+      "company": {
+        "names": ["Helix"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-24",
+            "amountUsdMinor": 300000000
+          }
+        ],
+        "location": { "label": "Cambridge", "lat": 52.2054, "lon": 0.123 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "05123987",
+            "name": "HELIX LTD",
+            "incorporatedOn": "2004-06-14",
+            "officePostcode": "CB2 1TN"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "12345098",
+            "name": "HELIX TECHNOLOGIES LTD",
+            "incorporatedOn": "2019-12-02",
+            "officePostcode": "M4 2AH"
+          },
+          "filings": [{ "actionDate": "2026-01-30" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-32",
+      "kind": "companies_house",
+      "tags": ["re-registered", "dissolved-namesake", "filing"],
+      "note": "The company re-registered: the old company was dissolved in 2023 and a new one with the same name was formed before the first round.",
+      "company": {
+        "names": ["Quillon Health"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2024-05-14",
+            "amountUsdMinor": 250000000
+          },
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-01-20",
+            "amountUsdMinor": 1400000000
+          }
+        ],
+        "location": { "label": "Nottingham", "lat": 52.9569, "lon": -1.1481 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11098712",
+            "name": "QUILLON HEALTH LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2018-01-08",
+            "ceasedOn": "2023-04-11",
+            "officePostcode": "NG1 5FS"
+          },
+          "filings": [{ "actionDate": "2019-02-02" }]
+        },
+        {
+          "profile": {
+            "companyNumber": "14612099",
+            "name": "QUILLON HEALTH LTD",
+            "incorporatedOn": "2023-02-01",
+            "officePostcode": "NG1 5FS"
+          },
+          "filings": [{ "actionDate": "2025-11-30" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "14612099" }
+    },
+    {
+      "id": "ch-33",
+      "kind": "companies_house",
+      "tags": ["re-registered", "dissolved-namesake", "too-young"],
+      "note": "Re-registered between rounds: the old company closed before the latest round and the new one was formed after the first. Neither fits all the news, so nothing links.",
+      "company": {
+        "names": ["Vellum Grove"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2021-09-10",
+            "amountUsdMinor": 90000000
+          },
+          {
+            "roundType": "series_a",
+            "announcedOn": "2025-10-01",
+            "amountUsdMinor": 800000000
+          }
+        ],
+        "location": { "label": "Bath", "lat": 51.3832, "lon": -2.3566 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11800231",
+            "name": "VELLUM GROVE LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2019-02-05",
+            "ceasedOn": "2023-06-20",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": [{ "actionDate": "2021-08-01" }]
+        },
+        {
+          "profile": {
+            "companyNumber": "14900877",
+            "name": "VELLUM GROVE LTD",
+            "incorporatedOn": "2023-05-15",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": [{ "actionDate": "2025-09-01" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-34",
+      "kind": "companies_house",
+      "tags": ["grant-number"],
+      "note": "Step 0: the grant record gives the number (without its leading zero) and the profile name matches.",
+      "company": {
+        "names": ["Ashgrove Materials"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-10-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 60000000
+          }
+        ],
+        "grantPostcodes": ["S1 2BJ"],
+        "grantCompanyNumber": "8765432"
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "08765432",
+            "name": "ASHGROVE MATERIALS LTD",
+            "incorporatedOn": "2013-11-19",
+            "officePostcode": "S1 2BJ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "08765432" }
+    },
+    {
+      "id": "ch-35",
+      "kind": "companies_house",
+      "tags": ["grant-number", "same-name-different-company"],
+      "note": "The grant number's profile has another name. The exact search match has an allotment, but while the grant names a different number nothing links automatically.",
+      "company": {
+        "names": ["Ferrous Loop"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-04-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 40000000
+          },
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-03",
+            "amountUsdMinor": 200000000
+          }
+        ],
+        "location": { "label": "Sheffield", "lat": 53.3833, "lon": -1.4655 },
+        "grantCompanyNumber": "10293847"
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "10293847",
+            "name": "NORTHGATE COMPOSITES LTD",
+            "incorporatedOn": "2016-07-28",
+            "officePostcode": "S1 2BJ"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "13311220",
+            "name": "FERROUS LOOP LTD",
+            "incorporatedOn": "2021-04-14",
+            "officePostcode": "S1 2BJ"
+          },
+          "filings": [{ "actionDate": "2026-02-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-36",
+      "kind": "companies_house",
+      "tags": ["grant-number", "previous-name"],
+      "note": "Step 0 with a renamed company: the grant name is the profile's previous name.",
+      "company": {
+        "names": ["Brackenlight Optics"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2024-09-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 50000000
+          }
+        ],
+        "grantPostcodes": ["DD1 4HN"],
+        "grantCompanyNumber": "SC598801"
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC598801",
+            "name": "LUMENFOLD PHOTONICS LTD",
+            "previousNames": ["BRACKENLIGHT OPTICS LTD"],
+            "incorporatedOn": "2018-05-08",
+            "officePostcode": "DD1 4HN"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "SC598801" }
+    },
+    {
+      "id": "ch-37",
+      "kind": "companies_house",
+      "tags": ["no-share-capital"],
+      "note": "The exact match is a company limited by guarantee (a charity) while the startup raised a seed round.",
+      "company": {
+        "names": ["Wildcress"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-09",
+            "amountUsdMinor": 110000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "07001234",
+            "name": "WILDCRESS LIMITED",
+            "companyType": "private-limited-guarant-nsc",
+            "incorporatedOn": "2009-08-14",
+            "officePostcode": "N1 7GU"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-38",
+      "kind": "companies_house",
+      "tags": ["no-share-capital", "grant-postcode"],
+      "note": "A guarantee company is allowed for a grant-only company. The grant postcode is the office postcode.",
+      "company": {
+        "names": ["Tarnside Innovation Centre"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-01-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 120000000
+          }
+        ],
+        "grantPostcodes": ["LS2 9JT"]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09345678",
+            "name": "TARNSIDE INNOVATION CENTRE LTD",
+            "companyType": "private-limited-guarant-nsc",
+            "incorporatedOn": "2014-12-01",
+            "officePostcode": "LS2 9JT"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "09345678" }
+    },
+    {
+      "id": "ch-39",
+      "kind": "companies_house",
+      "tags": ["foreign-company", "subsidiary"],
+      "note": "A US company with a London office. The exact UK match is its subsidiary, a different legal entity, so it goes to review.",
+      "company": {
+        "names": ["Cobaltine"],
+        "countryCode": "US",
+        "events": [
+          {
+            "roundType": "series_b",
+            "announcedOn": "2026-05-27",
+            "amountUsdMinor": 4000000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13700456",
+            "name": "COBALTINE LTD",
+            "incorporatedOn": "2021-11-02",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2026-05-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-40",
+      "kind": "companies_house",
+      "tags": ["manual-rejection"],
+      "note": "The maintainer rejected this number for the company before. It is never proposed again.",
+      "company": {
+        "names": ["Brightfold"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-18",
+            "amountUsdMinor": 140000000
+          }
+        ],
+        "location": { "label": "Liverpool", "lat": 53.4102, "lon": -2.9758 },
+        "rejectedNumbers": ["10456123"]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "10456123",
+            "name": "BRIGHTFOLD LTD",
+            "incorporatedOn": "2016-10-10",
+            "officePostcode": "L1 8JQ"
+          },
+          "filings": [{ "actionDate": "2026-02-20" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-41",
+      "kind": "companies_house",
+      "tags": ["prefix", "subsidiary"],
+      "note": "'UK' is not stripped: FERNGROVE UK LTD is a prefix match, probably a subsidiary. Review even with both signals.",
+      "company": {
+        "names": ["Ferngrove"],
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-04-28",
+            "amountUsdMinor": 1000000000
+          }
+        ],
+        "location": { "label": "Birmingham", "lat": 52.4799, "lon": -1.9001 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12600981",
+            "name": "FERNGROVE UK LTD",
+            "incorporatedOn": "2020-05-05",
+            "officePostcode": "B3 2PA"
+          },
+          "filings": [{ "actionDate": "2026-04-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-42",
+      "kind": "companies_house",
+      "tags": ["grant-postcode", "outcode"],
+      "note": "The grant participant's postcode is in the same district as the office (CB4), not the same full postcode.",
+      "company": {
+        "names": ["Orrery Biosystems"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-03-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 70000000
+          },
+          {
+            "roundType": "seed",
+            "announcedOn": "2025-12-02",
+            "amountUsdMinor": 300000000
+          }
+        ],
+        "grantPostcodes": ["CB4 1YG"]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11455667",
+            "name": "ORRERY BIOSYSTEMS LTD",
+            "incorporatedOn": "2018-07-07",
+            "officePostcode": "CB4 0WS"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "11455667" }
+    },
+    {
+      "id": "ch-43",
+      "kind": "companies_house",
+      "tags": ["shared-address", "grant-postcode", "outcode"],
+      "note": "Grant postcode in the same district as an office postcode flagged as shared. A shared office counts only on a full postcode match, so this goes to review.",
+      "company": {
+        "names": ["Gravelpit Software"],
+        "events": [
+          {
+            "roundType": "grant",
+            "announcedOn": "2025-07-01",
+            "datePrecision": "month",
+            "amountUsdMinor": 30000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 },
+        "grantPostcodes": ["EC1V 4PW"]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12099880",
+            "name": "GRAVELPIT SOFTWARE LTD",
+            "incorporatedOn": "2019-07-23",
+            "officePostcode": "EC1V 2NX"
+          },
+          "filings": [],
+          "officePostcodeShared": true
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-44",
+      "kind": "companies_house",
+      "tags": ["location", "distance"],
+      "note": "The office is in Guildford, 37 km from Reading: outside the 25 km limit. No allotment.",
+      "company": {
+        "names": ["Wexcombe Instruments"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-17",
+            "amountUsdMinor": 160000000
+          }
+        ],
+        "location": { "label": "Reading", "lat": 51.4542, "lon": -0.9707 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "10777123",
+            "name": "WEXCOMBE INSTRUMENTS LTD",
+            "incorporatedOn": "2017-05-18",
+            "officePostcode": "GU1 4RA"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-45",
+      "kind": "companies_house",
+      "tags": ["location"],
+      "note": "A distinctive two-word name with the office in the same city and no allotment yet. Location supports it.",
+      "company": {
+        "names": ["Brackwater Analytics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-09-09",
+            "amountUsdMinor": 120000000
+          }
+        ],
+        "location": { "label": "Sheffield", "lat": 53.3833, "lon": -1.4655 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13456002",
+            "name": "BRACKWATER ANALYTICS LTD",
+            "incorporatedOn": "2021-06-01",
+            "officePostcode": "S1 2BJ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "13456002" }
+    },
+    {
+      "id": "ch-46",
+      "kind": "companies_house",
+      "tags": ["filing", "window"],
+      "note": "The only allotment was 190 days before the round, outside the window. No location.",
+      "company": {
+        "names": ["Dovecote Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-10",
+            "amountUsdMinor": 200000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12888456",
+            "name": "DOVECOTE ROBOTICS LTD",
+            "incorporatedOn": "2020-09-09",
+            "officePostcode": "NG1 5FS"
+          },
+          "filings": [{ "actionDate": "2025-09-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-47",
+      "kind": "companies_house",
+      "tags": ["filing", "window"],
+      "note": "Allotment exactly 30 days after the round: the edge of the window.",
+      "company": {
+        "names": ["Ember Quay"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-01",
+            "amountUsdMinor": 90000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC688123",
+            "name": "EMBER QUAY LTD",
+            "incorporatedOn": "2022-02-22",
+            "officePostcode": "G2 4JR"
+          },
+          "filings": [{ "actionDate": "2026-05-01" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "SC688123" }
+    },
+    {
+      "id": "ch-48",
+      "kind": "companies_house",
+      "tags": ["filing", "window"],
+      "note": "Allotment 31 days after the round: just outside the window. No location.",
+      "company": {
+        "names": ["Saltpan Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-01",
+            "amountUsdMinor": 90000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14100222",
+            "name": "SALTPAN ROBOTICS LTD",
+            "incorporatedOn": "2022-03-03",
+            "officePostcode": "CF10 1EP"
+          },
+          "filings": [{ "actionDate": "2026-05-02" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-49",
+      "kind": "companies_house",
+      "tags": ["filing", "year-precision"],
+      "note": "The round is known only to the year, too vague for the filing window. No location.",
+      "company": {
+        "names": ["Inkberry Learning"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2025-01-01",
+            "datePrecision": "year",
+            "amountUsdMinor": 80000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13222111",
+            "name": "INKBERRY LEARNING LTD",
+            "incorporatedOn": "2021-02-02",
+            "officePostcode": "AB10 1XG"
+          },
+          "filings": [{ "actionDate": "2025-06-06" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-50",
+      "kind": "companies_house",
+      "tags": ["filing", "debt"],
+      "note": "Only a debt round: an allotment near it is not support, because the rules count equity rounds only.",
+      "company": {
+        "names": ["Fallowfield Energy"],
+        "events": [
+          {
+            "roundType": "debt",
+            "announcedOn": "2026-06-16",
+            "amountUsdMinor": 2000000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11567321",
+            "name": "FALLOWFIELD ENERGY LTD",
+            "incorporatedOn": "2018-09-30",
+            "officePostcode": "M1 3BE"
+          },
+          "filings": [{ "actionDate": "2026-06-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-51",
+      "kind": "companies_house",
+      "tags": ["short-name", "skipped"],
+      "note": "The name normalises to two characters, so the company is not searched.",
+      "company": {
+        "names": ["Q2"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-03",
+            "amountUsdMinor": 100000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13999001",
+            "name": "Q2 LTD",
+            "incorporatedOn": "2021-01-01",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2026-02-10" }]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "ch-52",
+      "kind": "companies_house",
+      "tags": ["dissolved-later", "filing", "location"],
+      "note": "The company was dissolved after its only round. That is not a conflict: it closed later.",
+      "company": {
+        "names": ["Hollowmere Foods"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2024-03-05",
+            "amountUsdMinor": 70000000
+          }
+        ],
+        "location": { "label": "York", "lat": 53.9629, "lon": -1.0805 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12345670",
+            "name": "HOLLOWMERE FOODS LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2019-12-12",
+            "ceasedOn": "2025-09-30",
+            "officePostcode": "YO1 7HH"
+          },
+          "filings": [{ "actionDate": "2024-02-20" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12345670" }
+    },
+    {
+      "id": "ch-53",
+      "kind": "companies_house",
+      "tags": ["prefix", "trading-name", "dissolved-namesake"],
+      "note": "The exact match was dissolved years ago. A prefix match has location and an allotment, but it is a film studio that happened to allot shares. Prefix matches go to review.",
+      "company": {
+        "names": ["Saffron Loop"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-03",
+            "amountUsdMinor": 110000000
+          }
+        ],
+        "location": { "label": "Cardiff", "lat": 51.4804, "lon": -3.1743 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "08002299",
+            "name": "SAFFRON LOOP LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2012-03-03",
+            "ceasedOn": "2018-11-20",
+            "officePostcode": "CF10 1EP"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "11402288",
+            "name": "SAFFRON LOOP STUDIOS LTD",
+            "incorporatedOn": "2018-06-06",
+            "officePostcode": "CF10 1EP"
+          },
+          "filings": [{ "actionDate": "2026-01-12" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-54",
+      "kind": "companies_house",
+      "tags": ["alias", "filing"],
+      "note": "The registry name matches the company's alias, not its short news name.",
+      "company": {
+        "names": ["Glowtern", "Glowtern Energy"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-08-19",
+            "amountUsdMinor": 260000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14321987",
+            "name": "GLOWTERN ENERGY LTD",
+            "incorporatedOn": "2022-08-30",
+            "officePostcode": "EH1 1YZ"
+          },
+          "filings": [{ "actionDate": "2026-07-29" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "14321987" }
+    },
+    {
+      "id": "ch-55",
+      "kind": "companies_house",
+      "tags": ["holdings", "location"],
+      "note": "The exact-name trading company in London and a holdings company that issued the shares. The exact match decides, by location.",
+      "company": {
+        "names": ["Ravelin Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-06-24",
+            "amountUsdMinor": 350000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12010203",
+            "name": "RAVELIN ROBOTICS LTD",
+            "incorporatedOn": "2019-05-14",
+            "officePostcode": "SE1 9PZ"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "15010204",
+            "name": "RAVELIN ROBOTICS HOLDINGS LTD",
+            "incorporatedOn": "2023-09-01",
+            "officePostcode": "SE1 9PZ"
+          },
+          "filings": [{ "actionDate": "2026-06-01" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "12010203" }
+    },
+    {
+      "id": "ch-56",
+      "kind": "companies_house",
+      "tags": ["prefix", "short-name"],
+      "note": "Five prefix matches for a short name. At most three go to review.",
+      "company": {
+        "names": ["Orion"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-26",
+            "amountUsdMinor": 100000000
+          }
+        ],
+        "location": { "label": "Manchester", "lat": 53.4798, "lon": -2.2424 }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "06000001",
+            "name": "ORION CONSULTING LTD",
+            "incorporatedOn": "2007-01-01",
+            "officePostcode": "M1 3BE"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "06000002",
+            "name": "ORION HOMES LTD",
+            "incorporatedOn": "2007-01-02",
+            "officePostcode": "M4 2AH"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "06000003",
+            "name": "ORION DATA SYSTEMS LTD",
+            "incorporatedOn": "2015-01-03",
+            "officePostcode": "M4 2AH"
+          },
+          "filings": [{ "actionDate": "2026-03-01" }]
+        },
+        {
+          "profile": {
+            "companyNumber": "06000004",
+            "name": "ORION LOGISTICS LTD",
+            "incorporatedOn": "2016-01-04",
+            "officePostcode": "L1 8JQ"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "06000005",
+            "name": "ORION PRINT LTD",
+            "incorporatedOn": "2001-01-05",
+            "officePostcode": "LS1 4AP"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "fd-01",
+      "kind": "sec_form_d",
+      "tags": ["worked-example", "form-d"],
+      "note": "Spec section 8.3 worked example. First sale 44 days before the round, amounts 2.2% apart.",
+      "filing": {
+        "accessionNumber": "0001999999-26-000001",
+        "cik": "1999999",
+        "issuerName": "Orbital Forge, Inc.",
+        "dateOfFirstSale": "2026-01-05",
+        "totalOfferingUsdMinor": 500000000,
+        "totalSoldUsdMinor": 440000000,
+        "filedOn": "2026-01-16"
+      },
+      "companies": [
+        {
+          "companyId": 101,
+          "names": ["Orbital Forge"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1001,
+              "roundType": "seed",
+              "announcedOn": "2026-02-18",
+              "amountUsdMinor": 450000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "linked", "companyId": 101 }
+    },
+    {
+      "id": "fd-02",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "cik"],
+      "note": "An amendment from a CIK already linked to a company: that company owns it, whatever the name.",
+      "filing": {
+        "accessionNumber": "0001888888-26-000004",
+        "cik": "1888888",
+        "issuerName": "Stoneglass Medical Holdings, Inc.",
+        "isAmendment": true,
+        "dateOfFirstSale": "2025-11-02",
+        "totalSoldUsdMinor": 900000000,
+        "filedOn": "2026-03-01"
+      },
+      "companies": [
+        {
+          "companyId": 102,
+          "names": ["Stoneglass Medical"],
+          "countryCode": "US",
+          "secCik": "1888888",
+          "events": []
+        }
+      ],
+      "expected": { "outcome": "owned", "companyId": 102 }
+    },
+    {
+      "id": "fd-03",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "foreign-company"],
+      "note": "A US issuer with the same name as a UK company. A known country other than US conflicts.",
+      "filing": {
+        "accessionNumber": "0002000001-26-000001",
+        "cik": "2000001",
+        "issuerName": "Lanternfish Labs LLC",
+        "dateOfFirstSale": "2026-02-01",
+        "totalSoldUsdMinor": 200000000,
+        "filedOn": "2026-02-10"
+      },
+      "companies": [
+        {
+          "companyId": 103,
+          "names": ["Lanternfish Labs"],
+          "countryCode": "GB",
+          "events": [
+            {
+              "id": 1031,
+              "roundType": "seed",
+              "announcedOn": "2026-03-01",
+              "amountUsdMinor": 210000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "fd-04",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "cik"],
+      "note": "The only name match is already linked to another CIK.",
+      "filing": {
+        "accessionNumber": "0002000002-26-000001",
+        "cik": "2000002",
+        "issuerName": "Brassica Robotics Corp",
+        "dateOfFirstSale": "2026-04-01",
+        "totalSoldUsdMinor": 600000000,
+        "filedOn": "2026-04-12"
+      },
+      "companies": [
+        {
+          "companyId": 104,
+          "names": ["Brassica Robotics"],
+          "countryCode": "US",
+          "secCik": "1777777",
+          "events": [
+            {
+              "id": 1041,
+              "roundType": "series_a",
+              "announcedOn": "2026-04-20",
+              "amountUsdMinor": 600000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "fd-05",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "amount"],
+      "note": "Confirmation case C5: the Form D is a different, smaller offering (85% apart). Not linked; a round within 365 days makes a candidate.",
+      "filing": {
+        "accessionNumber": "0002000003-26-000001",
+        "cik": "2000003",
+        "issuerName": "Tallgrass Compute, Inc.",
+        "dateOfFirstSale": "2026-05-10",
+        "totalOfferingUsdMinor": 300000000,
+        "totalSoldUsdMinor": 300000000,
+        "filedOn": "2026-05-20"
+      },
+      "companies": [
+        {
+          "companyId": 105,
+          "names": ["Tallgrass Compute"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1051,
+              "roundType": "series_a",
+              "announcedOn": "2026-06-01",
+              "amountUsdMinor": 2000000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "candidate" }
+    },
+    {
+      "id": "fd-06",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "short-name"],
+      "note": "A common single-word name and a news round with no amount. The dates fit, but a real-estate 'Atlas LLC' could file at any time: review.",
+      "filing": {
+        "accessionNumber": "0002000004-26-000001",
+        "cik": "2000004",
+        "issuerName": "Atlas LLC",
+        "industryGroup": "Real Estate",
+        "dateOfFirstSale": "2026-02-01",
+        "totalSoldUsdMinor": 1200000000,
+        "filedOn": "2026-02-09"
+      },
+      "companies": [
+        {
+          "companyId": 106,
+          "names": ["Atlas"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1061,
+              "roundType": "seed",
+              "announcedOn": "2026-03-03",
+              "amountUsdMinor": null
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "candidate" }
+    },
+    {
+      "id": "fd-07",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "short-name", "amount"],
+      "note": "A single-word name, but the amounts were compared and agree (3.3% apart).",
+      "filing": {
+        "accessionNumber": "0002000005-26-000001",
+        "cik": "2000005",
+        "issuerName": "Quorvex, Inc.",
+        "dateOfFirstSale": "2026-03-15",
+        "totalOfferingUsdMinor": 300000000,
+        "totalSoldUsdMinor": 290000000,
+        "filedOn": "2026-03-25"
+      },
+      "companies": [
+        {
+          "companyId": 107,
+          "names": ["Quorvex"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1071,
+              "roundType": "seed",
+              "announcedOn": "2026-04-10",
+              "amountUsdMinor": 300000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "linked", "companyId": 107 }
+    },
+    {
+      "id": "fd-08",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "same-name-different-company"],
+      "note": "Two non-merged companies share the issuer's name. Nothing is linked.",
+      "filing": {
+        "accessionNumber": "0002000006-26-000001",
+        "cik": "2000006",
+        "issuerName": "Pinecrest Bio, Inc.",
+        "dateOfFirstSale": "2026-01-10",
+        "totalSoldUsdMinor": 800000000,
+        "filedOn": "2026-01-20"
+      },
+      "companies": [
+        {
+          "companyId": 108,
+          "names": ["Pinecrest Bio"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1081,
+              "roundType": "series_a",
+              "announcedOn": "2026-02-01",
+              "amountUsdMinor": 800000000
+            }
+          ]
+        },
+        {
+          "companyId": 109,
+          "names": ["Pinecrest Bio"],
+          "countryCode": null,
+          "events": [
+            {
+              "id": 1091,
+              "type": "launch",
+              "roundType": null,
+              "announcedOn": "2025-11-11"
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "fd-09",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "no-round"],
+      "note": "The name matches, but the company has no funding round near the filing.",
+      "filing": {
+        "accessionNumber": "0002000007-26-000001",
+        "cik": "2000007",
+        "issuerName": "Wrenfield Diagnostics Inc",
+        "dateOfFirstSale": "2026-08-01",
+        "totalSoldUsdMinor": 400000000,
+        "filedOn": "2026-08-11"
+      },
+      "companies": [
+        {
+          "companyId": 110,
+          "names": ["Wrenfield Diagnostics"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1101,
+              "type": "launch",
+              "roundType": null,
+              "announcedOn": "2026-07-01"
+            },
+            {
+              "id": 1102,
+              "roundType": "seed",
+              "announcedOn": "2024-02-01",
+              "amountUsdMinor": 150000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "fd-10",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "no-first-sale"],
+      "note": "The first sale has yet to occur, so the filing cannot confirm. A round within 365 days makes a candidate.",
+      "filing": {
+        "accessionNumber": "0002000008-26-000001",
+        "cik": "2000008",
+        "issuerName": "Cobblestone Grid, Inc.",
+        "dateOfFirstSale": null,
+        "totalOfferingUsdMinor": 1000000000,
+        "totalSoldUsdMinor": 0,
+        "filedOn": "2026-05-04"
+      },
+      "companies": [
+        {
+          "companyId": 111,
+          "names": ["Cobblestone Grid"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1111,
+              "roundType": "series_a",
+              "announcedOn": "2026-05-20",
+              "amountUsdMinor": 1000000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "candidate" }
+    },
+    {
+      "id": "fd-11",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "founded-year"],
+      "note": "News says founded 2015; the issuer reports incorporation in 2024. A newly formed namesake.",
+      "filing": {
+        "accessionNumber": "0002000009-26-000001",
+        "cik": "2000009",
+        "issuerName": "Marsh Lantern Analytics, LLC",
+        "yearOfInc": 2024,
+        "dateOfFirstSale": "2026-03-01",
+        "totalSoldUsdMinor": 500000000,
+        "filedOn": "2026-03-10"
+      },
+      "companies": [
+        {
+          "companyId": 112,
+          "names": ["Marsh Lantern Analytics"],
+          "countryCode": "US",
+          "foundedYear": 2015,
+          "events": [
+            {
+              "id": 1121,
+              "roundType": "series_b",
+              "announcedOn": "2026-03-20",
+              "amountUsdMinor": 500000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
+      "id": "fd-12",
+      "kind": "sec_form_d",
+      "tags": ["form-d", "amount"],
+      "note": "Confirmation case C4: the amount agrees with the total offering, not the amount sold so far.",
+      "filing": {
+        "accessionNumber": "0002000010-26-000001",
+        "cik": "2000010",
+        "issuerName": "Harrow Kinetics Inc.",
+        "dateOfFirstSale": "2026-05-10",
+        "totalOfferingUsdMinor": 2000000000,
+        "totalSoldUsdMinor": 300000000,
+        "filedOn": "2026-05-21"
+      },
+      "companies": [
+        {
+          "companyId": 113,
+          "names": ["Harrow Kinetics"],
+          "countryCode": "US",
+          "events": [
+            {
+              "id": 1131,
+              "roundType": "series_a",
+              "announcedOn": "2026-06-01",
+              "amountUsdMinor": 2000000000
+            }
+          ]
+        }
+      ],
+      "expected": { "outcome": "linked", "companyId": 113 }
+    }
+  ]
+}

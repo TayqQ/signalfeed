@@ -17,19 +17,38 @@ import type {
 import {
   EVENT_TYPES,
   LLM_PURPOSES,
+  RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  REGISTRY_LINK_STATUSES,
   SOURCE_ITEM_STATUSES,
   type LlmPurpose,
+  type RegistryKind,
 } from "@/core/enums";
-import type { IngestRunSummary, StatusSummary } from "@/core/read-models";
+import type {
+  ConfirmationStatus,
+  FormDStatus,
+  IngestRunSummary,
+  RegistryLinkCounts,
+  RegistryStatus,
+  StatusSummary,
+} from "@/core/read-models";
 import type { Db } from "../client";
 import {
+  chCompanies,
   derivedRebuilds,
+  edgarIndexDays,
+  eventConfirmations,
+  eventRecordSources,
   events,
+  formDFilings,
   fxRates,
   grantParticipants,
   grantProjects,
   ingestRuns,
   llmUsage,
+  registryLinks,
+  registrySearches,
   sourceItems,
   tags,
   themes,
@@ -64,8 +83,16 @@ export interface Phase2Status {
   latestGrantsRun: LatestGrantsRun | null;
 }
 
-/** `StatusSummary` plus the Phase 2 block. */
-export type StatusReport = StatusSummary & { phase2: Phase2Status };
+/** `StatusSummary` with the Phase 3 blocks filled in, plus the Phase 2 block. */
+export type StatusReport = StatusSummary & {
+  phase2: Phase2Status;
+  registry: RegistryStatus;
+  formD: FormDStatus;
+  confirmations: ConfirmationStatus;
+};
+
+/** Linked profiles older than this are overdue for a refresh (D52). */
+const PROFILE_STALE_DAYS = 90;
 
 const RECENT_RUN_LIMIT = 10;
 
@@ -269,36 +296,188 @@ async function getPhase2Status(db: Db, now: Date): Promise<Phase2Status> {
   };
 }
 
+async function registryLinkCounts(
+  db: Db,
+  registry: RegistryKind,
+): Promise<RegistryLinkCounts> {
+  const rows = await db
+    .select({
+      status: registryLinks.status,
+      method: registryLinks.method,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(registryLinks)
+    .where(eq(registryLinks.registry, registry))
+    .groupBy(registryLinks.status, registryLinks.method);
+  const byStatus = zeroCounts(REGISTRY_LINK_STATUSES);
+  const linkedByMethod = zeroCounts(REGISTRY_LINK_METHODS);
+  for (const row of rows) {
+    const count = asCount(row.count);
+    byStatus[row.status] += count;
+    if (row.status === "linked" && row.method) {
+      linkedByMethod[row.method] += count;
+    }
+  }
+  return { byStatus, linkedByMethod };
+}
+
+async function latestRegistryRun(db: Db): Promise<RegistryStatus["lastRun"]> {
+  const [run] = await db
+    .select({ stats: ingestRuns.stats })
+    .from(ingestRuns)
+    .where(sql`${ingestRuns.stats} ? 'registry'`)
+    .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
+    .limit(1);
+  const registry = asStats(run?.stats ?? null)?.registry;
+  if (!registry) return null;
+  return {
+    requests: asCount(registry.requests),
+    profilesRefreshed: asCount(registry.profilesRefreshed),
+    stoppedAtLimit: registry.stoppedAtLimit === true,
+    rateLimited: registry.rateLimited === true,
+    skipped: registry.skipped === true,
+  };
+}
+
+async function getRegistryStatus(db: Db, now: Date): Promise<RegistryStatus> {
+  const staleBefore = new Date(
+    now.getTime() - PROFILE_STALE_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const [counts, noMatch, stale, lastRun] = await Promise.all([
+    Promise.all(REGISTRY_KINDS.map((kind) => registryLinkCounts(db, kind))),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(registrySearches)
+      .where(
+        and(
+          eq(registrySearches.registry, "companies_house"),
+          eq(registrySearches.outcome, "none"),
+        ),
+      ),
+    db
+      .select({
+        count: sql<number>`count(distinct ${chCompanies.companyNumber})::int`,
+      })
+      .from(chCompanies)
+      .innerJoin(
+        registryLinks,
+        and(
+          eq(registryLinks.registryId, chCompanies.companyNumber),
+          eq(registryLinks.registry, "companies_house"),
+          eq(registryLinks.status, "linked"),
+        ),
+      )
+      .where(lt(chCompanies.fetchedAt, staleBefore)),
+    latestRegistryRun(db),
+  ]);
+  const links = {} as RegistryStatus["links"];
+  REGISTRY_KINDS.forEach((kind, i) => {
+    const entry = counts[i];
+    if (entry) links[kind] = entry;
+  });
+  return {
+    links,
+    searchedNoMatch: asCount(noMatch[0]?.count),
+    profilesOlderThan90Days: asCount(stale[0]?.count),
+    lastRun,
+  };
+}
+
+async function getFormDStatus(db: Db): Promise<FormDStatus> {
+  const [day, filings, funds] = await Promise.all([
+    db
+      .select({ day: sql<string | null>`max(${edgarIndexDays.day})::text` })
+      .from(edgarIndexDays)
+      .where(eq(edgarIndexDays.status, "done")),
+    db
+      .select({
+        stored: sql<number>`count(*)::int`,
+        linked: sql<number>`count(${formDFilings.companyId})::int`,
+      })
+      .from(formDFilings),
+    db
+      .select({
+        skipped: sql<
+          string | number | null
+        >`coalesce(sum(${edgarIndexDays.fundSkipped}), 0)`,
+      })
+      .from(edgarIndexDays),
+  ]);
+  return {
+    lastDoneDay: day[0]?.day ?? null,
+    filingsStored: asCount(filings[0]?.stored),
+    fundsSkipped: asCount(funds[0]?.skipped),
+    filingsLinked: asCount(filings[0]?.linked),
+  };
+}
+
+async function getConfirmationStatus(db: Db): Promise<ConfirmationStatus> {
+  const [rows, confirmed] = await Promise.all([
+    db
+      .select({
+        kind: eventConfirmations.recordKind,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(eventConfirmations)
+      .groupBy(eventConfirmations.recordKind),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(events)
+      .where(
+        and(
+          eq(events.evidence, "confirmed"),
+          sql`not exists (select 1 from ${eventRecordSources} where ${eventRecordSources.eventId} = ${events.id})`,
+        ),
+      ),
+  ]);
+  const byRecordKind = zeroCounts(RECORD_KINDS);
+  for (const row of rows) byRecordKind[row.kind] = asCount(row.count);
+  return { byRecordKind, newsEventsConfirmed: asCount(confirmed[0]?.count) };
+}
+
 export async function getStatusSummary(
   db: Db,
   now: Date = new Date(),
 ): Promise<StatusReport> {
-  const [runs, itemRows, eventRows, monthToDate, usdPerEur, gbpPerEur, phase2] =
-    await Promise.all([
-      db
-        .select()
-        .from(ingestRuns)
-        .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
-        .limit(RECENT_RUN_LIMIT),
-      db
-        .select({
-          status: sourceItems.status,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(sourceItems)
-        .groupBy(sourceItems.status),
-      db
-        .select({
-          type: events.type,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(events)
-        .groupBy(events.type),
-      monthToDateUsdMicros(db, now),
-      latestPerEur(db, "USD"),
-      latestPerEur(db, "GBP"),
-      getPhase2Status(db, now),
-    ]);
+  const [
+    runs,
+    itemRows,
+    eventRows,
+    monthToDate,
+    usdPerEur,
+    gbpPerEur,
+    phase2,
+    registry,
+    formD,
+    confirmations,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(ingestRuns)
+      .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
+      .limit(RECENT_RUN_LIMIT),
+    db
+      .select({
+        status: sourceItems.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(sourceItems)
+      .groupBy(sourceItems.status),
+    db
+      .select({
+        type: events.type,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(events)
+      .groupBy(events.type),
+    monthToDateUsdMicros(db, now),
+    latestPerEur(db, "USD"),
+    latestPerEur(db, "GBP"),
+    getPhase2Status(db, now),
+    getRegistryStatus(db, now),
+    getFormDStatus(db),
+    getConfirmationStatus(db),
+  ]);
 
   const itemCountsByStatus = zeroCounts(SOURCE_ITEM_STATUSES);
   for (const row of itemRows) {
@@ -328,5 +507,8 @@ export async function getStatusSummary(
     capGbp: capOf(recentRuns[0]?.stats ?? null),
     usdPerGbp: usdPerEur && gbpPerEur ? usdPerEur / gbpPerEur : null,
     phase2,
+    registry,
+    formD,
+    confirmations,
   };
 }

@@ -34,6 +34,9 @@ describe("parsePipelineEnv", () => {
       MAX_THEME_NAMES_PER_RUN: 20,
       MAX_GRANT_TAGGINGS_PER_RUN: 200,
       THEME_CHECK_MODEL: "gpt-5.6-luna",
+      MAX_CH_REQUESTS_PER_RUN: 2000,
+      MAX_EDGAR_DAYS_PER_RUN: 10,
+      MAX_EDGAR_REQUESTS_PER_RUN: 3000,
     });
   });
 
@@ -158,7 +161,104 @@ describe("Phase 2 pipeline settings", () => {
   });
 });
 
+describe("Phase 3 pipeline settings", () => {
+  const phase3Defaults = {
+    MAX_CH_REQUESTS_PER_RUN: 2000,
+    MAX_EDGAR_DAYS_PER_RUN: 10,
+    MAX_EDGAR_REQUESTS_PER_RUN: 3000,
+  };
+  const phase3Overrides = {
+    COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
+    MAX_CH_REQUESTS_PER_RUN: "500",
+    MAX_EDGAR_DAYS_PER_RUN: "180",
+    MAX_EDGAR_REQUESTS_PER_RUN: "40000",
+  };
+
+  it("applies defaults and leaves COMPANIES_HOUSE_API_KEY unset", () => {
+    const env = parsePipelineEnv(secrets);
+    expect(env).toMatchObject(phase3Defaults);
+    expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
+  });
+
+  it("treats an empty COMPANIES_HOUSE_API_KEY as missing", () => {
+    const env = parsePipelineEnv({ ...secrets, COMPANIES_HOUSE_API_KEY: "" });
+    expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
+    expect(
+      parseNoLlmPipelineEnv({ ...secrets, COMPANIES_HOUSE_API_KEY: "" }),
+    ).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
+  });
+
+  it("treats empty limits as unset so defaults still apply", () => {
+    const env = parsePipelineEnv({
+      ...secrets,
+      MAX_CH_REQUESTS_PER_RUN: "",
+      MAX_EDGAR_DAYS_PER_RUN: "",
+      MAX_EDGAR_REQUESTS_PER_RUN: "",
+    });
+    expect(env).toMatchObject(phase3Defaults);
+  });
+
+  it("reads overrides in both pipeline schemas", () => {
+    const expected = {
+      COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
+      MAX_CH_REQUESTS_PER_RUN: 500,
+      MAX_EDGAR_DAYS_PER_RUN: 180,
+      MAX_EDGAR_REQUESTS_PER_RUN: 40000,
+    };
+    expect(parsePipelineEnv({ ...secrets, ...phase3Overrides })).toMatchObject(
+      expected,
+    );
+    expect(
+      parseNoLlmPipelineEnv({
+        ...secrets,
+        OPENAI_API_KEY: undefined,
+        ...phase3Overrides,
+      }),
+    ).toMatchObject(expected);
+  });
+
+  it("applies the same defaults without an LLM key", () => {
+    const env = parseNoLlmPipelineEnv({
+      ...secrets,
+      OPENAI_API_KEY: undefined,
+    });
+    expect(env).toMatchObject(phase3Defaults);
+    expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
+  });
+
+  it.each([
+    ["MAX_CH_REQUESTS_PER_RUN", "0"],
+    ["MAX_CH_REQUESTS_PER_RUN", "2.5"],
+    ["MAX_EDGAR_DAYS_PER_RUN", "-1"],
+    ["MAX_EDGAR_REQUESTS_PER_RUN", "lots"],
+  ])("rejects %s=%s without printing the key", (key, value) => {
+    const error = captureError(() =>
+      parsePipelineEnv({
+        ...secrets,
+        COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
+        [key]: value,
+      }),
+    ) as ConfigError;
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error.invalidKeys).toEqual([key]);
+    expect(error.missingKeys).toEqual([]);
+    expect(error.message).not.toContain("ch-test-key-789");
+  });
+});
+
 describe("web env", () => {
+  it("gains no Phase 3 setting and rejects none", () => {
+    const env = parseWebEnv({
+      DATABASE_URL: secrets.DATABASE_URL,
+      COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
+      MAX_CH_REQUESTS_PER_RUN: "not a number",
+      MAX_EDGAR_DAYS_PER_RUN: "-1",
+      MAX_EDGAR_REQUESTS_PER_RUN: "",
+    });
+    expect(env).toEqual({ DATABASE_URL: secrets.DATABASE_URL });
+    expect(Object.keys(webEnvSchema.shape)).toEqual(["DATABASE_URL"]);
+  });
+
   it("ignores OPENAI_API_KEY", () => {
     const env = parseWebEnv(secrets);
     expect(env).toEqual({ DATABASE_URL: secrets.DATABASE_URL });

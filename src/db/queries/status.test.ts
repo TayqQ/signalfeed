@@ -1,13 +1,28 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { IngestStats } from "@/core/domain";
-import { LLM_PURPOSES } from "@/core/enums";
+import {
+  LLM_PURPOSES,
+  RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  REGISTRY_LINK_STATUSES,
+} from "@/core/enums";
 import type { Db } from "../client";
 import {
+  chCompanies,
+  companies,
   derivedRebuilds,
+  edgarIndexDays,
+  eventConfirmations,
+  eventRecordSources,
+  events,
+  formDFilings,
   grantParticipants,
   grantProjects,
   ingestRuns,
   llmUsage,
+  registryLinks,
+  registrySearches,
   sources,
   tags,
   themes,
@@ -208,6 +223,7 @@ describe("getStatusSummary Phase 2 block", () => {
       theme_naming: 70_000,
       tagging: 300_000,
       eval: 0,
+      document_reading: 0,
     });
     const sum = Object.values(byPurpose).reduce((a, b) => a + b, 0);
     expect(sum).toBe(summary.monthToDateUsdMicros);
@@ -247,17 +263,335 @@ describe("getStatusSummary on an empty database", () => {
   it("returns zeros and nulls", async () => {
     const testDb = await createTestDb();
     try {
-      const { phase2 } = await getStatusSummary(testDb.db, NOW);
+      const { phase2, registry, formD, confirmations } = await getStatusSummary(
+        testDb.db,
+        NOW,
+      );
+      for (const kind of REGISTRY_KINDS) {
+        expect(Object.values(registry.links[kind].byStatus)).toEqual(
+          REGISTRY_LINK_STATUSES.map(() => 0),
+        );
+        expect(Object.values(registry.links[kind].linkedByMethod)).toEqual(
+          REGISTRY_LINK_METHODS.map(() => 0),
+        );
+      }
+      expect(registry.searchedNoMatch).toBe(0);
+      expect(registry.profilesOlderThan90Days).toBe(0);
+      expect(registry.lastRun).toBeNull();
+      expect(formD).toEqual({
+        lastDoneDay: null,
+        filingsStored: 0,
+        fundsSkipped: 0,
+        filingsLinked: 0,
+      });
+      expect(Object.values(confirmations.byRecordKind)).toEqual(
+        RECORD_KINDS.map(() => 0),
+      );
+      expect(confirmations.newsEventsConfirmed).toBe(0);
       expect(phase2.tags).toEqual({ embedded: 0, pending: 0 });
       expect(phase2.themes).toEqual({ active: 0, unnamed: 0, unreviewed: 0 });
       expect(phase2.statsRebuiltAt).toBeNull();
       expect(phase2.locationsRebuiltAt).toBeNull();
       expect(phase2.latestGrantsRun).toBeNull();
-      expect(Object.values(phase2.spendByPurposeUsdMicros)).toEqual([
-        0, 0, 0, 0, 0,
-      ]);
+      expect(Object.values(phase2.spendByPurposeUsdMicros)).toEqual(
+        LLM_PURPOSES.map(() => 0),
+      );
     } finally {
       await testDb.close();
     }
   }, 60_000);
+});
+
+describe("getStatusSummary Phase 3 blocks", () => {
+  let testDb: TestDb;
+  let db: Db;
+
+  beforeAll(async () => {
+    testDb = await createTestDb();
+    db = testDb.db;
+
+    const rows = await db
+      .insert(companies)
+      .values(
+        ["a", "b", "c", "d", "e"].map((slug) => ({
+          slug,
+          name: slug.toUpperCase(),
+          normalisedName: slug,
+        })),
+      )
+      .returning();
+    const [a, b, c, d, e] = rows;
+    if (!a || !b || !c || !d || !e) throw new Error("companies not seeded");
+
+    const link = (
+      company: typeof a,
+      registry: "companies_house" | "sec_edgar",
+      registryId: string,
+      status: "linked" | "candidate" | "rejected",
+      method: (typeof REGISTRY_LINK_METHODS)[number] | null,
+    ) => ({
+      companyId: company.id,
+      registry,
+      registryId,
+      registryName: company.name,
+      status,
+      method,
+      reason: "test",
+      decidedBy: "auto" as const,
+    });
+    await db
+      .insert(registryLinks)
+      .values([
+        link(a, "companies_house", "00000001", "linked", "name_location"),
+        link(b, "companies_house", "00000002", "linked", "name_filing"),
+        link(c, "companies_house", "00000003", "candidate", null),
+        link(d, "companies_house", "00000004", "rejected", null),
+        link(e, "sec_edgar", "1234", "linked", "form_d_round"),
+      ]);
+
+    const profile = {
+      status: "active",
+      companyType: "ltd",
+      incorporatedOn: "2020-01-01",
+    };
+    await db.insert(chCompanies).values([
+      // Linked and fetched 100 days before NOW: stale.
+      {
+        companyNumber: "00000001",
+        name: "A",
+        ...profile,
+        fetchedAt: new Date("2026-08-03T12:00:00Z"),
+      },
+      // Linked and fresh.
+      {
+        companyNumber: "00000002",
+        name: "B",
+        ...profile,
+        fetchedAt: new Date("2026-11-01T12:00:00Z"),
+      },
+      // Old but not linked: not counted.
+      {
+        companyNumber: "00000009",
+        name: "Z",
+        ...profile,
+        fetchedAt: new Date("2025-01-01T12:00:00Z"),
+      },
+    ]);
+
+    const searched = (company: typeof a, outcome: "linked" | "none") => ({
+      companyId: company.id,
+      registry: "companies_house" as const,
+      searchedAt: NOW,
+      outcome,
+      inputFingerprint: "f",
+    });
+    await db
+      .insert(registrySearches)
+      .values([
+        searched(a, "linked"),
+        searched(c, "none"),
+        searched(d, "none"),
+        { ...searched(e, "none"), registry: "sec_edgar" as const },
+      ]);
+
+    const baseStats = {
+      spendUsdMicros: 0,
+      monthToDateUsdMicros: 0,
+      capGbp: 10,
+      budgetPaused: false,
+    };
+    const registryStats = (requests: number, rateLimited: boolean) =>
+      ({
+        ...baseStats,
+        registry: {
+          companiesSearched: 3,
+          linkedByMethod: {},
+          candidates: 1,
+          none: 2,
+          companiesSkipped: 0,
+          profilesFetched: 2,
+          profilesRefreshed: 2,
+          filingsStored: 0,
+          addressChecks: 0,
+          requests,
+          rateLimited,
+          stoppedAtLimit: !rateLimited,
+        },
+      }) as unknown as IngestStats;
+    await db.insert(ingestRuns).values([
+      {
+        trigger: "schedule",
+        status: "succeeded",
+        startedAt: new Date("2026-11-08T05:00:00Z"),
+        stats: registryStats(10, true),
+      },
+      {
+        trigger: "schedule",
+        status: "succeeded",
+        startedAt: new Date("2026-11-09T05:00:00Z"),
+        stats: registryStats(500, false),
+      },
+      // Newest run, but with no registry step: must not be picked.
+      {
+        trigger: "manual",
+        status: "succeeded",
+        startedAt: new Date("2026-11-10T05:00:00Z"),
+        stats: baseStats as unknown as IngestStats,
+      },
+    ]);
+
+    const [source] = await db
+      .insert(sources)
+      .values({
+        slug: "sec-edgar",
+        name: "SEC EDGAR",
+        kind: "sec_edgar",
+        url: "https://www.sec.gov/",
+      })
+      .returning();
+    if (!source) throw new Error("source not seeded");
+    const day = (
+      isoDay: string,
+      status: "done" | "missing",
+      fundSkipped: number,
+    ) => ({
+      day: isoDay,
+      status,
+      formDFound: 0,
+      formDStored: 0,
+      fundSkipped,
+    });
+    await db
+      .insert(edgarIndexDays)
+      .values([
+        day("2026-11-04", "done", 2),
+        day("2026-11-05", "done", 1),
+        day("2026-11-06", "missing", 0),
+      ]);
+    const filing = (n: number, companyId: number | null) => ({
+      sourceId: source.id,
+      accessionNumber: `0000000000-26-00000${n}`,
+      cik: "1234",
+      issuerName: "E Inc",
+      isAmendment: false,
+      filedOn: "2026-11-05",
+      companyId,
+    });
+    await db
+      .insert(formDFilings)
+      .values([filing(1, e.id), filing(2, null), filing(3, null)]);
+
+    const eventRows = await db
+      .insert(events)
+      .values([
+        {
+          type: "funding_round",
+          companyId: a.id,
+          announcedOn: "2026-10-01",
+          evidence: "confirmed",
+        },
+        {
+          type: "funding_round",
+          companyId: b.id,
+          announcedOn: "2026-10-02",
+          evidence: "confirmed",
+        },
+        {
+          type: "funding_round",
+          companyId: e.id,
+          announcedOn: "2026-10-03",
+          evidence: "confirmed",
+        },
+        // A grant event: confirmed by its record source, so not a news event.
+        {
+          type: "funding_round",
+          companyId: c.id,
+          announcedOn: "2026-10-04",
+          evidence: "confirmed",
+        },
+        {
+          type: "funding_round",
+          companyId: d.id,
+          announcedOn: "2026-10-05",
+          evidence: "reported",
+        },
+      ])
+      .returning();
+    const [e1, e2, e3, grant] = eventRows;
+    if (!e1 || !e2 || !e3 || !grant) throw new Error("events not seeded");
+    await db
+      .insert(eventRecordSources)
+      .values({ eventId: grant.id, recordKind: "ukri_grant", recordId: 1 });
+    const confirmation = (
+      eventId: number,
+      recordKind: "ch_allotment" | "sec_form_d",
+      recordId: number,
+    ) => ({
+      eventId,
+      recordKind,
+      recordId,
+      rule: "test",
+      recordDate: "2026-10-01",
+    });
+    await db
+      .insert(eventConfirmations)
+      .values([
+        confirmation(e1.id, "ch_allotment", 1),
+        confirmation(e2.id, "ch_allotment", 2),
+        confirmation(e3.id, "sec_form_d", 1),
+      ]);
+  }, 60_000);
+
+  afterAll(async () => {
+    await testDb.close();
+  });
+
+  it("counts registry links by status and method for each registry", async () => {
+    const { registry } = await getStatusSummary(db, NOW);
+    const ch = registry.links.companies_house;
+    expect(ch.byStatus).toEqual({ linked: 2, candidate: 1, rejected: 1 });
+    expect(ch.linkedByMethod.name_location).toBe(1);
+    expect(ch.linkedByMethod.name_filing).toBe(1);
+    expect(ch.linkedByMethod.form_d_round).toBe(0);
+    const sec = registry.links.sec_edgar;
+    expect(sec.byStatus).toEqual({ linked: 1, candidate: 0, rejected: 0 });
+    expect(sec.linkedByMethod.form_d_round).toBe(1);
+  });
+
+  it("counts Companies House searches with no match and stale profiles", async () => {
+    const { registry } = await getStatusSummary(db, NOW);
+    expect(registry.searchedNoMatch).toBe(2);
+    expect(registry.profilesOlderThan90Days).toBe(1);
+  });
+
+  it("reads the latest run that had a registry step", async () => {
+    const { registry } = await getStatusSummary(db, NOW);
+    expect(registry.lastRun).toEqual({
+      requests: 500,
+      profilesRefreshed: 2,
+      stoppedAtLimit: true,
+      rateLimited: false,
+      skipped: false,
+    });
+  });
+
+  it("reports Form D state", async () => {
+    const { formD } = await getStatusSummary(db, NOW);
+    expect(formD).toEqual({
+      lastDoneDay: "2026-11-05",
+      filingsStored: 3,
+      fundsSkipped: 3,
+      filingsLinked: 1,
+    });
+  });
+
+  it("counts confirmations by kind and confirmed news events", async () => {
+    const { confirmations } = await getStatusSummary(db, NOW);
+    expect(confirmations.byRecordKind).toEqual({
+      ukri_grant: 0,
+      ch_allotment: 2,
+      sec_form_d: 1,
+    });
+    expect(confirmations.newsEventsConfirmed).toBe(3);
+  });
 });

@@ -10,10 +10,14 @@ import {
   locationsStep,
   prefilterStep,
   reextractStep,
+  relinkGrantsStep,
   resolveStep,
   runAll,
+  runFormD,
   runGrants,
+  runRegistry,
   themesStep,
+  type RunSummary,
 } from "@/pipeline/run";
 import { SOURCES } from "@/pipeline/sources";
 import { upsertSources } from "@/pipeline/store/sources";
@@ -24,8 +28,9 @@ const USAGE = `Usage: pnpm ingest <command> [options]
 
 Commands:
   run        Collect, prefilter, extract, resolve and convert, then tag and
-             resolve grants, embed tags, assign and name themes, and rebuild
-             locations and stats, under a lock
+             resolve grants, embed tags, assign and name themes, rebuild
+             locations and stats, then confirmations and sectors, under a lock.
+             Makes no Companies House or EDGAR request
   collect    Fetch feeds and store new items. Needs no LLM key
   extract    Prefilter pending items, then extract them
   resolve    Turn stored extractions into companies and events
@@ -33,24 +38,41 @@ Commands:
   reextract  Re-run extraction for the current prompt version
   grants     Fetch new Innovate UK projects and organisations from Gateway to
              Research. Needs no LLM key. Recorded as a run
+  registry   Link companies to Companies House and refresh their profiles,
+             then rebuild confirmations, locations and sectors. Needs
+             COMPANIES_HOUSE_API_KEY; recorded as skipped without it
+  formd      Fetch SEC Form D filings for days not yet done, link issuers to
+             companies, then rebuild confirmations. Needs an email address in
+             HTTP_CONTACT. Recorded as a run
+  relink-grants
+             One-off: move news reports of a grant to the grant event
   embed      Embed tags that have no embedding from the current model
   themes     Assign embedded tags to themes, then name new themes
   stats      Rebuild company locations and the derived stats tables
 
 Options:
-  --trigger schedule|manual   run, grants: recorded on the run (default manual)
+  --trigger schedule|manual   run, grants, registry, formd: recorded on the run
+                              (default manual)
   --prompt-version <v>        reextract: must match this build's prompt
   --limit <n>                 reextract: most items to process (default 100)
-  --dry-run                   reextract: print the estimate, call nothing
+  --dry-run                   reextract: print the estimate, call nothing.
+                              relink-grants: list the pairs, change nothing
   --yes                       reextract: confirm the spend
-  --since YYYY-MM-DD          grants: skip projects that start before this date
+  --since YYYY-MM-DD          grants: skip projects that start before this date.
+                              formd: first EDGAR day to collect
   --max-pages <n>             grants: most project pages to fetch (default 30)
   --max-orgs <n>              grants: most organisations to fetch (default 1500)
+  --max-requests <n>          registry: most Companies House requests (default
+                              MAX_CH_REQUESTS_PER_RUN). formd: most EDGAR
+                              requests (default MAX_EDGAR_REQUESTS_PER_RUN)
+  --max-days <n>              formd: most index days (default
+                              MAX_EDGAR_DAYS_PER_RUN)
   --force                     stats: rebuild even when nothing has changed
   -h, --help                  Show this help
 
 Without OPENAI_API_KEY, run still collects, resolves grants and rebuilds
-stats. Extraction, grant tagging, embedding and theme naming wait for a key.`;
+stats. Extraction, grant tagging, embedding and theme naming wait for a key.
+registry and formd never need an LLM key.`;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -95,6 +117,8 @@ async function main(): Promise<number> {
       since: { type: "string" },
       "max-pages": { type: "string" },
       "max-orgs": { type: "string" },
+      "max-requests": { type: "string" },
+      "max-days": { type: "string" },
       force: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -110,28 +134,33 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  const since = isoDate(values.since, "--since");
+  const maxRequests = positiveInt(values["max-requests"], "--max-requests");
   const grantOptions = {
-    since: isoDate(values.since, "--since"),
+    since,
     maxPages: positiveInt(values["max-pages"], "--max-pages"),
     maxOrgFetches: positiveInt(values["max-orgs"], "--max-orgs"),
   };
+  const formDOptions = {
+    since,
+    maxDays: positiveInt(values["max-days"], "--max-days"),
+    maxRequests,
+  };
+  const trigger = values.trigger as IngestTrigger;
 
   loadDotEnv();
   const { deps, lock, close } = createPipelineDeps(process.env);
   try {
-    if (command === "run") {
-      const summary = await runAll(deps, lock, values.trigger as IngestTrigger);
-      print(summary);
-      return summary.status === "failed" ? 1 : 0;
-    }
-
-    if (command === "grants") {
-      const summary = await runGrants(
-        deps,
-        lock,
-        values.trigger as IngestTrigger,
-        grantOptions,
-      );
+    // Recorded runs: each prints its summary and fails on a failed run.
+    const runs: Record<string, () => Promise<RunSummary>> = {
+      run: () => runAll(deps, lock, trigger),
+      grants: () => runGrants(deps, lock, trigger, grantOptions),
+      registry: () => runRegistry(deps, lock, trigger, { maxRequests }),
+      formd: () => runFormD(deps, lock, trigger, formDOptions),
+    };
+    const recorded = Object.hasOwn(runs, command) ? runs[command] : undefined;
+    if (recorded) {
+      const summary = await recorded();
       print(summary);
       return summary.status === "failed" ? 1 : 0;
     }
@@ -166,6 +195,13 @@ async function main(): Promise<number> {
         },
       }),
       resolve: async () => ({ output: { resolve: await resolveStep(deps) } }),
+      "relink-grants": async () => ({
+        output: {
+          relinkGrants: await relinkGrantsStep(deps, {
+            dryRun: values["dry-run"],
+          }),
+        },
+      }),
       fx: async () => ({ output: { fx: await fxStep(deps) } }),
       embed: async () => {
         const { stats, errors } = await embedStep(deps, { paidAllowed: true });

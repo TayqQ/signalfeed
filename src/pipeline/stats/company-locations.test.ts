@@ -5,6 +5,8 @@ import type { Clock } from "@/core/ports";
 import type { Db } from "@/db/client";
 import { createTestDb, type TestDb } from "@/db/testing";
 import {
+  chAddressCounts,
+  chCompanies,
   companies,
   companyLocations,
   derivedRebuilds,
@@ -13,9 +15,11 @@ import {
   extractions,
   grantParticipants,
   grantProjects,
+  registryLinks,
   sourceItems,
   sources,
 } from "@/db/schema";
+import { outcodeCentroid } from "@/lib/geo/postcode";
 import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { insertCompany } from "@/pipeline/resolve/testing";
 import {
@@ -130,6 +134,50 @@ async function addGrant(
     companyId,
     resolvedAt: new Date(resolvedAt),
   });
+}
+
+let nextNumber = 0;
+
+/** Links a company to a Companies House row with the given office. */
+async function linkOffice(
+  companyId: number,
+  postcode: string | null,
+  options: { count?: number | null; status?: "linked" | "candidate" } = {},
+): Promise<void> {
+  nextNumber += 1;
+  const number = String(10_000_000 + nextNumber);
+  const outcode = postcode ? postcode.split(" ")[0] : null;
+  await db.insert(chCompanies).values({
+    companyNumber: number,
+    name: "ACME LTD",
+    status: "active",
+    companyType: "ltd",
+    incorporatedOn: "2022-06-01",
+    officePostcode: postcode,
+    officeOutcode: outcode,
+  });
+  const status = options.status ?? "linked";
+  await db.insert(registryLinks).values({
+    companyId,
+    registry: "companies_house",
+    registryId: number,
+    registryName: "ACME LTD",
+    status,
+    method: status === "linked" ? "name_filing" : null,
+    reason: "test",
+    decidedBy: "auto",
+  });
+  const count = options.count === undefined ? 1 : options.count;
+  if (postcode && count !== null) {
+    await db
+      .insert(chAddressCounts)
+      .values({
+        postcode,
+        activeCompanies: count,
+        checkedAt: new Date("2026-11-01T00:00:00Z"),
+      })
+      .onConflictDoNothing();
+  }
 }
 
 const run = (force = false) => rebuildCompanyLocations({ db, clock, force });
@@ -397,5 +445,184 @@ describe("rebuildCompanyLocations", () => {
 
     expect(stats.written).toEqual({ inserted: 0, updated: 0, deleted: 1 });
     expect(await locationOf(company.id)).toBeUndefined();
+  });
+
+  describe("registered office", () => {
+    it("gives a linked company with no town an outcode row", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "LS1 4AP");
+      const stats = await run();
+
+      const centroid = outcodeCentroid("LS1");
+      expect(await locationOf(company.id)).toMatchObject({
+        precision: "outcode",
+        source: "registered_office",
+        outcode: "LS1",
+        itl1Code: centroid?.itl1,
+        latitude: centroid?.lat,
+        longitude: centroid?.lon,
+        placeSlug: null,
+      });
+      expect(stats.rowsByPrecision.outcode).toBe(1);
+    });
+
+    it("lets a news town win over the office", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+        city: "Leeds",
+      });
+      await linkOffice(company.id, "M1 1AE");
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        precision: "town",
+        source: "news_city",
+      });
+    });
+
+    it("lets a grant postcode win over the office", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "M1 1AE");
+      await addGrant(company.id, "LS1", "2026-03-01T00:00:00Z");
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        source: "grant_postcode",
+        outcode: "LS1",
+      });
+    });
+
+    it("uses no office at a shared postcode", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "EC2A 4NE", { count: 20 });
+      await run();
+
+      expect(await locationOf(company.id)).toBeUndefined();
+    });
+
+    it("uses an office just under the threshold", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "EC2A 4NE", { count: 19 });
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        source: "registered_office",
+      });
+    });
+
+    it("uses no office when no count is stored", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "LS1 4AP", { count: null });
+      await run();
+
+      expect(await locationOf(company.id)).toBeUndefined();
+    });
+
+    it("uses no office from a candidate link", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "LS1 4AP", { status: "candidate" });
+      await run();
+
+      expect(await locationOf(company.id)).toBeUndefined();
+    });
+
+    it("uses no office for a postcode with an unknown outcode", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "ZZ99 9ZZ");
+      await run();
+
+      expect(await locationOf(company.id)).toBeUndefined();
+    });
+
+    it("gives the region row when the news region differs from the office", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "EC2A 4NE");
+      await addReport(company.id, "Scottish");
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        precision: "region",
+        source: "news_region",
+        itl1Code: "TLM",
+      });
+    });
+
+    it("uses the office when the news region agrees", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "EH1 1YZ");
+      await addReport(company.id, "Scottish");
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        precision: "outcode",
+        source: "registered_office",
+        itl1Code: "TLM",
+      });
+    });
+
+    it("ignores the office of a company that is not in GB", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "US",
+        city: "Austin",
+      });
+      await linkOffice(company.id, "LS1 4AP");
+      await run();
+
+      expect(await locationOf(company.id)).toMatchObject({
+        source: "news_city",
+        countryCode: "US",
+      });
+    });
+
+    it("rebuilds when an address count makes the postcode shared", async () => {
+      const company = await insertCompany(db, {
+        name: "Acme",
+        countryCode: "GB",
+      });
+      await linkOffice(company.id, "LS1 4AP");
+      await run();
+      expect(await locationOf(company.id)).toBeDefined();
+
+      await db
+        .update(chAddressCounts)
+        .set({
+          activeCompanies: 45,
+          checkedAt: new Date("2026-11-10T00:00:00Z"),
+        })
+        .where(eq(chAddressCounts.postcode, "LS1 4AP"));
+      const stats = await run();
+
+      expect(stats.written).toEqual({ inserted: 0, updated: 0, deleted: 1 });
+      expect(await locationOf(company.id)).toBeUndefined();
+    });
   });
 });

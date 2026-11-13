@@ -83,6 +83,8 @@ export const FOUNDED_YEAR_SOURCES = [
   "companies_house",
   "yc",
   "manual",
+  // Phase 3
+  "sec_form_d",
 ] as const;
 export type FoundedYearSource = (typeof FOUNDED_YEAR_SOURCES)[number];
 
@@ -93,6 +95,8 @@ export const LLM_PURPOSES = [
   // Phase 2
   "theme_naming",
   "tagging",
+  // Phase 3 (used only by the cuttable SH01 reader, Task 067)
+  "document_reading",
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
@@ -123,6 +127,8 @@ export const ALIAS_SOURCES = [
   "merge",
   // Phase 2
   "grant",
+  // Phase 3
+  "registry",
 ] as const;
 export type AliasSource = (typeof ALIAS_SOURCES)[number];
 
@@ -146,6 +152,8 @@ export const LOCATION_SOURCES = [
   "grant_postcode",
   "news_city",
   "news_region",
+  // Phase 3
+  "registered_office",
 ] as const;
 export type LocationSource = (typeof LOCATION_SOURCES)[number];
 
@@ -153,5 +161,51 @@ export const GRANT_ROLES = ["lead", "participant"] as const;
 export type GrantRole = (typeof GRANT_ROLES)[number];
 
 /** Official records an event can be linked to through `event_record_sources`. */
-export const RECORD_KINDS = ["ukri_grant"] as const;
+export const RECORD_KINDS = [
+  "ukri_grant",
+  // Phase 3
+  "ch_allotment",
+  "sec_form_d",
+] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
+
+// Phase 3 enums (docs/spec-phase3.md section 5.1). Append only, as above.
+
+export const REGISTRY_KINDS = ["companies_house", "sec_edgar"] as const;
+export type RegistryKind = (typeof REGISTRY_KINDS)[number];
+
+/** `candidate` rows wait for review and are never shown on pages. */
+export const REGISTRY_LINK_STATUSES = [
+  "linked",
+  "candidate",
+  "rejected",
+] as const;
+export type RegistryLinkStatus = (typeof REGISTRY_LINK_STATUSES)[number];
+
+/** Which rule made a link (spec-phase3 section 7.2 and 8.3). */
+export const REGISTRY_LINK_METHODS = [
+  "grant_number",
+  "name_grant_postcode",
+  "name_filing",
+  "name_location",
+  "prefix_filing_location",
+  "form_d_round",
+  "manual",
+] as const;
+export type RegistryLinkMethod = (typeof REGISTRY_LINK_METHODS)[number];
+
+/** `manual` decisions are final: automatic linking never changes them. */
+export const LINK_DECIDED_BY = ["auto", "manual"] as const;
+export type LinkDecidedBy = (typeof LINK_DECIDED_BY)[number];
+
+export const REGISTRY_SEARCH_OUTCOMES = [
+  "linked",
+  "candidates",
+  "none",
+  "skipped",
+] as const;
+export type RegistrySearchOutcome = (typeof REGISTRY_SEARCH_OUTCOMES)[number];
+
+/** Where a row of `company_sectors` came from. */
+export const SECTOR_SOURCES = ["theme", "sic"] as const;
+export type SectorSource = (typeof SECTOR_SOURCES)[number];

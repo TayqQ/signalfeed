@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
-import type { MergeEntity } from "@/core/enums";
+import type { MergeEntity, RegistryKind } from "@/core/enums";
 import type { Db } from "@/db/client";
 import {
   acquisitions,
@@ -9,10 +9,12 @@ import {
   entityMerges,
   eventInvestors,
   events,
+  formDFilings,
   fundingRounds,
   investorAliases,
   investors,
   mergeCandidates,
+  registryLinks,
 } from "@/db/schema";
 import { normaliseCompanyName, normaliseInvestorName } from "@/lib/normalise";
 import {
@@ -33,6 +35,8 @@ export interface MergePreview {
   aliases: number;
   tags: number;
   investments: number;
+  /** Rows in `registry_links`, in any status. */
+  registryLinks: number;
 }
 
 export interface MergeOptions {
@@ -84,6 +88,75 @@ async function resolveCandidates(
     );
 }
 
+const LINK_STATUS_RANK = { linked: 3, rejected: 2, candidate: 1 } as const;
+
+/**
+ * Moves the merged company's registry links to the kept company. A number both
+ * hold keeps the stronger row (linked, then rejected, then candidate). When both
+ * hold a different `linked` number in one registry, the kept company's link
+ * stands and the other becomes a candidate. Returns the linked number of each
+ * registry afterwards, so the company columns can follow.
+ */
+async function moveRegistryLinks(
+  tx: Db,
+  keepId: number,
+  mergeId: number,
+): Promise<Map<RegistryKind, string>> {
+  const keepRows = await tx
+    .select()
+    .from(registryLinks)
+    .where(eq(registryLinks.companyId, keepId));
+  const mergeRows = await tx
+    .select()
+    .from(registryLinks)
+    .where(eq(registryLinks.companyId, mergeId));
+  const linked = new Map<RegistryKind, string>();
+  for (const row of keepRows) {
+    if (row.status === "linked") linked.set(row.registry, row.registryId);
+  }
+
+  for (const row of mergeRows) {
+    const same = keepRows.find(
+      (k) => k.registry === row.registry && k.registryId === row.registryId,
+    );
+    if (same) {
+      if (LINK_STATUS_RANK[row.status] > LINK_STATUS_RANK[same.status]) {
+        // The merged row is stronger: it replaces the kept row.
+        await tx.delete(registryLinks).where(eq(registryLinks.id, same.id));
+        await tx
+          .update(registryLinks)
+          .set({ companyId: keepId })
+          .where(eq(registryLinks.id, row.id));
+        if (row.status === "linked") linked.set(row.registry, row.registryId);
+      } else {
+        await tx.delete(registryLinks).where(eq(registryLinks.id, row.id));
+      }
+      continue;
+    }
+    const heldNumber = linked.get(row.registry);
+    if (row.status === "linked" && heldNumber !== undefined) {
+      await tx
+        .update(registryLinks)
+        .set({
+          companyId: keepId,
+          status: "candidate",
+          method: null,
+          reason: "from a merge; numbers differ",
+          decidedBy: "auto",
+          decidedAt: new Date(),
+        })
+        .where(eq(registryLinks.id, row.id));
+      continue;
+    }
+    await tx
+      .update(registryLinks)
+      .set({ companyId: keepId })
+      .where(eq(registryLinks.id, row.id));
+    if (row.status === "linked") linked.set(row.registry, row.registryId);
+  }
+  return linked;
+}
+
 async function findDuplicateRounds(
   db: Db,
   companyId: number,
@@ -120,7 +193,7 @@ export async function previewCompanyMerge(
   db: Db,
   mergeId: number,
 ): Promise<MergePreview> {
-  const [eventRows, aliasRows, tagRows] = await Promise.all([
+  const [eventRows, aliasRows, tagRows, linkRows] = await Promise.all([
     db
       .select({ id: events.id })
       .from(events)
@@ -133,12 +206,17 @@ export async function previewCompanyMerge(
       .select({ id: companyTags.tagId })
       .from(companyTags)
       .where(eq(companyTags.companyId, mergeId)),
+    db
+      .select({ id: registryLinks.id })
+      .from(registryLinks)
+      .where(eq(registryLinks.companyId, mergeId)),
   ]);
   return {
     events: eventRows.length,
     aliases: aliasRows.length,
     tags: tagRows.length,
     investments: 0,
+    registryLinks: linkRows.length,
   };
 }
 
@@ -162,6 +240,7 @@ export async function previewInvestorMerge(
     aliases: aliasRows.length,
     tags: 0,
     investments: investmentRows.length,
+    registryLinks: 0,
   };
 }
 
@@ -238,10 +317,20 @@ export async function mergeCompanies(
         });
     }
 
+    const linkedNumbers = await moveRegistryLinks(tx, keepId, mergeId);
+    await tx
+      .update(formDFilings)
+      .set({ companyId: keepId })
+      .where(eq(formDFilings.companyId, mergeId));
+
     // A unique value must leave the merged row before the kept row can take it.
+    // A `linked` row decides the number; without one the column keeps its value.
     const domain = keep.websiteDomain ?? merge.websiteDomain;
-    const ukNumber = keep.ukCompanyNumber ?? merge.ukCompanyNumber;
-    const cik = keep.secCik ?? merge.secCik;
+    const ukNumber =
+      linkedNumbers.get("companies_house") ??
+      keep.ukCompanyNumber ??
+      merge.ukCompanyNumber;
+    const cik = linkedNumbers.get("sec_edgar") ?? keep.secCik ?? merge.secCik;
     await tx
       .update(companies)
       .set({

@@ -5,12 +5,17 @@ import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { normaliseCompanyName, slugify } from "@/lib/normalise";
 import type { Db } from "../client";
 import {
+  chCompanies,
+  chFilings,
   companies,
   companyLocations,
+  companySectors,
   companyThemes,
+  eventConfirmations,
   events,
   fundingRoundMomentum,
   fundingRounds,
+  registryLinks,
   tags,
   themes,
 } from "../schema";
@@ -255,5 +260,167 @@ describe("company detail targeting data", () => {
       ukRegion: null,
       countryCode: "CH",
     });
+  });
+});
+
+describe("company registry data", () => {
+  let test: TestDb;
+  let db: Db;
+
+  beforeEach(async () => {
+    test = await createTestDb();
+    db = test.db;
+  });
+
+  afterEach(async () => {
+    await test.close();
+  });
+
+  async function linkRow(
+    companyId: number,
+    registry: "companies_house" | "sec_edgar",
+    registryId: string,
+    status: "linked" | "candidate" | "rejected",
+  ): Promise<void> {
+    await db.insert(registryLinks).values({
+      companyId,
+      registry,
+      registryId,
+      registryName: `Name ${registryId}`,
+      status,
+      method: status === "linked" ? "name_location" : null,
+      reason: "test",
+      decidedBy: "auto",
+    });
+  }
+
+  async function addCh(number: string, accountsType: string | null) {
+    await db.insert(chCompanies).values({
+      companyNumber: number,
+      name: "FAKE LEDGER LIMITED",
+      status: "active",
+      companyType: "ltd",
+      incorporatedOn: "2022-06-01",
+      sicCodes: ["62012", "00000"],
+      officePostcode: "ZZ9 9ZZ",
+      officeOutcode: "ZZ9",
+      accountsType,
+      accountsMadeUpTo: "2025-06-30",
+    });
+  }
+
+  it("returns the linked registry record without the full postcode", async () => {
+    const id = await addCompany(db, "Fake Ledger");
+    await addCh("09000401", "micro-entity");
+    await linkRow(id, "companies_house", "09000401", "linked");
+    await linkRow(id, "sec_edgar", "9000401", "linked");
+
+    const detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    expect(detail?.registry).toEqual({
+      companiesHouse: {
+        companyNumber: "09000401",
+        url: "https://find-and-update.company-information.service.gov.uk/company/09000401",
+        name: "FAKE LEDGER LIMITED",
+        statusLabel: "Active",
+        typeLabel: "Private limited company",
+        incorporatedOn: "2022-06-01",
+        ceasedOn: null,
+        sicCodes: [
+          { code: "62012", label: expect.any(String) as string },
+          { code: "00000", label: null },
+        ],
+        sizeBand: "micro",
+        accountsMadeUpTo: "2025-06-30",
+        officeOutcode: "ZZ9",
+      },
+      sec: {
+        cik: "9000401",
+        url: "https://www.sec.gov/edgar/browse/?CIK=9000401",
+      },
+    });
+    const text = JSON.stringify(detail);
+    expect(text).not.toContain("ZZ9 9ZZ");
+    expect(text).not.toContain("officePostcode");
+  });
+
+  it("never reads candidate or rejected links", async () => {
+    const id = await addCompany(db, "Fake Ledger");
+    await addCh("09000402", "small");
+    await addCh("09000403", "small");
+    await linkRow(id, "companies_house", "09000402", "candidate");
+    await linkRow(id, "companies_house", "09000403", "rejected");
+    await linkRow(id, "sec_edgar", "9000402", "candidate");
+
+    const detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    expect(detail?.registry).toBeNull();
+    expect(JSON.stringify(detail)).not.toContain("09000402");
+  });
+
+  it("returns null registry for an unlinked company", async () => {
+    await addCompany(db, "Fake Ledger");
+    const detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    expect(detail?.registry).toBeNull();
+  });
+
+  it("returns each event's confirmations, closest first", async () => {
+    const id = await addCompany(db, "Fake Ledger");
+    const [eventId] = await addRounds(db, id, [
+      { date: "2026-03-10", type: "seed", evidence: "confirmed" },
+    ]);
+    if (eventId == null) throw new Error("No event");
+    const rows = [];
+    for (const [tx, date] of [
+      ["T-1", "2026-02-02"],
+      ["T-2", "2026-03-05"],
+    ] as const) {
+      const [row] = await db
+        .insert(chFilings)
+        .values({
+          companyNumber: "09000404",
+          transactionId: tx,
+          type: "SH01",
+          category: "capital",
+          filedOn: date,
+          actionDate: date,
+        })
+        .returning({ id: chFilings.id });
+      if (!row) throw new Error("Filing insert failed");
+      rows.push({ id: row.id, date });
+    }
+    for (const row of rows) {
+      await db.insert(eventConfirmations).values({
+        eventId,
+        recordKind: "ch_allotment",
+        recordId: row.id,
+        rule: "test",
+        recordDate: row.date,
+      });
+    }
+    const detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    const confirmations = detail?.events[0]?.confirmations ?? [];
+    expect(confirmations.map((c) => c.recordDate)).toEqual([
+      "2026-03-05",
+      "2026-02-02",
+    ]);
+    expect(confirmations[0]?.text).toBe(
+      "Confirmed: shares allotted on 5 March 2026 (Companies House SH01)",
+    );
+  });
+
+  it("uses company_sectors when present, else the theme sectors", async () => {
+    const id = await addCompany(db, "Fake Ledger");
+    const theme = await addTheme(db, "health-ai", {
+      sector: "health-life-sciences",
+    });
+    await linkTheme(db, id, theme);
+    let detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    expect(detail?.sectors).toEqual(["health-life-sciences"]);
+
+    await db.insert(companySectors).values([
+      { companyId: id, sector: "software-ai", source: "theme" },
+      { companyId: id, sector: "education", source: "theme" },
+    ]);
+    detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
+    expect(detail?.sectors?.sort()).toEqual(["education", "software-ai"]);
   });
 });

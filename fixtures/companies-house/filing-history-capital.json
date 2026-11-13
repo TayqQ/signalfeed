@@ -1,0 +1,128 @@
+{
+  "filing_history_status": "filing-history-available",
+  "items_per_page": 100,
+  "start_index": 0,
+  "total_count": 6,
+  "items": [
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwMQ==",
+      "barcode": "FX000001",
+      "type": "SH20",
+      "date": "2019-10-28",
+      "category": "capital",
+      "description": "legacy",
+      "description_values": {
+        "description": "Statement by Directors"
+      },
+      "pages": 1,
+      "paper_filed": true,
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwMQ=="
+      }
+    },
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwMg==",
+      "barcode": "FX000002",
+      "type": "SH19",
+      "date": "2019-10-28",
+      "category": "capital",
+      "description": "capital-statement-capital-company-with-date-currency-figure",
+      "description_values": {
+        "date": "2019-10-28",
+        "capital": [
+          {
+            "currency": "GBP",
+            "figure": "0.0001"
+          }
+        ]
+      },
+      "pages": 5,
+      "action_date": "2019-10-28",
+      "paper_filed": true,
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwMg=="
+      }
+    },
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwMw==",
+      "barcode": "FX000003",
+      "type": "SH01",
+      "date": "2019-10-24",
+      "category": "capital",
+      "description": "capital-allotment-shares",
+      "description_values": {
+        "date": "2019-10-24",
+        "capital": [
+          {
+            "currency": "GBP",
+            "figure": "526,640.6358"
+          }
+        ]
+      },
+      "pages": 3,
+      "action_date": "2019-10-24",
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwMw=="
+      }
+    },
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwNA==",
+      "barcode": "FX000004",
+      "type": "SH01",
+      "date": "2014-02-05",
+      "category": "capital",
+      "description": "capital-allotment-shares",
+      "description_values": {
+        "date": "2014-01-24",
+        "capital": [
+          {
+            "currency": "GBP",
+            "figure": "1,640.64"
+          }
+        ]
+      },
+      "pages": 4,
+      "action_date": "2014-01-24",
+      "paper_filed": true,
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwNA=="
+      }
+    },
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwNQ==",
+      "barcode": "FX000005",
+      "type": "SH10",
+      "date": "2013-12-19",
+      "category": "capital",
+      "description": "capital-variation-of-rights-attached-to-shares",
+      "pages": 2,
+      "paper_filed": true,
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwNQ=="
+      }
+    },
+    {
+      "transaction_id": "RklYVFVSRVRYTjAwMDAwNg==",
+      "barcode": "FX000006",
+      "type": "SH01",
+      "date": "2013-12-06",
+      "category": "capital",
+      "description": "capital-allotment-shares",
+      "description_values": {
+        "date": "2013-12-02",
+        "capital": [
+          {
+            "currency": "GBP",
+            "figure": "1,550.62"
+          }
+        ]
+      },
+      "pages": 4,
+      "action_date": "2013-12-02",
+      "paper_filed": true,
+      "links": {
+        "self": "/company/09100417/filing-history/RklYVFVSRVRYTjAwMDAwNg=="
+      }
+    }
+  ]
+}

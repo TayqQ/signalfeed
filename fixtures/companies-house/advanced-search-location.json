@@ -1,0 +1,41 @@
+{
+  "etag": "a523c4776d5c49205a22d4467e3318aad65ee48c",
+  "kind": "search#advanced-search",
+  "hits": 331,
+  "top_hit": {
+    "company_name": "HALCYON TERRACE SERVICES LIMITED",
+    "company_number": "09100702",
+    "company_status": "active",
+    "company_type": "ltd",
+    "kind": "search-results#company",
+    "links": {
+      "company_profile": "/company/09100702"
+    },
+    "date_of_creation": "2022-08-23",
+    "registered_office_address": {
+      "address_line_1": "1 Example Plaza",
+      "locality": "Westbridge",
+      "postal_code": "EX1 1AA"
+    },
+    "sic_codes": ["66300"]
+  },
+  "items": [
+    {
+      "company_name": "HALCYON TERRACE SERVICES LIMITED",
+      "company_number": "09100702",
+      "company_status": "active",
+      "company_type": "ltd",
+      "kind": "search-results#company",
+      "links": {
+        "company_profile": "/company/09100702"
+      },
+      "date_of_creation": "2022-08-23",
+      "registered_office_address": {
+        "address_line_1": "1 Example Plaza",
+        "locality": "Westbridge",
+        "postal_code": "EX1 1AA"
+      },
+      "sic_codes": ["66300"]
+    }
+  ]
+}

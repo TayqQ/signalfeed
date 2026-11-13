@@ -23,6 +23,7 @@ import { resolveCompany } from "./company-matcher";
 import {
   corroboratesFor,
   findMatchingEvent,
+  matchGrantRecord,
   type IncomingEvent,
 } from "./event-matcher";
 import { postProcess, type ProcessedEvent } from "./post-process";
@@ -33,6 +34,8 @@ export interface ResolveOutcome {
   eventsCreated: number;
   eventsUpdated: number;
   eventsDeleted: number;
+  /** Reports attached to a grant event from an official record (D56). */
+  grantReportsAttached: number;
 }
 
 export interface ResolveExtractionOptions {
@@ -124,6 +127,7 @@ export async function resolveExtraction(
       eventsCreated: 0,
       eventsUpdated: 0,
       eventsDeleted: 0,
+      grantReportsAttached: 0,
     };
 
     const [row] = await tx
@@ -210,11 +214,16 @@ export async function resolveExtraction(
         continue;
       }
 
-      const matchId = await findMatchingEvent(tx, {
+      const candidate: IncomingEvent = {
         ...incoming,
         companyId: company.companyId,
         acquirerCompanyId,
-      });
+      };
+      // A news report of a grant attaches to the grant event (D56). Other
+      // news events never match a record-origin event.
+      const grantId = await matchGrantRecord(tx, candidate);
+      if (grantId !== null) outcome.grantReportsAttached += 1;
+      const matchId = grantId ?? (await findMatchingEvent(tx, candidate));
       const eventId =
         matchId ??
         (await insertEvent(

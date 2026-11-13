@@ -9,6 +9,7 @@ import { formatDate, formatRoundType } from "@/lib/format";
 import { serialiseFundingFilters } from "@/lib/funding-filters";
 import { formatLocation } from "@/lib/location";
 import { describeRoundMomentum } from "./company-momentum";
+import { ConfirmedMarker } from "./confirmed-marker";
 import { RoundAmount } from "./round-amount";
 
 function effectiveSort(filters: FundingFilters): FundingSort {
@@ -197,6 +198,11 @@ export function FundingTable({
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums">
                   {formatDate(row.announcedOn)}
+                  {row.confirmation ? (
+                    <div className="mt-0.5">
+                      <ConfirmedMarker text={row.confirmation.text} />
+                    </div>
+                  ) : null}
                 </td>
                 <td className="py-3 pl-3 text-right tabular-nums">
                   {row.sourceCount}

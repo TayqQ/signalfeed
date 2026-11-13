@@ -215,4 +215,30 @@ describe("FundingTable momentum, grants and sort links", () => {
     expect(params.get("momentum")).toBe("first");
     expect(params.get("sort")).toBe("amount");
   });
+
+  it("shows the Confirmed marker only on confirmed rows", () => {
+    const text =
+      "Confirmed: shares allotted on 2 February 2026 (Companies House SH01)";
+    render(
+      <FundingTable
+        page={page([
+          row({
+            eventId: 1,
+            confirmation: {
+              kind: "ch_allotment",
+              recordDate: "2026-02-02",
+              confirmsAmount: false,
+              text,
+            },
+          }),
+          row({ eventId: 2, companySlug: "beta", companyName: "Beta" }),
+        ])}
+        filters={filters}
+      />,
+    );
+    expect(screen.getAllByRole("note")).toHaveLength(1);
+    expect(screen.getByRole("note", { name: text })).toHaveTextContent(
+      "Confirmed",
+    );
+  });
 });

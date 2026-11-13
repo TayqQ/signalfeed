@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<edgarSubmission>
+    <schemaVersion>X0708</schemaVersion>
+    <submissionType>D/A</submissionType>
+    <testOrLive>LIVE</testOrLive>
+    <primaryIssuer>
+        <cik>0001999002</cik>
+        <entityName>Example Harbor Medical Inc.</entityName>
+        <issuerAddress>
+            <street1>#8 - 200 Example Road</street1>
+            <city>EXAMPLETOWN</city>
+            <stateOrCountry>A1</stateOrCountry>
+            <stateOrCountryDescription>BRITISH COLUMBIA, CANADA</stateOrCountryDescription>
+            <zipCode>V0X 0X0</zipCode>
+        </issuerAddress>
+        <jurisdictionOfInc>BRITISH COLUMBIA, CANADA</jurisdictionOfInc>
+        <issuerPreviousNameList>
+            <value>None</value>
+        </issuerPreviousNameList>
+        <edgarPreviousNameList>
+            <previousName>Example Harbor Devices Inc.</previousName>
+        </edgarPreviousNameList>
+        <entityType>Corporation</entityType>
+        <yearOfInc>
+            <overFiveYears>true</overFiveYears>
+        </yearOfInc>
+    </primaryIssuer>
+    <relatedPersonsList>
+        <relatedPersonInfo>
+            <relatedPersonName>
+                <firstName>Example</firstName>
+                <lastName>Person One</lastName>
+            </relatedPersonName>
+            <relatedPersonAddress>
+                <street1>#8 - 200 Example Road</street1>
+                <city>Exampletown</city>
+                <stateOrCountry>A1</stateOrCountry>
+                <stateOrCountryDescription>BRITISH COLUMBIA, CANADA</stateOrCountryDescription>
+                <zipCode>V0X 0X0</zipCode>
+            </relatedPersonAddress>
+            <relatedPersonRelationshipList>
+                <relationship>Director</relationship>
+                <relationship>Executive Officer</relationship>
+            </relatedPersonRelationshipList>
+        </relatedPersonInfo>
+        <relatedPersonInfo>
+            <relatedPersonName>
+                <firstName>Example</firstName>
+                <lastName>Person Two</lastName>
+            </relatedPersonName>
+            <relatedPersonAddress>
+                <street1>#8 - 200 Example Road</street1>
+                <city>Exampletown</city>
+                <stateOrCountry>A1</stateOrCountry>
+                <stateOrCountryDescription>BRITISH COLUMBIA, CANADA</stateOrCountryDescription>
+                <zipCode>V0X 0X0</zipCode>
+            </relatedPersonAddress>
+            <relatedPersonRelationshipList>
+                <relationship>Director</relationship>
+            </relatedPersonRelationshipList>
+        </relatedPersonInfo>
+    </relatedPersonsList>
+    <offeringData>
+        <industryGroup>
+            <industryGroupType>Biotechnology</industryGroupType>
+        </industryGroup>
+        <issuerSize>
+            <revenueRange>Decline to Disclose</revenueRange>
+        </issuerSize>
+        <federalExemptionsExclusions>
+            <item>06b</item>
+        </federalExemptionsExclusions>
+        <typeOfFiling>
+            <newOrAmendment>
+                <isAmendment>true</isAmendment>
+                <previousAccessionNumber>0001999002-25-000001</previousAccessionNumber>
+            </newOrAmendment>
+            <dateOfFirstSale>
+                <value>2024-10-04</value>
+            </dateOfFirstSale>
+        </typeOfFiling>
+        <durationOfOffering>
+            <moreThanOneYear>true</moreThanOneYear>
+        </durationOfOffering>
+        <typesOfSecuritiesOffered>
+            <isEquityType>true</isEquityType>
+        </typesOfSecuritiesOffered>
+        <businessCombinationTransaction>
+            <isBusinessCombinationTransaction>false</isBusinessCombinationTransaction>
+        </businessCombinationTransaction>
+        <minimumInvestmentAccepted>0</minimumInvestmentAccepted>
+        <salesCompensationList>
+            <recipient>
+                <recipientName>Example Person Three</recipientName>
+                <recipientCRDNumber>None</recipientCRDNumber>
+                <associatedBDName>Example Securities L.L.C.</associatedBDName>
+                <associatedBDCRDNumber>000000000</associatedBDCRDNumber>
+                <recipientAddress>
+                    <street1>1 Example Avenue</street1>
+                    <city>NEW YORK</city>
+                    <stateOrCountry>NY</stateOrCountry>
+                    <stateOrCountryDescription>NEW YORK</stateOrCountryDescription>
+                    <zipCode>10001</zipCode>
+                </recipientAddress>
+                <statesOfSolicitationList>
+                    <value>All States</value>
+                </statesOfSolicitationList>
+                <foreignSolicitation>false</foreignSolicitation>
+            </recipient>
+        </salesCompensationList>
+        <offeringSalesAmounts>
+            <totalOfferingAmount>Indefinite</totalOfferingAmount>
+            <totalAmountSold>1623382</totalAmountSold>
+            <totalRemaining>Indefinite</totalRemaining>
+            <clarificationOfResponse>C$1.3540=US$1.00</clarificationOfResponse>
+        </offeringSalesAmounts>
+        <investors>
+            <hasNonAccreditedInvestors>false</hasNonAccreditedInvestors>
+            <totalNumberAlreadyInvested>11</totalNumberAlreadyInvested>
+        </investors>
+        <signatureBlock>
+            <authorizedRepresentative>false</authorizedRepresentative>
+            <signature>
+                <issuerName>Example Harbor Medical Inc.</issuerName>
+                <signatureName>/s/ Example Person One</signatureName>
+                <nameOfSigner>Example Person One</nameOfSigner>
+                <signatureTitle>CEO</signatureTitle>
+                <signatureDate>2026-11-09</signatureDate>
+            </signature>
+        </signatureBlock>
+    </offeringData>
+</edgarSubmission>

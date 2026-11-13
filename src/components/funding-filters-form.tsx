@@ -3,9 +3,11 @@ import { ROUND_TYPES } from "@/core/enums";
 import { NEAR_RADII_KM, DEFAULT_NEAR_KM } from "@/core/read-models";
 import type { FundingFilters, ThemeRef } from "@/core/read-models";
 import { SECTORS, SECTOR_LABELS } from "@/core/sectors";
+import { COMPANY_SIZE_BANDS, companySizeBandSlug } from "@/core/registry";
 import { formatRoundType } from "@/lib/format";
 import { UK_PLACES, findPlaceBySlug } from "@/lib/geo/uk-places";
 import { UK_REGIONS } from "@/lib/geo/uk-regions";
+import { BAND_LABELS } from "@/lib/registry/company-size";
 import { SIZE_BAND_RANGES, SIZE_BANDS } from "@/lib/size-bands";
 
 const inputClass =
@@ -235,6 +237,35 @@ export function FundingFiltersForm({
             ))}
           </div>
         </fieldset>
+        <fieldset>
+          <legend className={labelClass}>Company size</legend>
+          <div className={checkGridClass}>
+            {COMPANY_SIZE_BANDS.map((band) => (
+              <label key={band} className={checkLabelClass}>
+                <input
+                  type="checkbox"
+                  name="cosize"
+                  value={companySizeBandSlug(band)}
+                  defaultChecked={filters.companySizes?.includes(band)}
+                />
+                {BAND_LABELS[band]}
+              </label>
+            ))}
+          </div>
+          <p className={hintClass}>
+            From the company&apos;s latest accounts at Companies House. UK
+            companies only.
+          </p>
+        </fieldset>
+        <label className={checkLabelClass}>
+          <input
+            type="checkbox"
+            name="evidence"
+            value="confirmed"
+            defaultChecked={filters.evidence === "confirmed"}
+          />
+          Confirmed by an official filing
+        </label>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="min" className={labelClass}>

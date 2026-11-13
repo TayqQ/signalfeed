@@ -35,13 +35,19 @@ import {
   INVESTOR_KINDS,
   INVESTOR_ROLES,
   LAUNCH_KINDS,
+  LINK_DECIDED_BY,
   LLM_PURPOSES,
   LOCATION_PRECISIONS,
   LOCATION_SOURCES,
   MERGE_CANDIDATE_STATUSES,
   MERGE_ENTITIES,
   RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  REGISTRY_LINK_STATUSES,
+  REGISTRY_SEARCH_OUTCOMES,
   ROUND_TYPES,
+  SECTOR_SOURCES,
   SOURCE_ITEM_STATUSES,
   SOURCE_KINDS,
   THEME_ASSIGNED_BY,
@@ -49,6 +55,7 @@ import {
   THEME_STATUSES,
 } from "@/core/enums";
 import type { ExtractionV1, ExtractionV2 } from "@/core/extraction-schema";
+import type { CapitalAmount } from "@/core/registry";
 
 export const EMBEDDING_DIMENSIONS = 512;
 
@@ -105,6 +112,24 @@ export const locationPrecision = pgEnum(
 export const locationSource = pgEnum("location_source", LOCATION_SOURCES);
 export const grantRole = pgEnum("grant_role", GRANT_ROLES);
 export const recordKind = pgEnum("record_kind", RECORD_KINDS);
+
+// Phase 3 enums (docs/spec-phase3.md section 5.1)
+
+export const registryKind = pgEnum("registry_kind", REGISTRY_KINDS);
+export const registryLinkStatus = pgEnum(
+  "registry_link_status",
+  REGISTRY_LINK_STATUSES,
+);
+export const registryLinkMethod = pgEnum(
+  "registry_link_method",
+  REGISTRY_LINK_METHODS,
+);
+export const linkDecidedBy = pgEnum("link_decided_by", LINK_DECIDED_BY);
+export const registrySearchOutcome = pgEnum(
+  "registry_search_outcome",
+  REGISTRY_SEARCH_OUTCOMES,
+);
+export const sectorSource = pgEnum("sector_source", SECTOR_SOURCES);
 
 // Collection and processing
 
@@ -903,11 +928,265 @@ export const eventRecordSources = pgTable(
   (t) => [primaryKey({ columns: [t.eventId, t.recordKind, t.recordId] })],
 );
 
+// Registry links (spec-phase3 section 5.2). Only `src/pipeline/registry/link-store.ts`
+// writes `registry_links`.
+
+export const registryLinks = pgTable(
+  "registry_links",
+  {
+    id: id(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    registry: registryKind("registry").notNull(),
+    /** A normalised Companies House number, or a CIK without leading zeros. */
+    registryId: text("registry_id").notNull(),
+    /** The organisation name the registry gives. */
+    registryName: text("registry_name").notNull(),
+    status: registryLinkStatus("status").notNull(),
+    /** Null for candidates and rejections. */
+    method: registryLinkMethod("method"),
+    /** Which rule and signals decided the row. */
+    reason: text("reason").notNull(),
+    decidedBy: linkDecidedBy("decided_by").notNull(),
+    createdAt: createdNow("created_at"),
+    decidedAt: createdNow("decided_at"),
+  },
+  (t) => [
+    unique("registry_links_company_registry_id_unique").on(
+      t.companyId,
+      t.registry,
+      t.registryId,
+    ),
+    uniqueIndex("registry_links_one_linked_per_company_idx")
+      .on(t.companyId, t.registry)
+      .where(sql`${t.status} = 'linked'`),
+    uniqueIndex("registry_links_one_linked_per_number_idx")
+      .on(t.registry, t.registryId)
+      .where(sql`${t.status} = 'linked'`),
+    index("registry_links_registry_status_idx").on(t.registry, t.status),
+    check(
+      "registry_links_linked_has_method",
+      sql`${t.status} <> 'linked' OR ${t.method} IS NOT NULL`,
+    ),
+  ],
+);
+
+/** A company is searched again only when its fingerprint changes or after 90 days. */
+export const registrySearches = pgTable(
+  "registry_searches",
+  {
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    registry: registryKind("registry").notNull(),
+    searchedAt: timestamptz("searched_at").notNull(),
+    outcome: registrySearchOutcome("outcome").notNull(),
+    /** Hash of the names and events the search used. */
+    inputFingerprint: text("input_fingerprint").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.registry] })],
+);
+
+// Companies House (spec-phase3 section 5.3). Organisation facts only (D58).
+
+export const chCompanies = pgTable(
+  "ch_companies",
+  {
+    companyNumber: text("company_number").primaryKey(),
+    name: text("name").notNull(),
+    /** Companies House's own status value, such as `active`. */
+    status: text("status").notNull(),
+    statusDetail: text("status_detail"),
+    companyType: text("company_type").notNull(),
+    incorporatedOn: isoDate("incorporated_on").notNull(),
+    ceasedOn: isoDate("ceased_on"),
+    sicCodes: text("sic_codes").array().notNull().default([]),
+    /** Full registered office postcode, for the shared-address check. Never displayed. */
+    officePostcode: text("office_postcode"),
+    /** Postcode district, for example `LS1`. */
+    officeOutcode: text("office_outcode"),
+    officeLocality: text("office_locality"),
+    /** Organisation names only. */
+    previousNames: text("previous_names").array().notNull().default([]),
+    /** `accounts.last_accounts.type`. */
+    accountsType: text("accounts_type"),
+    accountsMadeUpTo: isoDate("accounts_made_up_to"),
+    hasInsolvencyHistory: boolean("has_insolvency_history")
+      .notNull()
+      .default(false),
+    etag: text("etag"),
+    fetchedAt: createdNow("fetched_at"),
+    firstSeenAt: createdNow("first_seen_at"),
+  },
+  (t) => [index("ch_companies_office_outcode_idx").on(t.officeOutcode)],
+);
+
+/** Capital-category SH01 filings only. */
+export const chFilings = pgTable(
+  "ch_filings",
+  {
+    id: id(),
+    companyNumber: text("company_number").notNull(),
+    transactionId: text("transaction_id").notNull().unique(),
+    /** For example `SH01`. */
+    type: text("type").notNull(),
+    /** For example `capital`. */
+    category: text("category").notNull(),
+    filedOn: isoDate("filed_on").notNull(),
+    /** For an SH01, the allotment date. */
+    actionDate: isoDate("action_date"),
+    /** Statement of capital after the allotment. */
+    capital: jsonb("capital").$type<CapitalAmount[]>(),
+    /** For the deferred SH01 reader (Task 067). */
+    documentId: text("document_id"),
+    fetchedAt: createdNow("fetched_at"),
+  },
+  (t) => [
+    index("ch_filings_company_number_action_date_idx").on(
+      t.companyNumber,
+      t.actionDate,
+    ),
+  ],
+);
+
+/** Cache for the shared-address check (spec-phase3 section 7.3). */
+export const chAddressCounts = pgTable(
+  "ch_address_counts",
+  {
+    postcode: text("postcode").primaryKey(),
+    activeCompanies: integer("active_companies").notNull(),
+    checkedAt: timestamptz("checked_at").notNull(),
+  },
+  (t) => [
+    check("ch_address_counts_non_negative", sql`${t.activeCompanies} >= 0`),
+  ],
+);
+
+// SEC Form D (spec-phase3 section 5.4). Issuer and offering fields only (D58);
+// pooled investment funds are never stored.
+
+export const formDFilings = pgTable(
+  "form_d_filings",
+  {
+    id: id(),
+    sourceId: integer("source_id")
+      .notNull()
+      .references(() => sources.id),
+    accessionNumber: text("accession_number").notNull().unique(),
+    /** Without leading zeros. */
+    cik: text("cik").notNull(),
+    issuerName: text("issuer_name").notNull(),
+    entityType: text("entity_type"),
+    /** State or country of incorporation. */
+    jurisdiction: text("jurisdiction"),
+    issuerState: text("issuer_state"),
+    issuerCity: text("issuer_city"),
+    /** Given only when the issuer was incorporated within five years. */
+    yearOfInc: smallint("year_of_inc"),
+    incOverFiveYears: boolean("inc_over_five_years").notNull().default(false),
+    industryGroup: text("industry_group"),
+    isAmendment: boolean("is_amendment").notNull(),
+    previousAccessionNumber: text("previous_accession_number"),
+    dateOfFirstSale: isoDate("date_of_first_sale"),
+    firstSaleYetToOccur: boolean("first_sale_yet_to_occur")
+      .notNull()
+      .default(false),
+    /** Null when the offering is "Indefinite". */
+    totalOfferingUsdMinor: moneyMinor("total_offering_usd_minor"),
+    totalSoldUsdMinor: moneyMinor("total_sold_usd_minor"),
+    investorCount: integer("investor_count"),
+    /** For example `equity`, `debt`, `option`. */
+    securities: text("securities").array().notNull().default([]),
+    /** For example `06b`. */
+    exemptions: text("exemptions").array().notNull().default([]),
+    filedOn: isoDate("filed_on").notNull(),
+    fetchedAt: createdNow("fetched_at"),
+    companyId: integer("company_id").references(() => companies.id),
+    linkedAt: timestamptz("linked_at"),
+  },
+  (t) => [
+    index("form_d_filings_cik_idx").on(t.cik),
+    index("form_d_filings_filed_on_idx").on(t.filedOn),
+    index("form_d_filings_company_id_idx").on(t.companyId),
+    check(
+      "form_d_filings_amounts_non_negative",
+      sql`${t.totalOfferingUsdMinor} >= 0 AND ${t.totalSoldUsdMinor} >= 0 AND ${t.investorCount} >= 0`,
+    ),
+  ],
+);
+
+/** One row per EDGAR daily index processed, so collection resumes without repeats. */
+export const edgarIndexDays = pgTable(
+  "edgar_index_days",
+  {
+    day: isoDate("day").primaryKey(),
+    /** `done` or `missing` (no index for that day). */
+    status: text("status").notNull(),
+    formDFound: nonNegativeCount("form_d_found"),
+    formDStored: nonNegativeCount("form_d_stored"),
+    fundSkipped: nonNegativeCount("fund_skipped"),
+    fetchedAt: createdNow("fetched_at"),
+  },
+  (t) => [
+    check("edgar_index_days_status", sql`${t.status} IN ('done', 'missing')`),
+    check(
+      "edgar_index_days_non_negative",
+      sql`${t.formDFound} >= 0 AND ${t.formDStored} >= 0 AND ${t.fundSkipped} >= 0`,
+    ),
+  ],
+);
+
+// Phase 3 derived tables (spec-phase3 section 5.5, D37). Rebuilt from source
+// tables, so the rebuild may replace their rows.
+
+export const eventConfirmations = pgTable(
+  "event_confirmations",
+  {
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    recordKind: recordKind("record_kind").notNull(),
+    /** A `ch_filings.id` or a `form_d_filings.id`. */
+    recordId: integer("record_id").notNull(),
+    /** For example `ch_allotment_window`. */
+    rule: text("rule").notNull(),
+    recordDate: isoDate("record_date").notNull(),
+    confirmsAmount: boolean("confirms_amount").notNull().default(false),
+    computedAt: createdNow("computed_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.eventId, t.recordKind, t.recordId] }),
+    index("event_confirmations_record_kind_record_id_idx").on(
+      t.recordKind,
+      t.recordId,
+    ),
+  ],
+);
+
+/** Theme sectors, plus SIC sectors for companies with no theme sector. */
+export const companySectors = pgTable(
+  "company_sectors",
+  {
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    /** One of the slugs in `src/core/sectors.ts`, checked in code (the list is append-only). */
+    sector: text("sector").notNull(),
+    source: sectorSource("source").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.companyId, t.sector] }),
+    index("company_sectors_sector_idx").on(t.sector),
+  ],
+);
+
 // Relations
 
 export const sourcesRelations = relations(sources, ({ many }) => ({
   items: many(sourceItems),
   grantProjects: many(grantProjects),
+  formDFilings: many(formDFilings),
 }));
 
 export const sourceItemsRelations = relations(sourceItems, ({ one, many }) => ({
@@ -961,6 +1240,10 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   themes: many(companyThemes),
   location: one(companyLocations),
   grantParticipants: many(grantParticipants),
+  registryLinks: many(registryLinks),
+  registrySearches: many(registrySearches),
+  formDFilings: many(formDFilings),
+  sectors: many(companySectors),
   mergedInto: one(companies, {
     fields: [companies.mergedIntoId],
     references: [companies.id],
@@ -1023,6 +1306,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   recordSources: many(eventRecordSources),
   metricSnapshots: many(launchMetricSnapshots),
   momentum: one(fundingRoundMomentum),
+  confirmations: many(eventConfirmations),
 }));
 
 export const fundingRoundsRelations = relations(fundingRounds, ({ one }) => ({
@@ -1206,3 +1490,60 @@ export const eventRecordSourcesRelations = relations(
     }),
   }),
 );
+
+export const registryLinksRelations = relations(registryLinks, ({ one }) => ({
+  company: one(companies, {
+    fields: [registryLinks.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const registrySearchesRelations = relations(
+  registrySearches,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [registrySearches.companyId],
+      references: [companies.id],
+    }),
+  }),
+);
+
+export const chCompaniesRelations = relations(chCompanies, ({ many }) => ({
+  filings: many(chFilings),
+}));
+
+// No foreign key: a filing may be stored before its profile.
+export const chFilingsRelations = relations(chFilings, ({ one }) => ({
+  chCompany: one(chCompanies, {
+    fields: [chFilings.companyNumber],
+    references: [chCompanies.companyNumber],
+  }),
+}));
+
+export const formDFilingsRelations = relations(formDFilings, ({ one }) => ({
+  source: one(sources, {
+    fields: [formDFilings.sourceId],
+    references: [sources.id],
+  }),
+  company: one(companies, {
+    fields: [formDFilings.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const eventConfirmationsRelations = relations(
+  eventConfirmations,
+  ({ one }) => ({
+    event: one(events, {
+      fields: [eventConfirmations.eventId],
+      references: [events.id],
+    }),
+  }),
+);
+
+export const companySectorsRelations = relations(companySectors, ({ one }) => ({
+  company: one(companies, {
+    fields: [companySectors.companyId],
+    references: [companies.id],
+  }),
+}));
