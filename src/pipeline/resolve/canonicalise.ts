@@ -5,6 +5,7 @@ import type { Db } from "@/db/client";
 import {
   acquisitions,
   eventInvestors,
+  eventRecordSources,
   events,
   eventSources,
   extractions,
@@ -210,9 +211,54 @@ async function rewriteInvestors(
 }
 
 /**
+ * An event from an official record (a grant) has no reports to rebuild from,
+ * so its stored facts stand. Only a missing USD figure is filled in. This is
+ * how the FX step converts a grant amount once a rate is known.
+ */
+async function convertRecordAmount(
+  db: Db,
+  eventId: number,
+  fx: FxLookup,
+): Promise<void> {
+  const [row] = await db
+    .select({
+      announcedOn: events.announcedOn,
+      amountMinor: fundingRounds.amountMinor,
+      currency: fundingRounds.currency,
+      amountUsdMinor: fundingRounds.amountUsdMinor,
+      amountGbpMinor: fundingRounds.amountGbpMinor,
+    })
+    .from(events)
+    .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+    .innerJoin(eventRecordSources, eq(eventRecordSources.eventId, events.id))
+    .where(eq(events.id, eventId))
+    .limit(1);
+  if (
+    !row ||
+    row.amountMinor === null ||
+    row.currency === null ||
+    row.amountUsdMinor !== null
+  ) {
+    return;
+  }
+  const money = { amountMinor: row.amountMinor, currency: row.currency };
+  const converted = await convert(db, money, row.announcedOn, fx);
+  if (converted.usd === null) return;
+  await db
+    .update(fundingRounds)
+    .set({
+      amountUsdMinor: converted.usd,
+      amountGbpMinor: row.amountGbpMinor ?? converted.gbp,
+      fxRateDate: converted.rateDate,
+    })
+    .where(eq(fundingRounds.eventId, eventId));
+}
+
+/**
  * Rebuilds every canonical field from all linked reports, so the result does
  * not depend on arrival order and new evidence can correct old values (D12).
- * An event with no usable report is left for the caller to delete.
+ * An event with no usable report is left for the caller to delete. An event
+ * from an official record keeps its stored facts (see `convertRecordAmount`).
  */
 export async function recomputeEvent(
   db: Db,
@@ -227,6 +273,7 @@ export async function recomputeEvent(
       .update(events)
       .set({ sourceCount: 0, updatedAt: now })
       .where(eq(events.id, eventId));
+    await convertRecordAmount(db, eventId, fx);
     return;
   }
 
@@ -323,7 +370,10 @@ export async function recomputeEventsForCompany(
   for (const row of rows) await recomputeEvent(db, row.id, fx);
 }
 
-/** Removes events left with no reports. Events are derived data (D12). */
+/**
+ * Removes events left with no reports. Events are derived data (D12), except
+ * those linked to an official record, which are always kept.
+ */
 export async function deleteOrphanEvents(
   db: Db,
   eventIds: readonly number[],
@@ -333,7 +383,11 @@ export async function deleteOrphanEvents(
     .selectDistinct({ eventId: eventSources.eventId })
     .from(eventSources)
     .where(inArray(eventSources.eventId, [...eventIds]));
-  const keep = new Set(linked.map((row) => row.eventId));
+  const recorded = await db
+    .selectDistinct({ eventId: eventRecordSources.eventId })
+    .from(eventRecordSources)
+    .where(inArray(eventRecordSources.eventId, [...eventIds]));
+  const keep = new Set([...linked, ...recorded].map((row) => row.eventId));
   const orphans = eventIds.filter((id) => !keep.has(id));
   if (orphans.length === 0) return 0;
   await db.delete(events).where(and(inArray(events.id, orphans)));

@@ -113,3 +113,27 @@ describe("listEnabledSources", () => {
     expect(stored[0]?.lastFetchedAt).toEqual(new Date("2026-03-01T12:00:00Z"));
   });
 });
+
+describe("listEnabledSources with kinds", () => {
+  it("returns only sources of the given kinds", async () => {
+    await upsertSources(db, [
+      sourceConfig({ slug: "feed", name: "Feed", kind: "rss" }),
+      sourceConfig({
+        slug: "ukri-gtr",
+        name: "UKRI Gateway to Research",
+        kind: "ukri_gtr",
+        url: "https://gtr.ukri.org/gtr/api/",
+      }),
+    ]);
+
+    const rss = await listEnabledSources(db, ["rss"]);
+    expect(rss.map((source) => source.config.slug)).toEqual(["feed"]);
+
+    const all = await listEnabledSources(db);
+    expect(all.map((source) => source.config.slug).sort()).toEqual([
+      "feed",
+      "ukri-gtr",
+    ]);
+    expect(await listEnabledSources(db, [])).toEqual([]);
+  });
+});

@@ -61,3 +61,79 @@ Tier counts: 8 at Tier 1, 11 at Tier 2, 4 at Tier 3.
 | `README.md` | 023 |
 
 If a task finds it needs a dependency or a shared file it doesn't own, it stops and reports. The maintainer then adds a small follow-up task.
+
+# Phase 2 tasks
+
+Phase 2 is specified in `docs/spec-phase2.md`. The same rules apply as in Phase 1: one fresh agent per task, in its own worktree; tasks in a wave never touch the same file; start a wave only when every task it depends on is merged to `main`. Use `pnpm ingest`, not `pnpm pipeline` (D31).
+
+**Extraction gate.** Task 024 changes the extraction schema and prompt. Once it is merged and its live eval passes, paid extraction can start on the hosted database. No later Phase 2 task changes extraction.
+
+**Cuttable.** Waves 7 and 8 (Hacker News and GitHub) are optional. Phase 2 is complete without them.
+
+## Waves
+
+| Wave | Task | Tier | Depends on |
+|---|---|---|---|
+| 1 | [024 Extraction v2: region, city and tag guidance](024-extraction-v2.md) **[maintainer]** | 3 | none |
+| 1 | [025 Phase 2 core contracts](025-phase2-contracts.md) | 3 | none |
+| 1 | [026 UK geography: places, postcode districts and regions](026-uk-geography.md) | 2 | none |
+| 2 | [027 Phase 2 database schema and migration](027-phase2-schema.md) | 3 | 025 |
+| 2 | [028 Trend maths: weeks, rising score and company momentum](028-trend-maths.md) | 3 | 025 |
+| 2 | [029 Targeting filter model](029-targeting-filters.md) | 2 | 025, 026 |
+| 2 | [030 Server-rendered chart components](030-chart-components.md) | 2 | none |
+| 3 | [031 Embedding client and tag embedding step](031-tag-embeddings.md) | 2 | 025, 027 |
+| 3 | [032 Theme clustering, assignment and naming](032-themes.md) | 3 | 024, 025, 027 |
+| 3 | [033 Derived stats](033-derived-stats.md) | 3 | 027, 028 |
+| 3 | [035 UKRI Gateway to Research grants collector](035-gtr-collector.md) | 2 | 025, 027 |
+| 3 | [036 Trend read queries and seed data](036-trend-queries.md) | 2 | 027, 028 |
+| 3 | [037 Funding table targeting filters and company momentum queries](037-funding-company-queries.md) | 2 | 027, 029 |
+| 4 | [034 Company locations](034-company-locations.md) | 2 | 024, 026, 027, 033 |
+| 4 | [038 Grant resolution and tagging](038-grant-resolution.md) | 3 | 024, 027, 035 |
+| 4 | [039 Theme clustering eval](039-theme-eval.md) **[maintainer]** | 2 | 031, 032 |
+| 4 | [040 Trends and theme pages](040-trends-theme-pages.md) | 2 | 030, 036, 037 |
+| 4 | [041 Acquisitions and investor activity pages](041-acquisitions-investor-pages.md) | 2 | 030, 036 |
+| 4 | [042 Funding page targeting filters and company momentum](042-funding-targeting-ui.md) | 2 | 029, 030, 037 |
+| 5 | [043 Pipeline integration, CLIs and workflows](043-pipeline-integration.md) | 2 | 031, 032, 033, 034, 035, 038 |
+| 5 | [044 About and status page updates](044-about-status-pages.md) | 1 | 036, 038 |
+| 6 | [045 Phase 2 go-live and real-data review](045-phase2-go-live.md) **[maintainer]** | 1 | 039, 043, 044 |
+| 7 | [046 Hacker News Show HN and Launch HN collector](046-hn-collector.md) _(deferred, D45)_ | 2 | 043 |
+| 8 | [047 GitHub star snapshots](047-github-star-snapshots.md) _(deferred, D45)_ | 2 | 046 |
+
+Tier counts: 2 at Tier 1, 15 at Tier 2, 7 at Tier 3.
+
+Task 034 is numbered with the stats work but runs in wave 4, because it reuses Task 033's diff-write helper.
+
+## Shared-file ownership (Phase 2)
+
+Only the owner may change these files in a given wave. "Then" means a later wave takes over.
+
+| File | Owner task |
+|---|---|
+| `src/core/extraction-schema.ts`, `src/core/json-schema.ts`, `src/core/eval-fixture.ts` | 024 |
+| Every other file in `src/core/**` | 025 |
+| `src/pipeline/extract/prompt.ts`, `extract-item.ts`, `openai-client.ts` | 024 |
+| `src/pipeline/extract/pricing.ts` | 031 |
+| `src/eval/cli.ts` | 024, then 039 |
+| `src/eval/score.ts`, `report.ts`, `recording.ts` | 024 |
+| `docs/eval-results.md` | 024 |
+| `src/lib/geo/**`, `scripts/geo/**` | 026 |
+| `src/lib/funding-filters.ts` | 029 |
+| `src/app/globals.css` | 030 |
+| `src/db/schema.ts`, `drizzle/**`, `scripts/sql/roles.sql` | 027 |
+| `src/pipeline/stats/diff-write.ts`, `fingerprint.ts`, `rebuild-stats.ts` | 033 |
+| `src/pipeline/themes/cluster.ts` | 032, then 039 (only `DEFAULT_THEME_THRESHOLD`) |
+| `src/db/seed-data.ts`, `src/db/seed.ts` | 036 |
+| `src/db/queries/funding.ts`, `src/db/queries/companies.ts` | 037 |
+| `src/db/queries/status.ts` | 044 |
+| `src/pipeline/resolve/event-matcher.ts`, `src/pipeline/resolve/canonicalise.ts` | 038 |
+| `src/components/site-header.tsx` | 040 |
+| `src/app/page.tsx`, `src/components/funding-table.tsx`, `src/components/funding-filters-form.tsx`, `src/app/companies/[slug]/page.tsx` | 042 |
+| `src/pipeline/run.ts`, `src/pipeline/run.test.ts`, `src/pipeline/wiring.ts`, `src/cli/pipeline.ts` | 043, then 046, then 047 (`src/cli/pipeline.ts` only) |
+| `src/pipeline/store/sources.ts`, `src/cli/themes.ts`, `package.json` (scripts) | 043 |
+| `src/pipeline/sources.ts` | 046 |
+| `.github/workflows/ingest.yml`, `docs/deployment.md` | 043 |
+| `.github/workflows/daily.yml` | 043, then 047 |
+| `docs/sources.md` | 026 (wave 1), 035 (wave 3), 046 (wave 7), 047 (wave 8), each in its own section |
+| `docs/spec-phase2.md`, `docs/decisions.md`, `docs/roadmap.md` | The maintainer only |
+
+No Phase 2 task adds a dependency. If one turns out to need one, or a shared file it does not own, it stops and reports, and the maintainer adds a small follow-up task.

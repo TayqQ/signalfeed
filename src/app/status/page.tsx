@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import type { EventType, IngestStatus, SourceItemStatus } from "@/core/enums";
 import { EVENT_TYPES, SOURCE_ITEM_STATUSES } from "@/core/enums";
-import type { IngestRunSummary, StatusSummary } from "@/core/read-models";
-import { getStatusSummary } from "@/db/queries/status";
+import { LLM_PURPOSES, type LlmPurpose } from "@/core/enums";
+import type { IngestRunSummary } from "@/core/read-models";
+import {
+  getStatusSummary,
+  type Phase2Status,
+  type StatusReport,
+} from "@/db/queries/status";
 import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
 import { formatMoneyCompact } from "@/lib/format";
@@ -17,7 +22,7 @@ const FALLBACK_USD_PER_GBP = 1;
 
 export const dynamic = "force-dynamic";
 
-function loadStatus(): Promise<StatusSummary> {
+function loadStatus(): Promise<StatusReport> {
   return cached(() => getStatusSummary(getWebDb()), ["status-summary"], {
     revalidateSeconds: 60,
   });
@@ -137,7 +142,153 @@ function statusBadgeClass(status: IngestStatus): string {
   }
 }
 
-function SpendSection({ summary }: { summary: StatusSummary }) {
+function formatPurpose(purpose: LlmPurpose): string {
+  switch (purpose) {
+    case "extraction":
+      return "Extraction";
+    case "embedding":
+      return "Embedding";
+    case "theme_naming":
+      return "Theme naming";
+    case "tagging":
+      return "Tagging";
+    case "eval":
+      return "Eval";
+    default: {
+      const exhaustive: never = purpose;
+      return exhaustive;
+    }
+  }
+}
+
+function SpendByPurpose({ summary }: { summary: StatusReport }) {
+  const byPurpose = summary.phase2.spendByPurposeUsdMicros;
+  return (
+    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      {LLM_PURPOSES.map((purpose) => (
+        <div
+          key={purpose}
+          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+        >
+          <dt className="text-xs text-zinc-600">{formatPurpose(purpose)}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-zinc-900">
+            {formatUsdFromMicros(byPurpose[purpose])}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function StatGrid({
+  items,
+}: {
+  items: { label: string; value: string | number }[];
+}) {
+  return (
+    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+        >
+          <dt className="text-xs text-zinc-600">{item.label}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-zinc-900">
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function formatWhen(iso: string | null): string {
+  return iso ? formatUtcDateTime(iso) : "Never";
+}
+
+function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
+  const run = phase2.latestGrantsRun;
+  return (
+    <>
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Tags and themes</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Pending tags wait for the next embedding run. Unnamed themes still
+          carry the label of their first tag. Unreviewed themes have not been
+          checked by a person.
+        </p>
+        <StatGrid
+          items={[
+            { label: "Tags embedded", value: phase2.tags.embedded },
+            { label: "Tags pending", value: phase2.tags.pending },
+            { label: "Active themes", value: phase2.themes.active },
+            { label: "Unnamed themes", value: phase2.themes.unnamed },
+            { label: "Unreviewed themes", value: phase2.themes.unreviewed },
+          ]}
+        />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Grants</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Innovate UK projects from UKRI Gateway to Research. Skipped
+          participants have no grant offer or start date. Organisations that may
+          be individuals are never stored.
+        </p>
+        <StatGrid
+          items={[
+            { label: "Grant projects", value: phase2.grants.projects },
+            { label: "Kept", value: phase2.grants.participantsKept },
+            { label: "Skipped", value: phase2.grants.participantsSkipped },
+            {
+              label: "Unresolved",
+              value: phase2.grants.participantsUnresolved,
+            },
+          ]}
+        />
+        {run ? (
+          <p className="mt-3 text-sm text-zinc-700">
+            Latest grants run: {formatUtcDateTime(run.startedAt)} UTC (
+            {formatIngestStatus(run.status).toLowerCase()})
+            {run.collect
+              ? `, ${run.collect.projectsInserted} new projects and ${run.collect.participantsSkipped} participants left out as not organisations`
+              : ""}
+            {run.resolve
+              ? `, ${run.resolve.eventsCreated} grant events created`
+              : ""}
+            .
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-600">
+            The grants collector has not run yet.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Derived data</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Trend figures and locations are rebuilt from stored events. A rebuild
+          is skipped when nothing has changed, so an old time is not a fault.
+        </p>
+        <StatGrid
+          items={[
+            {
+              label: "Trend stats rebuilt (UTC)",
+              value: formatWhen(phase2.statsRebuiltAt),
+            },
+            {
+              label: "Locations rebuilt (UTC)",
+              value: formatWhen(phase2.locationsRebuiltAt),
+            },
+          ]}
+        />
+      </section>
+    </>
+  );
+}
+
+function SpendSection({ summary }: { summary: StatusReport }) {
   const { monthToDateUsdMicros, capGbp } = summary;
   const usdPerGbp = summary.usdPerGbp ?? FALLBACK_USD_PER_GBP;
   const gbpMinor = gbpMinorFromUsdMicros(monthToDateUsdMicros, usdPerGbp);
@@ -179,6 +330,8 @@ function SpendSection({ summary }: { summary: StatusSummary }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      <h3 className="mt-6 text-sm font-medium text-zinc-700">By purpose</h3>
+      <SpendByPurpose summary={summary} />
     </section>
   );
 }
@@ -363,6 +516,7 @@ export default async function StatusPage() {
             labels={eventLabels}
             counts={summary.eventCountsByType}
           />
+          <Phase2Sections phase2={summary.phase2} />
         </>
       ) : null}
     </main>

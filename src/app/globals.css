@@ -47,3 +47,23 @@ summary:focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }
+
+/*
+ * Chart colours. Every fill and stroke is at least 3:1 against the paper
+ * (WCAG 1.4.11); text uses the ink and quiet colours above. The site has one
+ * light theme, so there are no dark overrides. Stacked series also differ by
+ * pattern (solid, stripes, dots, cross-hatch), so colour is never the only cue.
+ */
+:root {
+  --chart-1: #5a82ea;
+  --chart-2: #142a8f;
+  --chart-3: #6a768c;
+  --chart-4: #0f766e;
+  --chart-bar: #1f3fd1;
+  --chart-line: #1f3fd1;
+  --chart-axis: #6a768c;
+  --chart-grid: #d4dae5;
+  --chart-mark: #ffffff;
+  --chart-gap: #f3f5f8;
+  --chart-text: #55627a;
+}

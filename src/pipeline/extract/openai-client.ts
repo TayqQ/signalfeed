@@ -5,7 +5,7 @@ import type {
   LlmCompleteResult,
   LlmTokenUsage,
 } from "@/core/ports";
-import { extractionJsonSchema } from "@/core/extraction-schema";
+import { strictJsonSchema } from "@/core/json-schema";
 import { ExtractionValidationError, type ValidationIssue } from "@/core/errors";
 
 /** Chat Completions surface the adapter needs. Tests inject a fake. */
@@ -108,7 +108,7 @@ export function createOpenAiClient({
           json_schema: {
             name: request.schemaName,
             strict: true,
-            schema: extractionJsonSchema(),
+            schema: strictJsonSchema(request.schema),
           },
         },
         ...(modelSupportsTemperature(model) ? { temperature: 0 } : {}),

@@ -8,6 +8,7 @@ import type {
 import { formatDate, formatRoundType } from "@/lib/format";
 import { serialiseFundingFilters } from "@/lib/funding-filters";
 import { formatLocation } from "@/lib/location";
+import { describeRoundMomentum } from "./company-momentum";
 import { RoundAmount } from "./round-amount";
 
 function effectiveSort(filters: FundingFilters): FundingSort {
@@ -100,7 +101,7 @@ export function FundingTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[780px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[900px] border-collapse text-left text-sm">
         <thead className="border-b-2 border-ink text-quiet">
           <tr>
             <th scope="col" className="py-2 pr-3 font-medium">
@@ -110,6 +111,9 @@ export function FundingTable({
               Round
             </th>
             <SortHeader label="Amount" sort="amount" filters={filters} />
+            <th scope="col" className="px-3 py-2 font-medium">
+              Momentum
+            </th>
             <th scope="col" className="px-3 py-2 font-medium">
               Lead investors
             </th>
@@ -136,7 +140,21 @@ export function FundingTable({
                   ) : null}
                 </td>
                 <td className="whitespace-nowrap px-3 py-3">
-                  {row.roundLabel ?? formatRoundType(row.roundType)}
+                  {row.roundType === "grant" ? (
+                    <>
+                      <span className="border border-ink px-1.5 py-0.5 text-xs font-semibold">
+                        Grant
+                      </span>
+                      {row.roundLabel ? (
+                        <span className="ml-2">{row.roundLabel}</span>
+                      ) : null}
+                      <div className="mt-0.5 text-xs text-quiet">
+                        Source: UKRI
+                      </div>
+                    </>
+                  ) : (
+                    (row.roundLabel ?? formatRoundType(row.roundType))
+                  )}
                 </td>
                 <td className="px-3 py-3">
                   <RoundAmount
@@ -144,6 +162,20 @@ export function FundingTable({
                     amountGbpMinor={row.amountGbpMinor}
                     roundType={row.roundType}
                   />
+                </td>
+                <td className="px-3 py-3 text-xs">
+                  {(() => {
+                    const text = describeRoundMomentum(row.momentum);
+                    return text ? (
+                      text
+                    ) : (
+                      <span className="text-quiet">
+                        {row.roundType === "grant"
+                          ? "Not applicable to grants"
+                          : "Not applicable"}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="px-3 py-3">
                   {row.leadInvestors.length > 0 ? (

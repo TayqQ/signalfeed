@@ -1,0 +1,251 @@
+{
+  "links": null,
+  "ext": null,
+  "page": 1,
+  "size": 3,
+  "totalPages": 1,
+  "totalSize": 3,
+  "project": [
+    {
+      "links": {
+        "link": [
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000001",
+            "rel": "LEAD_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000001",
+            "rel": "PARTICIPANT_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/funds/ffffffff-0000-4000-8000-000000000001",
+            "rel": "FUND",
+            "start": 1782860400000,
+            "end": 1824937200000,
+            "otherAttributes": {}
+          }
+        ]
+      },
+      "ext": null,
+      "id": "11111111-1111-4111-8111-111111111111",
+      "outcomeid": null,
+      "href": "http://gtr.ukri.org/gtr/api/projects/11111111-1111-4111-8111-111111111111",
+      "created": 1788431759000,
+      "updated": null,
+      "identifiers": {
+        "identifier": [
+          {
+            "value": "9000001",
+            "type": "RCUK"
+          }
+        ]
+      },
+      "title": "Invented cyclone cooling study",
+      "status": "Active",
+      "grantCategory": "Collaborative R&D",
+      "leadFunder": "Innovate UK",
+      "leadOrganisationDepartment": null,
+      "abstractText": "A made-up project about cooling industrial equipment with a new design.",
+      "techAbstractText": null,
+      "potentialImpact": null,
+      "researchTopics": {
+        "researchTopic": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "text": "Unclassified",
+            "percentage": null
+          }
+        ]
+      },
+      "start": null,
+      "end": null,
+      "participantValues": {
+        "participant": [
+          {
+            "organisationId": "aaaaaaaa-0000-4000-8000-000000000001",
+            "organisationName": "ACME ROBOTICS LTD",
+            "role": "LEAD_PARTICIPANT",
+            "projectCost": 272582.0,
+            "grantOffer": 182629.94
+          }
+        ]
+      }
+    },
+    {
+      "links": {
+        "link": [
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000002",
+            "rel": "LEAD_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000002",
+            "rel": "PARTICIPANT_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000003",
+            "rel": "PARTICIPANT_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/funds/ffffffff-0000-4000-8000-000000000002",
+            "rel": "FUND",
+            "start": 1782860400000,
+            "end": 1806447600000,
+            "otherAttributes": {}
+          }
+        ]
+      },
+      "ext": null,
+      "id": "22222222-2222-4222-8222-222222222222",
+      "outcomeid": null,
+      "href": "http://gtr.ukri.org/gtr/api/projects/22222222-2222-4222-8222-222222222222",
+      "created": 1788431759000,
+      "updated": null,
+      "identifiers": {
+        "identifier": [
+          {
+            "value": "90000011",
+            "type": "RCUK"
+          }
+        ]
+      },
+      "title": "Invented group data partnership",
+      "status": "Active",
+      "grantCategory": "Collaborative R&D",
+      "leadFunder": "Innovate UK",
+      "leadOrganisationDepartment": null,
+      "abstractText": "A made-up partnership project between two invented companies.",
+      "techAbstractText": null,
+      "potentialImpact": null,
+      "researchTopics": {
+        "researchTopic": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "text": "Unclassified",
+            "percentage": null
+          }
+        ]
+      },
+      "start": null,
+      "end": null,
+      "participantValues": {
+        "participant": [
+          {
+            "organisationId": "aaaaaaaa-0000-4000-8000-000000000002",
+            "organisationName": "EXAMPLE GROUP LIMITED",
+            "role": "LEAD_PARTICIPANT",
+            "projectCost": 99435.0,
+            "grantOffer": 69604.0
+          },
+          {
+            "organisationId": "aaaaaaaa-0000-4000-8000-000000000003",
+            "organisationName": "SAMPLE WIDGETS LIMITED",
+            "role": "PARTICIPANT",
+            "projectCost": 43058.0,
+            "grantOffer": 30141.0
+          }
+        ]
+      }
+    },
+    {
+      "links": {
+        "link": [
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000004",
+            "rel": "LEAD_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000004",
+            "rel": "PARTICIPANT_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/organisations/aaaaaaaa-0000-4000-8000-000000000005",
+            "rel": "PARTICIPANT_ORG",
+            "start": null,
+            "end": null,
+            "otherAttributes": {}
+          },
+          {
+            "href": "http://gtr.ukri.org/gtr/api/funds/ffffffff-0000-4000-8000-000000000003",
+            "rel": "FUND",
+            "start": 1782860400000,
+            "end": 1861833600000,
+            "otherAttributes": {}
+          }
+        ]
+      },
+      "ext": null,
+      "id": "33333333-3333-4333-8333-333333333333",
+      "outcomeid": null,
+      "href": "http://gtr.ukri.org/gtr/api/projects/33333333-3333-4333-8333-333333333333",
+      "created": 1788431759000,
+      "updated": null,
+      "identifiers": {
+        "identifier": [
+          {
+            "value": "9000000",
+            "type": "RCUK"
+          }
+        ]
+      },
+      "title": "Invented university knowledge transfer",
+      "status": "Active",
+      "grantCategory": "Knowledge Transfer Partnership",
+      "leadFunder": "Innovate UK",
+      "leadOrganisationDepartment": null,
+      "abstractText": "A made-up knowledge transfer project led by an invented university.",
+      "techAbstractText": null,
+      "potentialImpact": null,
+      "researchTopics": {
+        "researchTopic": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "text": "Unclassified",
+            "percentage": null
+          }
+        ]
+      },
+      "start": null,
+      "end": null,
+      "participantValues": {
+        "participant": [
+          {
+            "organisationId": "aaaaaaaa-0000-4000-8000-000000000004",
+            "organisationName": "UNIVERSITY OF EXAMPLE",
+            "role": "LEAD_PARTICIPANT",
+            "projectCost": 272582.0,
+            "grantOffer": 182629.94
+          },
+          {
+            "organisationId": "aaaaaaaa-0000-4000-8000-000000000005",
+            "organisationName": "Example Design Studio",
+            "role": "PARTICIPANT",
+            "projectCost": 10000.0,
+            "grantOffer": 5000.0
+          }
+        ]
+      }
+    }
+  ]
+}

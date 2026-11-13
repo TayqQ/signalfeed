@@ -1,4 +1,4 @@
-import type { LlmPurpose, SourceKind } from "./enums";
+import type { LlmPurpose, LocationPrecision, SourceKind } from "./enums";
 
 /** ISO 4217 currency code, upper case (e.g. "GBP", "USD", "EUR"). */
 export type CurrencyCode = string;
@@ -109,13 +109,107 @@ export interface FxStats {
   eventsMissingRate: number;
 }
 
-/** Stored as `ingest_runs.stats`. */
+// Phase 2 step stats (docs/spec-phase2.md section 6).
+
+/** `pnpm ingest grants`: projects and organisations fetched from Gateway to Research. */
+export interface GrantCollectStats {
+  pagesFetched: number;
+  projectsFound: number;
+  projectsInserted: number;
+  participantsInserted: number;
+  /** Participants that are not organisations. They are never stored. */
+  participantsSkipped: number;
+  orgsFetched: number;
+  orgsFailed: number;
+}
+
+/** Grant tagging and resolution, the first Phase 2 step of `pnpm ingest run`. */
+export interface GrantResolveStats {
+  projectsTagged: number;
+  participantsResolved: number;
+  /** Participants with no grant offer or no start date. */
+  participantsSkipped: number;
+  companiesCreated: number;
+  /** Companies found by company number rather than by name. */
+  companiesMatchedByNumber: number;
+  eventsCreated: number;
+  mergeCandidatesCreated: number;
+  /** True when no LLM key is configured: resolution still runs, tagging does not. */
+  taggingSkipped?: boolean;
+  /** True when the budget guard stopped tagging. */
+  budgetPaused?: boolean;
+  /** Set when the provider itself refused (bad key, no credit, outage). */
+  providerError?: string;
+}
+
+export interface EmbedStats {
+  tagsEmbedded: number;
+  batches: number;
+  /** True when no LLM key is configured. */
+  skipped?: boolean;
+  budgetPaused?: boolean;
+  providerError?: string;
+}
+
+/** Theme assignment and naming. */
+export interface ThemeStats {
+  tagsAssigned: number;
+  themesCreated: number;
+  themesNamed: number;
+  /** True when the step did not run, for example after a budget pause upstream. */
+  skipped?: boolean;
+  /** True when no LLM key is configured: assignment runs, naming does not. */
+  namingSkipped?: boolean;
+  budgetPaused?: boolean;
+  providerError?: string;
+}
+
+/** Rows written by a diff rebuild of one derived table. */
+export interface DiffCounts {
+  inserted: number;
+  updated: number;
+  deleted: number;
+}
+
+/** Rebuild of `company_locations`. */
+export interface LocationStats {
+  /** Rows after the rebuild, by precision. Zero when skipped. */
+  rowsByPrecision: Record<LocationPrecision, number>;
+  /** UK city names that matched more than one place. */
+  ambiguousCities: number;
+  /** UK city names that matched no place in the gazetteer. */
+  unmatchedUkCities: number;
+  written: DiffCounts;
+  /** True when the input fingerprint had not changed. Counts are then zero. */
+  skipped?: boolean;
+}
+
+/** Rebuild of the derived stats tables (spec section 5.3). */
+export interface DerivedStats {
+  companyThemes: DiffCounts;
+  themeWeeklyStats: DiffCounts;
+  weeklyTotals: DiffCounts;
+  fundingRoundMomentum: DiffCounts;
+  /** True when the input fingerprint had not changed. Counts are then zero. */
+  skipped?: boolean;
+}
+
+/**
+ * Stored as `ingest_runs.stats`. Phase 2 fields are optional, because runs
+ * stored before Phase 2 do not have them.
+ */
 export interface IngestStats {
   collect: CollectStats;
   prefilter: PrefilterStats;
   extract: ExtractStats;
   resolve: ResolveStats;
   fx: FxStats;
+  grantCollect?: GrantCollectStats;
+  grantResolve?: GrantResolveStats;
+  embed?: EmbedStats;
+  themes?: ThemeStats;
+  locations?: LocationStats;
+  stats?: DerivedStats;
   spendUsdMicros: number;
   monthToDateUsdMicros: number;
   capGbp: number;

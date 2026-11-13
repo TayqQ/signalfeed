@@ -11,6 +11,16 @@ export const EVAL_EXPECTED_EVENT_SCHEMA = z.strictObject({
     .string()
     .regex(/^[A-Z]{2}$/, "Expected an upper-case ISO 3166-1 alpha-2 code")
     .nullable(),
+  /**
+   * Town or city, only when the headline or summary states it. Left out or
+   * null means the text gives none, and the event is not scored on city.
+   */
+  city: z.string().min(1).nullable().optional(),
+  /**
+   * Region, nation or county as the headline or summary states it, such as
+   * "Scottish" or "Yorkshire". Same rule as `city`.
+   */
+  regionText: z.string().min(1).nullable().optional(),
   roundType: z.enum(ROUND_TYPES).nullable(),
   /** Verbatim amount as it appears in the headline or summary. */
   amountText: z.string().nullable(),

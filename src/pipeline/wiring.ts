@@ -3,8 +3,10 @@ import { createPipelineDb } from "@/db/client";
 import { buildUserAgent, createHttpFetcher } from "@/lib/http";
 import { createBudgetGuard } from "./budget/budget-guard";
 import { createRssCollector } from "./collect/rss";
+import { createOpenAiEmbeddingClient } from "./embed/openai-embeddings";
 import { createOpenAiClient } from "./extract/openai-client";
 import { createFrankfurterProvider } from "./fx/frankfurter";
+import { createGtrClient } from "./grants/gtr-client";
 import { dedicatedConnectionLock, type IngestLock } from "./lock";
 import type { PipelineDeps } from "./run";
 
@@ -14,7 +16,10 @@ export interface Wired {
   close: () => Promise<void>;
 }
 
-/** Builds the real implementations. A missing LLM key leaves `llm` null rather than failing. */
+/**
+ * Builds the real implementations. A missing LLM key leaves `llm` and
+ * `embedder` null rather than failing, so paid steps skip and the rest runs.
+ */
 export function createPipelineDeps(env: EnvSource): Wired {
   const parsed = parseNoLlmPipelineEnv(env);
   const { db, close } = createPipelineDb(parsed.DATABASE_URL);
@@ -22,17 +27,26 @@ export function createPipelineDeps(env: EnvSource): Wired {
     userAgent: buildUserAgent(parsed.HTTP_CONTACT),
   });
   const clock = { now: () => new Date() };
+  const apiKey = parsed.OPENAI_API_KEY;
 
   return {
     deps: {
       db,
       collector: createRssCollector(fetcher),
-      llm: parsed.OPENAI_API_KEY
-        ? createOpenAiClient({
-            apiKey: parsed.OPENAI_API_KEY,
-            model: parsed.EXTRACTION_MODEL,
+      llm: apiKey
+        ? createOpenAiClient({ apiKey, model: parsed.EXTRACTION_MODEL })
+        : null,
+      themeCheckLlm:
+        apiKey && parsed.THEME_CHECK_MODEL !== parsed.EXTRACTION_MODEL
+          ? createOpenAiClient({ apiKey, model: parsed.THEME_CHECK_MODEL })
+          : null,
+      embedder: apiKey
+        ? createOpenAiEmbeddingClient({
+            apiKey,
+            model: parsed.EMBEDDING_MODEL,
           })
         : null,
+      gtr: createGtrClient({ http: fetcher }),
       budget: createBudgetGuard({
         db,
         clock,
@@ -42,8 +56,13 @@ export function createPipelineDeps(env: EnvSource): Wired {
       clock,
       config: {
         model: parsed.EXTRACTION_MODEL,
+        themeCheckModel: parsed.THEME_CHECK_MODEL,
         maxExtractionsPerRun: parsed.MAX_EXTRACTIONS_PER_RUN,
         capGbp: parsed.LLM_MONTHLY_CAP_GBP,
+        embeddingModel: parsed.EMBEDDING_MODEL,
+        maxEmbeddingsPerRun: parsed.MAX_EMBEDDINGS_PER_RUN,
+        maxThemeNamesPerRun: parsed.MAX_THEME_NAMES_PER_RUN,
+        maxGrantTaggingsPerRun: parsed.MAX_GRANT_TAGGINGS_PER_RUN,
       },
       log: (message) => console.error(message),
     },

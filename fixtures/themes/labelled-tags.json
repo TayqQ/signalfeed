@@ -1,0 +1,1077 @@
+[
+  {
+    "tag": "ai agents",
+    "group": "ai-agents",
+    "mentions": 58
+  },
+  {
+    "tag": "agentic ai",
+    "group": "ai-agents",
+    "mentions": 51
+  },
+  {
+    "tag": "autonomous agents",
+    "group": "ai-agents",
+    "mentions": 44
+  },
+  {
+    "tag": "ai agent platform",
+    "group": "ai-agents",
+    "mentions": 40
+  },
+  {
+    "tag": "agent orchestration",
+    "group": "ai-agents",
+    "mentions": 33
+  },
+  {
+    "tag": "multi-agent systems",
+    "group": "ai-agents",
+    "mentions": 26
+  },
+  {
+    "tag": "ai copilots",
+    "group": "ai-agents",
+    "mentions": 22
+  },
+  {
+    "tag": "workflow agents",
+    "group": "ai-agents",
+    "mentions": 15
+  },
+  {
+    "tag": "llmops",
+    "group": "llmops",
+    "mentions": 65
+  },
+  {
+    "tag": "llm ops",
+    "group": "llmops",
+    "mentions": 58
+  },
+  {
+    "tag": "model serving",
+    "group": "ai-inference",
+    "mentions": 51
+  },
+  {
+    "tag": "vector database",
+    "group": "ai-retrieval",
+    "mentions": 47
+  },
+  {
+    "tag": "prompt management",
+    "group": "llmops",
+    "mentions": 40
+  },
+  {
+    "tag": "inference optimisation",
+    "group": "ai-inference",
+    "mentions": 33
+  },
+  {
+    "tag": "ai observability",
+    "group": "llmops",
+    "mentions": 29
+  },
+  {
+    "tag": "rag pipelines",
+    "group": "ai-retrieval",
+    "mentions": 22
+  },
+  {
+    "tag": "insurtech",
+    "group": "insurtech",
+    "mentions": 59
+  },
+  {
+    "tag": "digital insurance",
+    "group": "insurtech",
+    "mentions": 52
+  },
+  {
+    "tag": "insurance software",
+    "group": "insurance-software",
+    "mentions": 45
+  },
+  {
+    "tag": "claims automation",
+    "group": "insurance-software",
+    "mentions": 41
+  },
+  {
+    "tag": "underwriting automation",
+    "group": "insurance-software",
+    "mentions": 34
+  },
+  {
+    "tag": "embedded insurance",
+    "group": "embedded-insurance",
+    "mentions": 27
+  },
+  {
+    "tag": "insurance analytics",
+    "group": "insurance-software",
+    "mentions": 23
+  },
+  {
+    "tag": "usage-based insurance",
+    "group": "usage-based-insurance",
+    "mentions": 16
+  },
+  {
+    "tag": "pet insurance",
+    "group": "pet-insurance",
+    "mentions": 66
+  },
+  {
+    "tag": "pet health cover",
+    "group": "pet-insurance",
+    "mentions": 59
+  },
+  {
+    "tag": "veterinary insurance",
+    "group": "pet-insurance",
+    "mentions": 52
+  },
+  {
+    "tag": "cat insurance",
+    "group": "pet-insurance",
+    "mentions": 48
+  },
+  {
+    "tag": "dog insurance",
+    "group": "pet-insurance",
+    "mentions": 41
+  },
+  {
+    "tag": "pet wellness plans",
+    "group": "pet-insurance",
+    "mentions": 34
+  },
+  {
+    "tag": "vet cost cover",
+    "group": "pet-insurance",
+    "mentions": 30
+  },
+  {
+    "tag": "e-commerce",
+    "group": "ecommerce",
+    "mentions": 60
+  },
+  {
+    "tag": "ecommerce",
+    "group": "ecommerce",
+    "mentions": 53
+  },
+  {
+    "tag": "online retail",
+    "group": "ecommerce",
+    "mentions": 46
+  },
+  {
+    "tag": "online shopping",
+    "group": "ecommerce",
+    "mentions": 42
+  },
+  {
+    "tag": "d2c brands",
+    "group": "ecommerce",
+    "mentions": 35
+  },
+  {
+    "tag": "direct-to-consumer",
+    "group": "ecommerce",
+    "mentions": 28
+  },
+  {
+    "tag": "shopify apps",
+    "group": "ecommerce",
+    "mentions": 24
+  },
+  {
+    "tag": "checkout optimisation",
+    "group": "ecommerce",
+    "mentions": 17
+  },
+  {
+    "tag": "payment rails",
+    "group": "payments",
+    "mentions": 67
+  },
+  {
+    "tag": "payments infrastructure",
+    "group": "payments",
+    "mentions": 60
+  },
+  {
+    "tag": "open banking payments",
+    "group": "payments",
+    "mentions": 53
+  },
+  {
+    "tag": "payment processing",
+    "group": "payments",
+    "mentions": 49
+  },
+  {
+    "tag": "cross-border payments",
+    "group": "payments",
+    "mentions": 42
+  },
+  {
+    "tag": "payment orchestration",
+    "group": "payments",
+    "mentions": 35
+  },
+  {
+    "tag": "account-to-account payments",
+    "group": "payments",
+    "mentions": 31
+  },
+  {
+    "tag": "merchant acquiring",
+    "group": "payments",
+    "mentions": 24
+  },
+  {
+    "tag": "neobank",
+    "group": "neobanking",
+    "mentions": 61
+  },
+  {
+    "tag": "digital bank",
+    "group": "neobanking",
+    "mentions": 54
+  },
+  {
+    "tag": "challenger bank",
+    "group": "neobanking",
+    "mentions": 47
+  },
+  {
+    "tag": "mobile banking",
+    "group": "neobanking",
+    "mentions": 43
+  },
+  {
+    "tag": "banking app",
+    "group": "neobanking",
+    "mentions": 36
+  },
+  {
+    "tag": "business current account",
+    "group": "neobanking",
+    "mentions": 29
+  },
+  {
+    "tag": "savings app",
+    "group": "neobanking",
+    "mentions": 25
+  },
+  {
+    "tag": "digital wallet",
+    "group": "payments",
+    "mentions": 18
+  },
+  {
+    "tag": "embedded finance",
+    "group": "embedded-finance",
+    "mentions": 68
+  },
+  {
+    "tag": "banking as a service",
+    "group": "embedded-finance",
+    "mentions": 61
+  },
+  {
+    "tag": "baas",
+    "group": "embedded-finance",
+    "mentions": 54
+  },
+  {
+    "tag": "embedded lending",
+    "group": "embedded-finance",
+    "mentions": 50
+  },
+  {
+    "tag": "white-label banking",
+    "group": "embedded-finance",
+    "mentions": 43
+  },
+  {
+    "tag": "card issuing api",
+    "group": "embedded-finance",
+    "mentions": 36
+  },
+  {
+    "tag": "fintech apis",
+    "group": "embedded-finance",
+    "mentions": 32
+  },
+  {
+    "tag": "buy now pay later",
+    "group": "buy-now-pay-later",
+    "mentions": 25
+  },
+  {
+    "tag": "battery recycling",
+    "group": "battery-recycling",
+    "mentions": 62
+  },
+  {
+    "tag": "battery reuse",
+    "group": "battery-recycling",
+    "mentions": 55
+  },
+  {
+    "tag": "second-life batteries",
+    "group": "battery-recycling",
+    "mentions": 48
+  },
+  {
+    "tag": "lithium recovery",
+    "group": "battery-recycling",
+    "mentions": 44
+  },
+  {
+    "tag": "ev battery recycling",
+    "group": "battery-recycling",
+    "mentions": 37
+  },
+  {
+    "tag": "black mass processing",
+    "group": "battery-recycling",
+    "mentions": 30
+  },
+  {
+    "tag": "battery materials recovery",
+    "group": "battery-recycling",
+    "mentions": 26
+  },
+  {
+    "tag": "battery circularity",
+    "group": "battery-recycling",
+    "mentions": 19
+  },
+  {
+    "tag": "grid storage",
+    "group": "energy-storage",
+    "mentions": 69
+  },
+  {
+    "tag": "battery storage",
+    "group": "energy-storage",
+    "mentions": 62
+  },
+  {
+    "tag": "long-duration storage",
+    "group": "energy-storage",
+    "mentions": 55
+  },
+  {
+    "tag": "energy storage",
+    "group": "energy-storage",
+    "mentions": 51
+  },
+  {
+    "tag": "home batteries",
+    "group": "energy-storage",
+    "mentions": 44
+  },
+  {
+    "tag": "flow batteries",
+    "group": "energy-storage",
+    "mentions": 37
+  },
+  {
+    "tag": "virtual power plant",
+    "group": "grid-flexibility",
+    "mentions": 33
+  },
+  {
+    "tag": "demand response",
+    "group": "grid-flexibility",
+    "mentions": 26
+  },
+  {
+    "tag": "solar panels",
+    "group": "solar",
+    "mentions": 63
+  },
+  {
+    "tag": "solar installation",
+    "group": "solar",
+    "mentions": 56
+  },
+  {
+    "tag": "rooftop solar",
+    "group": "solar",
+    "mentions": 49
+  },
+  {
+    "tag": "solar financing",
+    "group": "solar",
+    "mentions": 45
+  },
+  {
+    "tag": "perovskite solar",
+    "group": "solar",
+    "mentions": 38
+  },
+  {
+    "tag": "solar monitoring",
+    "group": "solar",
+    "mentions": 31
+  },
+  {
+    "tag": "community solar",
+    "group": "solar",
+    "mentions": 27
+  },
+  {
+    "tag": "solar tracking",
+    "group": "solar",
+    "mentions": 20
+  },
+  {
+    "tag": "offshore wind",
+    "group": "wind-energy",
+    "mentions": 70
+  },
+  {
+    "tag": "floating wind",
+    "group": "wind-energy",
+    "mentions": 63
+  },
+  {
+    "tag": "wind turbines",
+    "group": "wind-energy",
+    "mentions": 56
+  },
+  {
+    "tag": "wind farm software",
+    "group": "wind-energy",
+    "mentions": 52
+  },
+  {
+    "tag": "onshore wind",
+    "group": "wind-energy",
+    "mentions": 45
+  },
+  {
+    "tag": "wind blade recycling",
+    "group": "wind-energy",
+    "mentions": 38
+  },
+  {
+    "tag": "turbine maintenance",
+    "group": "wind-energy",
+    "mentions": 34
+  },
+  {
+    "tag": "wind forecasting",
+    "group": "wind-energy",
+    "mentions": 27
+  },
+  {
+    "tag": "digital health",
+    "group": "digital-health",
+    "mentions": 64
+  },
+  {
+    "tag": "telehealth",
+    "group": "telehealth",
+    "mentions": 57
+  },
+  {
+    "tag": "telemedicine",
+    "group": "telehealth",
+    "mentions": 50
+  },
+  {
+    "tag": "remote consultations",
+    "group": "telehealth",
+    "mentions": 46
+  },
+  {
+    "tag": "virtual care",
+    "group": "telehealth",
+    "mentions": 39
+  },
+  {
+    "tag": "online gp",
+    "group": "telehealth",
+    "mentions": 32
+  },
+  {
+    "tag": "remote patient monitoring",
+    "group": "remote-patient-monitoring",
+    "mentions": 28
+  },
+  {
+    "tag": "digital therapeutics",
+    "group": "digital-therapeutics",
+    "mentions": 21
+  },
+  {
+    "tag": "mental health",
+    "group": "mental-health",
+    "mentions": 58
+  },
+  {
+    "tag": "mental wellbeing",
+    "group": "mental-health",
+    "mentions": 51
+  },
+  {
+    "tag": "therapy app",
+    "group": "mental-health",
+    "mentions": 44
+  },
+  {
+    "tag": "cbt app",
+    "group": "mental-health",
+    "mentions": 40
+  },
+  {
+    "tag": "workplace wellbeing",
+    "group": "mental-health",
+    "mentions": 33
+  },
+  {
+    "tag": "mindfulness app",
+    "group": "mental-health",
+    "mentions": 26
+  },
+  {
+    "tag": "employee assistance",
+    "group": "mental-health",
+    "mentions": 22
+  },
+  {
+    "tag": "stress management",
+    "group": "mental-health",
+    "mentions": 15
+  },
+  {
+    "tag": "drug discovery",
+    "group": "drug-discovery",
+    "mentions": 65
+  },
+  {
+    "tag": "ai drug discovery",
+    "group": "drug-discovery",
+    "mentions": 58
+  },
+  {
+    "tag": "protein design",
+    "group": "drug-discovery",
+    "mentions": 51
+  },
+  {
+    "tag": "computational biology",
+    "group": "drug-discovery",
+    "mentions": 47
+  },
+  {
+    "tag": "biologics",
+    "group": "biologics",
+    "mentions": 40
+  },
+  {
+    "tag": "small molecule discovery",
+    "group": "drug-discovery",
+    "mentions": 33
+  },
+  {
+    "tag": "target identification",
+    "group": "drug-discovery",
+    "mentions": 29
+  },
+  {
+    "tag": "preclinical research",
+    "group": "drug-discovery",
+    "mentions": 22
+  },
+  {
+    "tag": "cybersecurity",
+    "group": "cybersecurity",
+    "mentions": 59
+  },
+  {
+    "tag": "cyber security",
+    "group": "cybersecurity",
+    "mentions": 52
+  },
+  {
+    "tag": "threat detection",
+    "group": "cybersecurity",
+    "mentions": 45
+  },
+  {
+    "tag": "endpoint security",
+    "group": "cybersecurity",
+    "mentions": 41
+  },
+  {
+    "tag": "identity security",
+    "group": "cybersecurity",
+    "mentions": 34
+  },
+  {
+    "tag": "zero trust",
+    "group": "cybersecurity",
+    "mentions": 27
+  },
+  {
+    "tag": "security operations",
+    "group": "cybersecurity",
+    "mentions": 23
+  },
+  {
+    "tag": "vulnerability management",
+    "group": "cybersecurity",
+    "mentions": 16
+  },
+  {
+    "tag": "carbon capture",
+    "group": "carbon-removal",
+    "mentions": 66
+  },
+  {
+    "tag": "direct air capture",
+    "group": "carbon-removal",
+    "mentions": 59
+  },
+  {
+    "tag": "carbon removal",
+    "group": "carbon-removal",
+    "mentions": 52
+  },
+  {
+    "tag": "carbon credits",
+    "group": "carbon-markets",
+    "mentions": 48
+  },
+  {
+    "tag": "carbon accounting",
+    "group": "carbon-accounting",
+    "mentions": 41
+  },
+  {
+    "tag": "carbon markets",
+    "group": "carbon-markets",
+    "mentions": 34
+  },
+  {
+    "tag": "emissions tracking",
+    "group": "carbon-accounting",
+    "mentions": 30
+  },
+  {
+    "tag": "net zero software",
+    "group": "carbon-accounting",
+    "mentions": 23
+  },
+  {
+    "tag": "proptech",
+    "group": "proptech",
+    "mentions": 60
+  },
+  {
+    "tag": "property technology",
+    "group": "proptech",
+    "mentions": 53
+  },
+  {
+    "tag": "estate agency software",
+    "group": "home-buying",
+    "mentions": 46
+  },
+  {
+    "tag": "lettings platform",
+    "group": "rentals",
+    "mentions": 42
+  },
+  {
+    "tag": "property management software",
+    "group": "rentals",
+    "mentions": 35
+  },
+  {
+    "tag": "mortgage broker software",
+    "group": "mortgage-software",
+    "mentions": 28
+  },
+  {
+    "tag": "home buying platform",
+    "group": "home-buying",
+    "mentions": 24
+  },
+  {
+    "tag": "rental marketplace",
+    "group": "rentals",
+    "mentions": 17
+  },
+  {
+    "tag": "construction tech",
+    "group": "construction-tech",
+    "mentions": 67
+  },
+  {
+    "tag": "building information modelling",
+    "group": "construction-software",
+    "mentions": 60
+  },
+  {
+    "tag": "modular construction",
+    "group": "modular-construction",
+    "mentions": 53
+  },
+  {
+    "tag": "offsite manufacturing",
+    "group": "modular-construction",
+    "mentions": 49
+  },
+  {
+    "tag": "construction robotics",
+    "group": "construction-robotics",
+    "mentions": 42
+  },
+  {
+    "tag": "site management software",
+    "group": "construction-software",
+    "mentions": 35
+  },
+  {
+    "tag": "low-carbon concrete",
+    "group": "low-carbon-concrete",
+    "mentions": 31
+  },
+  {
+    "tag": "building retrofit",
+    "group": "building-retrofit",
+    "mentions": 24
+  },
+  {
+    "tag": "logistics",
+    "group": "logistics",
+    "mentions": 61
+  },
+  {
+    "tag": "supply chain",
+    "group": "logistics",
+    "mentions": 54
+  },
+  {
+    "tag": "freight forwarding",
+    "group": "freight",
+    "mentions": 47
+  },
+  {
+    "tag": "last-mile delivery",
+    "group": "last-mile-delivery",
+    "mentions": 43
+  },
+  {
+    "tag": "warehouse automation",
+    "group": "warehouse-automation",
+    "mentions": 36
+  },
+  {
+    "tag": "fleet management",
+    "group": "fleet-management",
+    "mentions": 29
+  },
+  {
+    "tag": "shipment tracking",
+    "group": "freight",
+    "mentions": 25
+  },
+  {
+    "tag": "freight marketplace",
+    "group": "freight",
+    "mentions": 18
+  },
+  {
+    "tag": "electric vehicles",
+    "group": "electric-vehicles",
+    "mentions": 68
+  },
+  {
+    "tag": "ev charging",
+    "group": "ev-charging",
+    "mentions": 61
+  },
+  {
+    "tag": "charge point network",
+    "group": "ev-charging",
+    "mentions": 54
+  },
+  {
+    "tag": "electric vans",
+    "group": "electric-vehicles",
+    "mentions": 50
+  },
+  {
+    "tag": "e-bikes",
+    "group": "micromobility",
+    "mentions": 43
+  },
+  {
+    "tag": "micromobility",
+    "group": "micromobility",
+    "mentions": 36
+  },
+  {
+    "tag": "fleet electrification",
+    "group": "electric-vehicles",
+    "mentions": 32
+  },
+  {
+    "tag": "vehicle-to-grid",
+    "group": "ev-charging",
+    "mentions": 25
+  },
+  {
+    "tag": "edtech",
+    "group": "edtech",
+    "mentions": 62
+  },
+  {
+    "tag": "online learning",
+    "group": "online-learning",
+    "mentions": 55
+  },
+  {
+    "tag": "learning platform",
+    "group": "online-learning",
+    "mentions": 48
+  },
+  {
+    "tag": "tutoring marketplace",
+    "group": "tutoring",
+    "mentions": 44
+  },
+  {
+    "tag": "language learning",
+    "group": "language-learning",
+    "mentions": 37
+  },
+  {
+    "tag": "corporate training",
+    "group": "online-learning",
+    "mentions": 30
+  },
+  {
+    "tag": "student assessment",
+    "group": "school-software",
+    "mentions": 26
+  },
+  {
+    "tag": "school software",
+    "group": "school-software",
+    "mentions": 19
+  },
+  {
+    "tag": "food tech",
+    "group": "food-tech",
+    "mentions": 69
+  },
+  {
+    "tag": "alternative protein",
+    "group": "alternative-protein",
+    "mentions": 62
+  },
+  {
+    "tag": "plant-based food",
+    "group": "alternative-protein",
+    "mentions": 55
+  },
+  {
+    "tag": "cultivated meat",
+    "group": "alternative-protein",
+    "mentions": 51
+  },
+  {
+    "tag": "precision fermentation",
+    "group": "alternative-protein",
+    "mentions": 44
+  },
+  {
+    "tag": "food waste",
+    "group": "food-waste",
+    "mentions": 37
+  },
+  {
+    "tag": "meal kits",
+    "group": "meal-kits",
+    "mentions": 33
+  },
+  {
+    "tag": "functional beverages",
+    "group": "functional-beverages",
+    "mentions": 26
+  },
+  {
+    "tag": "agritech",
+    "group": "agritech",
+    "mentions": 63
+  },
+  {
+    "tag": "precision agriculture",
+    "group": "precision-agriculture",
+    "mentions": 56
+  },
+  {
+    "tag": "vertical farming",
+    "group": "vertical-farming",
+    "mentions": 49
+  },
+  {
+    "tag": "crop monitoring",
+    "group": "precision-agriculture",
+    "mentions": 45
+  },
+  {
+    "tag": "farm robotics",
+    "group": "farm-robotics",
+    "mentions": 38
+  },
+  {
+    "tag": "soil health",
+    "group": "soil-health",
+    "mentions": 31
+  },
+  {
+    "tag": "agricultural drones",
+    "group": "precision-agriculture",
+    "mentions": 27
+  },
+  {
+    "tag": "livestock monitoring",
+    "group": "livestock-monitoring",
+    "mentions": 20
+  },
+  {
+    "tag": "space tech",
+    "group": "space-tech",
+    "mentions": 70
+  },
+  {
+    "tag": "satellites",
+    "group": "satellites",
+    "mentions": 63
+  },
+  {
+    "tag": "earth observation",
+    "group": "earth-observation",
+    "mentions": 56
+  },
+  {
+    "tag": "launch vehicles",
+    "group": "launch-vehicles",
+    "mentions": 52
+  },
+  {
+    "tag": "small satellites",
+    "group": "satellites",
+    "mentions": 45
+  },
+  {
+    "tag": "satellite data",
+    "group": "earth-observation",
+    "mentions": 38
+  },
+  {
+    "tag": "space debris",
+    "group": "space-debris",
+    "mentions": 34
+  },
+  {
+    "tag": "orbital logistics",
+    "group": "orbital-logistics",
+    "mentions": 27
+  },
+  {
+    "tag": "quantum computing",
+    "group": "quantum-computing",
+    "mentions": 64
+  },
+  {
+    "tag": "quantum hardware",
+    "group": "quantum-computing",
+    "mentions": 57
+  },
+  {
+    "tag": "quantum software",
+    "group": "quantum-computing",
+    "mentions": 50
+  },
+  {
+    "tag": "qubits",
+    "group": "quantum-computing",
+    "mentions": 46
+  },
+  {
+    "tag": "quantum sensing",
+    "group": "quantum-sensing",
+    "mentions": 39
+  },
+  {
+    "tag": "quantum cryptography",
+    "group": "quantum-cryptography",
+    "mentions": 32
+  },
+  {
+    "tag": "quantum error correction",
+    "group": "quantum-computing",
+    "mentions": 28
+  },
+  {
+    "tag": "photonic computing",
+    "group": "photonic-computing",
+    "mentions": 21
+  },
+  {
+    "tag": "additive manufacturing",
+    "group": "3d-printing",
+    "mentions": 58
+  },
+  {
+    "tag": "3d printing",
+    "group": "3d-printing",
+    "mentions": 51
+  },
+  {
+    "tag": "industrial automation",
+    "group": "industrial-automation",
+    "mentions": 44
+  },
+  {
+    "tag": "robotics",
+    "group": "robotics",
+    "mentions": 40
+  },
+  {
+    "tag": "smart factory",
+    "group": "industrial-automation",
+    "mentions": 33
+  },
+  {
+    "tag": "cobots",
+    "group": "robotics",
+    "mentions": 26
+  },
+  {
+    "tag": "digital twins",
+    "group": "digital-twins",
+    "mentions": 22
+  },
+  {
+    "tag": "predictive maintenance",
+    "group": "predictive-maintenance",
+    "mentions": 15
+  }
+]

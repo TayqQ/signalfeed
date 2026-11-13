@@ -1,0 +1,68 @@
+# Runs the daily jobs: new Innovate UK grants from UKRI Gateway to Research
+# (docs/spec-phase2.md, section 10.2). Collecting grants is free and needs no
+# OPENAI_API_KEY. The hourly run tags and resolves what this collects.
+#
+# It shares the "ingest" concurrency group with the hourly workflow, so the two
+# never overlap. The pipeline's database lock is a second guard.
+#
+# Set the repository variable INGEST_ENABLED to anything but "true" to stop it.
+name: Daily
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  grants:
+    runs-on: ubuntu-latest
+    if: vars.INGEST_ENABLED == 'true'
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      EXTRACTION_MODEL: ${{ vars.EXTRACTION_MODEL }}
+      LLM_MONTHLY_CAP_GBP: ${{ vars.LLM_MONTHLY_CAP_GBP }}
+      HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
+      TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Collect grants
+        run: |
+          set -o pipefail
+          pnpm --silent ingest grants --trigger "$TRIGGER" | tee summary.json
+      - name: Write the step summary
+        if: always()
+        run: |
+          [ -s summary.json ] || exit 0
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("summary.json", "utf8"));
+            const g = s.stats && s.stats.grantCollect;
+            const rows = g
+              ? [
+                  ["Status", s.status],
+                  ["Pages fetched", g.pagesFetched],
+                  ["Projects found", g.projectsFound],
+                  ["New projects", g.projectsInserted],
+                  ["New participants", g.participantsInserted],
+                  ["Participants skipped (not organisations)", g.participantsSkipped],
+                  ["Organisations fetched", g.orgsFetched],
+                  ["Organisations failed", g.orgsFailed],
+                ]
+              : [["Ran", String(s.ran)]];
+            const lines = ["| Step | Result |", "|---|---|", ...rows.map(([a, b]) => `| ${a} | ${b} |`)];
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '

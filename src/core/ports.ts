@@ -50,6 +50,23 @@ export interface LlmClient {
   complete<T>(request: LlmCompleteRequest<T>): Promise<LlmCompleteResult<T>>;
 }
 
+export interface EmbeddingRequest {
+  inputs: string[];
+  dimensions: number;
+}
+
+export interface EmbeddingResult {
+  /** Same order as `inputs`, each of length `dimensions`. */
+  vectors: number[][];
+  usage: { inputTokens: number };
+  model: string;
+}
+
+/** Turns short texts (tag labels) into vectors. Every call goes through `BudgetGuard`. */
+export interface EmbeddingClient {
+  embed(request: EmbeddingRequest): Promise<EmbeddingResult>;
+}
+
 export interface BudgetGuard {
   /** Throws `BudgetExceededError` or `UnknownModelPriceError` if the call must not happen. */
   assertCanSpend(estimate: CostEstimate): Promise<void>;

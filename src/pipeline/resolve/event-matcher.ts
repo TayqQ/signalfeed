@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lte, ne } from "drizzle-orm";
 import type { Money } from "@/core/domain";
 import type { EventType, RoundType } from "@/core/enums";
 import type { Db } from "@/db/client";
@@ -10,6 +10,14 @@ const FUNDING_WINDOW_DAYS = 45;
 const ACQUISITION_WINDOW_DAYS = 60;
 const LAUNCH_WINDOW_DAYS = 14;
 const AMOUNT_TOLERANCE = 0.15;
+
+/**
+ * Events from an official record (grants) are never matched by news reports,
+ * so news can neither overwrite nor absorb them (spec-phase2 section 10.4).
+ */
+function notConfirmed() {
+  return ne(events.evidence, "confirmed");
+}
 
 export interface IncomingEvent {
   type: EventType;
@@ -112,6 +120,7 @@ async function matchFunding(
     .where(
       and(
         eq(events.companyId, incoming.companyId),
+        notConfirmed(),
         gte(events.announcedOn, shiftDays(incoming.date, -FUNDING_WINDOW_DAYS)),
         lte(events.announcedOn, shiftDays(incoming.date, FUNDING_WINDOW_DAYS)),
       ),
@@ -144,6 +153,7 @@ async function matchAcquisition(
     .where(
       and(
         eq(events.companyId, incoming.companyId),
+        notConfirmed(),
         gte(
           events.announcedOn,
           shiftDays(incoming.date, -ACQUISITION_WINDOW_DAYS),
@@ -183,6 +193,7 @@ async function matchLaunch(
     .where(
       and(
         eq(events.companyId, incoming.companyId),
+        notConfirmed(),
         gte(events.announcedOn, shiftDays(incoming.date, -LAUNCH_WINDOW_DAYS)),
         lte(events.announcedOn, shiftDays(incoming.date, LAUNCH_WINDOW_DAYS)),
       ),
@@ -217,7 +228,8 @@ export async function findMatchingEvent(
  * Whether the incoming event confirms a fuzzy company match. Stricter than the
  * event match: for funding, the amounts must agree. A shared round type alone is
  * weak evidence that two similar names are one company, and a wrong merge is
- * harder to undo than a pair left in the review queue (D29).
+ * harder to undo than a pair left in the review queue (D29). Grant events
+ * never corroborate, as they are kept apart from news until Phase 3.
  */
 export function corroboratesFor(
   db: Db,
@@ -244,6 +256,7 @@ export function corroboratesFor(
       .where(
         and(
           eq(events.companyId, candidateCompanyId),
+          notConfirmed(),
           gte(
             events.announcedOn,
             shiftDays(incoming.date, -FUNDING_WINDOW_DAYS),

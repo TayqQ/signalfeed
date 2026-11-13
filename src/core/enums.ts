@@ -8,6 +8,8 @@ export const SOURCE_KINDS = [
   "github",
   "companies_house",
   "sec_edgar",
+  // Phase 2
+  "ukri_gtr",
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 
@@ -84,7 +86,14 @@ export const FOUNDED_YEAR_SOURCES = [
 ] as const;
 export type FoundedYearSource = (typeof FOUNDED_YEAR_SOURCES)[number];
 
-export const LLM_PURPOSES = ["extraction", "embedding", "eval"] as const;
+export const LLM_PURPOSES = [
+  "extraction",
+  "embedding",
+  "eval",
+  // Phase 2
+  "theme_naming",
+  "tagging",
+] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 export const INGEST_TRIGGERS = ["schedule", "manual"] as const;
@@ -108,5 +117,41 @@ export const MERGE_CANDIDATE_STATUSES = [
 ] as const;
 export type MergeCandidateStatus = (typeof MERGE_CANDIDATE_STATUSES)[number];
 
-export const ALIAS_SOURCES = ["extraction", "manual", "merge"] as const;
+export const ALIAS_SOURCES = [
+  "extraction",
+  "manual",
+  "merge",
+  // Phase 2
+  "grant",
+] as const;
 export type AliasSource = (typeof ALIAS_SOURCES)[number];
+
+// Phase 2 enums (docs/spec-phase2.md section 5.1). Append only, as above.
+
+export const THEME_STATUSES = ["active", "merged"] as const;
+export type ThemeStatus = (typeof THEME_STATUSES)[number];
+
+/** `manual` names are never overwritten by the naming step. */
+export const THEME_NAME_SOURCES = ["tag", "llm", "manual"] as const;
+export type ThemeNameSource = (typeof THEME_NAME_SOURCES)[number];
+
+/** `manual` links are never changed by automatic assignment. */
+export const THEME_ASSIGNED_BY = ["auto", "manual"] as const;
+export type ThemeAssignedBy = (typeof THEME_ASSIGNED_BY)[number];
+
+export const LOCATION_PRECISIONS = ["outcode", "town", "region"] as const;
+export type LocationPrecision = (typeof LOCATION_PRECISIONS)[number];
+
+export const LOCATION_SOURCES = [
+  "grant_postcode",
+  "news_city",
+  "news_region",
+] as const;
+export type LocationSource = (typeof LOCATION_SOURCES)[number];
+
+export const GRANT_ROLES = ["lead", "participant"] as const;
+export type GrantRole = (typeof GRANT_ROLES)[number];
+
+/** Official records an event can be linked to through `event_record_sources`. */
+export const RECORD_KINDS = ["ukri_grant"] as const;
+export type RecordKind = (typeof RECORD_KINDS)[number];

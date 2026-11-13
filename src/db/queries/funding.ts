@@ -10,7 +10,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import type { RoundType } from "@/core/enums";
+import type { EvidenceLevel, RoundType } from "@/core/enums";
 import { ROUND_TYPES } from "@/core/enums";
 import type { Money } from "@/core/domain";
 import type {
@@ -19,8 +19,13 @@ import type {
   FundingSort,
   InvestorRef,
   Page,
+  RoundMomentum,
   TagRef,
 } from "@/core/read-models";
+import { effectiveRoundTypes } from "@/lib/funding-filters";
+import { boundingBox } from "@/lib/geo/distance";
+import { findPlaceBySlug, normalisePlaceName } from "@/lib/geo/uk-places";
+import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { normaliseCompanyName } from "@/lib/normalise";
 import { countriesInRegion, REGIONS, type Region } from "@/lib/regions";
 import { SIZE_BAND_RANGES, SIZE_BANDS } from "@/lib/size-bands";
@@ -28,12 +33,16 @@ import type { Db } from "../client";
 import {
   companies,
   companyAliases,
+  companyLocations,
   companyTags,
+  companyThemes,
   eventInvestors,
   events,
+  fundingRoundMomentum,
   fundingRounds,
   investors,
   tags,
+  themes,
 } from "../schema";
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -103,6 +112,181 @@ function regionCodes(regions: readonly string[]): string[] {
   return [...codes];
 }
 
+const DIACRITICS_FROM =
+  "àáâãäåāăąçćčďéèêëēęěìíîïīłñńňòóôõöøōőŕřśšşťùúûüūůűýÿźżž";
+const DIACRITICS_TO =
+  "aaaaaaaaaccc" + "deeeeeeeiiiiilnnn" + "oooooooo" + "rrsssttuuuuuuuyyzzz";
+const EARTH_RADIUS_KM = 6371;
+
+/**
+ * SQL mirror of `normalisePlaceName`: lower case, no diacritics, words
+ * separated by single spaces, and "st" written as "saint".
+ */
+function normalisedCitySql(column: SQL | typeof companies.city): SQL {
+  const from = DIACRITICS_FROM + DIACRITICS_FROM.toUpperCase();
+  const to = DIACRITICS_TO + DIACRITICS_TO.toUpperCase();
+  return sql`regexp_replace(
+    btrim(regexp_replace(
+      lower(translate(
+        replace(replace(replace(${column}, 'ß', 'ss'), 'æ', 'ae'), 'Æ', 'AE'),
+        ${from}, ${to}
+      )),
+      '[^a-z0-9]+', ' ', 'g'
+    )),
+    '\\mst\\M', 'saint', 'g'
+  )`;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+/** Theme and location filters, and momentum (spec sections 9.2 and 8.3). */
+function targetingConditions(filters: FundingFilters): SQL[] {
+  const conditions: SQL[] = [];
+
+  if (filters.themes && filters.themes.length > 0) {
+    const slugs = uniqueStrings(filters.themes);
+    if (slugs.length === 0) {
+      conditions.push(sql`false`);
+    } else {
+      // Resolve merged slugs to their survivors in the same statement.
+      conditions.push(sql`exists (
+        select 1
+        from ${companyThemes}
+        where ${companyThemes.companyId} = ${companies.id}
+          and ${companyThemes.themeId} in (
+            with recursive chain(id, merged_into_id) as (
+              select ${themes.id}, ${themes.mergedIntoId}
+              from ${themes}
+              where ${inArray(themes.slug, slugs)}
+              union
+              select t.id, t.merged_into_id
+              from ${themes} as t
+              inner join chain on t.id = chain.merged_into_id
+            )
+            select id from chain where merged_into_id is null
+          )
+      )`);
+    }
+  }
+
+  if (filters.sectors && filters.sectors.length > 0) {
+    conditions.push(sql`exists (
+      select 1
+      from ${companyThemes}
+      inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
+      where ${companyThemes.companyId} = ${companies.id}
+        and ${inArray(themes.sector, [...filters.sectors])}
+    )`);
+  }
+
+  if (filters.ukRegions && filters.ukRegions.length > 0) {
+    const codes = uniqueStrings(
+      filters.ukRegions.flatMap((slug) => {
+        const region = ukRegionBySlug(slug);
+        return region ? [region.code] : [];
+      }),
+    );
+    conditions.push(
+      codes.length === 0
+        ? sql`false`
+        : sql`exists (
+            select 1
+            from ${companyLocations}
+            where ${companyLocations.companyId} = ${companies.id}
+              and ${inArray(companyLocations.itl1Code, codes)}
+          )`,
+    );
+  }
+
+  if (filters.cities && filters.cities.length > 0) {
+    const alternatives: SQL[] = [];
+    for (const value of uniqueStrings(filters.cities)) {
+      if (findPlaceBySlug(value)) {
+        alternatives.push(sql`exists (
+          select 1
+          from ${companyLocations}
+          where ${companyLocations.companyId} = ${companies.id}
+            and ${companyLocations.placeSlug} = ${value}
+        )`);
+        continue;
+      }
+      const name = normalisePlaceName(value);
+      if (name.length === 0) continue;
+      alternatives.push(sql`${normalisedCitySql(companies.city)} = ${name}`);
+    }
+    const any = or(...alternatives);
+    conditions.push(any ? sql`(${any})` : sql`false`);
+  }
+
+  if (filters.near) {
+    const place = findPlaceBySlug(filters.near.placeSlug);
+    const km = filters.near.km;
+    if (!place || !Number.isFinite(km) || km < 0) {
+      conditions.push(sql`false`);
+    } else {
+      const box = boundingBox({ lat: place.lat, lon: place.lon }, km);
+      const lat = sql`${companyLocations.latitude}::float8`;
+      const lon = sql`${companyLocations.longitude}::float8`;
+      // Bounding box first, so the index narrows rows before the exact test.
+      conditions.push(sql`exists (
+        select 1
+        from ${companyLocations}
+        where ${companyLocations.companyId} = ${companies.id}
+          and ${companyLocations.latitude} is not null
+          and ${companyLocations.longitude} is not null
+          and ${companyLocations.latitude} between ${box.minLat} and ${box.maxLat}
+          and ${companyLocations.longitude} between ${box.minLon} and ${box.maxLon}
+          and ${2 * EARTH_RADIUS_KM} * asin(least(1, sqrt(
+            power(sin(radians(${lat} - ${place.lat}) / 2), 2)
+            + cos(radians(${place.lat})) * cos(radians(${lat}))
+              * power(sin(radians(${lon} - ${place.lon}) / 2), 2)
+          ))) <= ${km}
+      )`);
+    }
+  }
+
+  if (filters.momentum === "first") {
+    conditions.push(sql`exists (
+      select 1
+      from ${fundingRoundMomentum}
+      where ${fundingRoundMomentum.eventId} = ${events.id}
+        and ${fundingRoundMomentum.equityRoundNumber} = 1
+    )`);
+  } else if (filters.momentum === "repeat") {
+    conditions.push(sql`exists (
+      select 1
+      from ${fundingRoundMomentum}
+      where ${fundingRoundMomentum.eventId} = ${events.id}
+        and ${fundingRoundMomentum.equityRoundNumber} > 1
+        and ${fundingRoundMomentum.monthsSincePrevious} <= 24
+    )`);
+  }
+
+  return conditions;
+}
+
+function momentumSql(): SQL<unknown> {
+  return sql<unknown>`(
+    select json_build_object(
+      'equityRoundNumber', ${fundingRoundMomentum.equityRoundNumber},
+      'monthsSincePrevious', ${fundingRoundMomentum.monthsSincePrevious},
+      'stepUpRatio', ${fundingRoundMomentum.stepUpRatio},
+      'stepUpBasisOn', case
+        when ${fundingRoundMomentum.stepUpRatio} is null then null
+        else (
+          select basis.announced_on
+          from ${events} as basis
+          where basis.id = ${fundingRoundMomentum.stepUpBasisEventId}
+        )
+      end
+    )
+    from ${fundingRoundMomentum}
+    where ${fundingRoundMomentum.eventId} = ${events.id}
+  )`;
+}
+
 function fundingWhere(filters: FundingFilters, query: string | null): SQL {
   const conditions: SQL[] = [
     eq(events.type, "funding_round"),
@@ -111,14 +295,11 @@ function fundingWhere(filters: FundingFilters, query: string | null): SQL {
 
   if (query) conditions.push(textMatch(query));
 
-  if (filters.roundTypes && filters.roundTypes.length > 0) {
-    const rounds = filters.roundTypes.filter(isRoundType);
-    conditions.push(
-      rounds.length === 0
-        ? sql`false`
-        : inArray(fundingRounds.roundType, rounds),
-    );
-  }
+  // Grants are hidden unless `grant` is selected (D44).
+  const rounds = effectiveRoundTypes(filters).filter(isRoundType);
+  conditions.push(
+    rounds.length === 0 ? sql`false` : inArray(fundingRounds.roundType, rounds),
+  );
 
   if (filters.regions && filters.regions.length > 0) {
     const codes = regionCodes(filters.regions);
@@ -191,6 +372,8 @@ function fundingWhere(filters: FundingFilters, query: string | null): SQL {
       ranges.length === 0 ? sql`false` : (or(...ranges) ?? sql`false`),
     );
   }
+
+  conditions.push(...targetingConditions(filters));
 
   const where = and(...conditions);
   if (!where) throw new Error("Funding query is missing a filter");
@@ -295,6 +478,8 @@ export interface FundingRowSource {
   leadInvestors: unknown;
   investorCount: unknown;
   tags: unknown;
+  momentum: unknown;
+  evidence: EvidenceLevel;
 }
 
 export function fundingColumns() {
@@ -315,6 +500,8 @@ export function fundingColumns() {
     leadInvestors: leadInvestorsSql(),
     investorCount: investorCountSql(),
     tags: tagsSql(),
+    momentum: momentumSql(),
+    evidence: events.evidence,
   };
 }
 
@@ -385,6 +572,30 @@ function money(amount: unknown, currency: string | null): Money | null {
   return { amountMinor, currency: code };
 }
 
+function num(value: unknown): number | null {
+  if (value == null) return null;
+  const n = typeof value === "string" ? Number(value) : value;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+/** Equity rounds only; debt and grant rounds have no momentum row. */
+export function readMomentum(value: unknown): RoundMomentum | null {
+  const parsed = typeof value === "string" ? parseJson(value) : value;
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const item = parsed as Record<string, unknown>;
+  const number = num(item.equityRoundNumber);
+  if (number == null) return null;
+  const basis = item.stepUpBasisOn;
+  return {
+    equityRoundNumber: number,
+    monthsSincePrevious: num(item.monthsSincePrevious),
+    stepUpRatio: num(item.stepUpRatio),
+    stepUpBasisOn: typeof basis === "string" ? basis.slice(0, 10) : null,
+  };
+}
+
 export function toFundingRow(row: FundingRowSource): FundingRow {
   return {
     eventId: row.eventId,
@@ -402,7 +613,41 @@ export function toFundingRow(row: FundingRowSource): FundingRow {
     investorCount: asCount(row.investorCount),
     sourceCount: asCount(row.sourceCount),
     tags: readTagRefs(row.tags),
+    momentum: readMomentum(row.momentum),
+    evidence: row.evidence,
   };
+}
+
+/**
+ * How many companies in these results have no coordinates, so a `near` filter
+ * drops them. Counts the results as they would be without `near`.
+ */
+export async function countUnlocatedCompanies(
+  db: Db,
+  filters: FundingFilters,
+): Promise<number> {
+  const where = fundingWhere(
+    { ...filters, near: undefined },
+    normalisedQuery(filters.q),
+  );
+  const [counted] = await db
+    .select({ total: sql<number>`count(distinct ${companies.id})::int` })
+    .from(events)
+    .innerJoin(companies, eq(companies.id, events.companyId))
+    .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+    .where(
+      and(
+        where,
+        sql`not exists (
+          select 1
+          from ${companyLocations}
+          where ${companyLocations.companyId} = ${companies.id}
+            and ${companyLocations.latitude} is not null
+            and ${companyLocations.longitude} is not null
+        )`,
+      ),
+    );
+  return asCount(counted?.total);
 }
 
 export async function listFundingRounds(

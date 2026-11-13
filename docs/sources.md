@@ -307,3 +307,85 @@ Copied into code by Task 006.
 - GitHub Actions billing: https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions
 - SEC EDGAR access: https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
 - Companies House rate limits: https://developer-specs.company-information.service.gov.uk/guides/rateLimiting
+
+---
+
+# Phase 2 sources (planning pass)
+
+Verification date: **11 November 2026** (UTC). Methods: live requests to the APIs and vendor or publisher pages linked below. Assumption numbers are those in `docs/spec-phase2.md` section 15. Tasks 026, 035, 046 and 047 re-check their rows and add their own sections below.
+
+## A15 — OpenAI embeddings
+
+**Status: confirmed**
+
+| Model | Price / 1M input tokens | Notes |
+|-------|-------------------------|-------|
+| `text-embedding-3-small` | **$0.02** | Chosen. `dimensions: 512` supported (A10) |
+| `text-embedding-3-large` | $0.13 | Not needed for short tags |
+| `text-embedding-ada-002` | $0.10 | Older, no `dimensions` parameter |
+
+`gpt-5.6-luna` rechecked at the same time: $0.20 input, $1.20 output per M tokens (Batch API $0.10 / $0.60). No batch price is listed for embeddings. Source: [API pricing](https://developers.openai.com/api/docs/pricing).
+
+## A16-A19 — UKRI Gateway to Research (GtR)
+
+**Status: confirmed for the legacy API; the new API is not yet usable. Re-checked 11 Nov 2026 in Task 035.**
+
+| Item | Fact | Source |
+|------|------|--------|
+| Legacy API | `https://gtr.ukri.org/gtr/api/` answers JSON with no key. `projects.json?q=Innovate%20UK&f=pro.lf&sf=pro.sd&so=D&s=100` returned 200 with `totalSize` 33,170, newest start first | Live request, 11 Nov 2026 |
+| Page size | `s=100` works; `s=200` returns HTTP 400 | Live request |
+| Project fields | `id`, `title`, `status`, `grantCategory` (for example "Collaborative R&D", "Investment Accelerator", "Vouchers"), `leadFunder` ("Innovate UK"), `abstractText`, `researchTopics` (mostly "Unclassified" for Innovate UK), `participantValues.participant[]` with `organisationId`, `organisationName`, `role`, `projectCost`, `grantOffer`; links `LEAD_ORG`, `PARTICIPANT_ORG`, `FUND` (with start and end in ms) | Live request |
+| Organisation fields | `name`, `regNumber` (often null), `website`, `addresses.address[]` with `postCode`, `region` (for example "North West"), `type` (`MAIN_ADDRESS`) | `organisations/{id}`, live request |
+| Fund fields | `valuePounds.amount`, `currencyCode` GBP, `start`, `end`, `category` | `funds/{id}`, live request |
+| New API | Documented under `/api/content/search/project?term=*`, but that URL returned 404 on 11 Nov 2026. The page says "If you use the previous API, you will need to update your tools" and that changes will be announced in advance | [GTR API](https://gtr.ukri.org/resources/api.html), [Getting started](https://gtr.ukri.org/find-research-and-innovation/getting-started-with-the-gtr-api) |
+| Access and terms (A17) | API page: anyone can use it, for any purpose, free; no key or account. The GtR terms page refers to the Open Government Licence (linking v2) for the site and code, and restricts reproducing documents and images for commercial purposes without permission. **Confirm commercial reuse of the data with `gateway@ukri.org` before Phase 4** | [GTR API](https://gtr.ukri.org/resources/api.html), [Terms of use for GtR](https://gtr.ukri.org/terms-of-use-for-gtr) |
+| Rate limit (A18) | "10 requests upon the GTR API per second per user", marked "[Frequency to be confirmed]"; excess requests are queued and may time out | [GTR API](https://gtr.ukri.org/resources/api.html) |
+| Updates (A19) | Project data monthly, outcomes annually | [Data updates](https://gtr.ukri.org/find-research-and-innovation/data-updates) |
+| Coverage | UKRI projects starting on or after 1 January 2006, including Innovate UK. Innovate UK grant offers are only the Innovate UK-funded part. Region is based on the postcode | [Understanding the data](https://gtr.ukri.org/find-research-and-innovation/understanding-the-data-on-gtr) |
+| Personal data | GtR publishes people linked to projects, with no unique identifiers. SignalFeed never calls person endpoints and stores organisations only | Same |
+| Bulk download | JSON Lines (885 MB zip) or SQLite (1.3 GB zip). Too large for scheduled runs | [Bulk download](https://gtr.ukri.org/find-research-and-innovation/bulk-download) |
+
+**Task 035 re-check and results (11 Nov 2026, 9 requests in all, at most 1 a second)**
+
+- The legacy API still answers (HTTP 200, `totalSize` 33,170, 332 pages of 100). No deprecation or sunset header. The new `/api/content/search/project?term=*` URL still returns 404, so the legacy API stays in use. The base URL is one constant in `src/pipeline/grants/gtr-client.ts`.
+- A page past the end (`p=99999`) returns HTTP 500, not an empty list. The collector stops on `totalPages` and on the 3-seen-pages rule, so it never asks for one.
+- Fund dates are midnight in London. A summer start such as 1 July arrives as 23:00 UTC on 30 June, so the collector reads them in London time. Project `start` and `end` are null; the dates are on the `FUND` link.
+- Roles seen: `LEAD_PARTICIPANT` and `PARTICIPANT`. Statuses seen: `Active`. The project link list includes person links (`PM_PER`); they are ignored and never requested.
+- The `gtr.ukri.org/project/{id}` site address answers 308 (a redirect). Its final target was not followed. `grant_projects.gtr_url` uses that address; check it opens before the UI links to it.
+- **A29/A30 were not measured with the full run.** The task asks for `--since 2026-06-01 --max-pages 5` against a local database, which needs about 5 page requests and hundreds of organisation requests. The Task 035 limit was about 10 requests, so the measurement is left for a run by hand (Task 043 adds the CLI).
+- What was measured from page 1 alone (100 projects, 130 participants): 67 participants have a company form in the name and are kept, 63 are skipped (universities, councils, and names with no company form). Of 4 organisations fetched as a sample, all 4 had `regNumber` null, and the 3 with a postcode checked all had a valid main-address postcode and region. Too small to give a share.
+- Limit of the rule: `regNumber` is only known after the organisation fetch, so a participant with no company form in its name is skipped even if it has a registration number. Real companies without "Ltd" (for example a trading name) are lost. Fixing it would mean fetching organisations for every skipped participant, including people's names, which D19 rules out.
+
+## A20 — Innovate UK funded-projects spreadsheets (not used)
+
+**Status: confirmed, rejected as a source**
+
+- Two `.xlsx` files (8 MB for 2004 to 2015-16, 24 MB for 2016-17 onwards), last updated 3 November 2026 at irregular intervals. [Innovate UK funded projects since 2004](https://www.ukri.org/publications/innovate-uk-funded-projects-since-2004/).
+- A third-party data dictionary lists columns including `EnterpriseSize`, `Postcode`, `Sector`, `AwardOffered` and `ParticipantName`. [The Data City dictionary](https://docs.thedatacity.com/data-dictionary/innovate-uk-funding-clean).
+- ukri.org says most of its content is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0. [UKRI terms of use](https://www.ukri.org/who-we-are/terms-of-use/). That would block Phase 4 commercial use, so the GtR API is used instead.
+
+## A21-A23 — UK geography (verified in Task 026)
+
+**Status: confirmed, with Northern Ireland postcodes left out.** Checked on 11 Nov 2026. Everything committed comes from sources under the Open Government Licence v3.0 (OGL).
+
+| Item | Fact | Source |
+|------|------|--------|
+| GB places (A21), used | OS Open Names, release 2026-10, GB, CSV (103 MB zip). `LOCAL_TYPE` City (71) and Town (1,355) carry name, BNG coordinates, county or council area and `REGION`. English names with Welsh or Gaelic as a second name. No population field, so the band comes from postcode counts (see below). The `licence.txt` in the zip points to `os.uk/opendata/licence`, which redirects to OGL v3.0. Attribution wording in the zip: "Contains OS data © Crown Copyright and database rights 2026. Contains Royal Mail data © Royal Mail copyright and database right 2026. Contains National Statistics data © Crown copyright and database right 2026." | [OS Open Names](https://docs.os.uk/os-downloads/products/addresses-and-names-portfolio/os-open-names/os-open-names-overview), [download API](https://api.os.uk/downloads/v1/products/OpenNames), [OS OpenData licence](http://os.uk/opendata/licence) |
+| GB places, not used | ONS Index of Place Names (July 2024). The portal default is OGL v3.0, but one catalogue entry says "No Licence Provided". Open Names is clearer on licence and has the postcode records that give each place a size and each outcode its ITL1 area | [Index of Place Names July 2024](https://ckan.publishing.service.gov.uk/dataset/index-of-place-names-july-2024-in-gb) |
+| NI places (A21) | NISRA Settlement Development Limits 2015, GeoJSON of 527 settlement boundaries in Irish Grid, with `Band` (A to H) and occupied households (`OccHH_ex`). The dataset is listed as `uk-ogl` (UK Open Government Licence). There is no centroid or population field, so the script takes the area-weighted centroid of the outlines and estimates residents as 2.4 per household. Bands A to F (68 settlements, minus the three "Metropolitan" sub-areas of Belfast) are kept as towns | [Settlement Development Limits 2015 (OpenDataNI)](https://www.opendatani.gov.uk/dataset/settlement-development-limits-2015), [CKAN record](https://admin.opendatani.gov.uk/api/3/action/package_show?id=settlement-development-limits-2015), [NISRA urban-rural geography](https://www.nisra.gov.uk/publications/urban-rural-geography-documents-2015) |
+| GB postcode districts (A22), used | Code-Point Open, release 2026-11, GB, CSV (14 MB zip, about 1.7 million postcode units with eastings and northings). The `licence.txt` in the zip points to the OS OpenData licence (OGL v3.0). Attribution wording in the zip: "Contains Ordnance Survey data © Crown copyright and database right 2026. Contains Royal Mail data © Royal Mail copyright and database right 2026. Contains National Statistics data © Crown copyright and database right 2026." The outcode centroid is the mean of its units. ITL1 comes from the most common `REGION` or `COUNTRY` of that outcode's postcode records in Open Names | [Code-Point Open](https://docs.os.uk/os-downloads/products/areas-and-zones-portfolio/code-point-open/code-point-open-overview), [download API](https://api.os.uk/downloads/v1/products/CodePointOpen) |
+| NI postcodes (A22), not used | Code-Point Open covers Great Britain only. The ONS Postcode Directory includes BT postcodes, but ONS issues them only under a Northern Ireland End User Licence for internal business use. External commercial use needs a licence from Land and Property Services, with the extra credit "Contains Land and Property Services data © Crown copyright and database right". That is not open for commercial reuse, so no BT centroids are committed. `outcodeItl1("BT1")` still returns `TLN`, because "BT means Northern Ireland" is a fact, not licensed data | [ONS geography licences](https://www.ons.gov.uk/methodology/geography/licences), [postcodes.io licences](https://postcodes.io/docs/licences/) |
+| ITL1 (A23) | January 2025 codes TLC to TLN, 12 areas, TLN is Northern Ireland. ONS spells some names "North East (England)" and "East (England)"; the spec names are used, and `ukRegionFromGtrName` accepts both. The data.gov.uk page shows "Licence: Not set"; the site says its content is under OGL v3.0 unless stated, and ONS Open Geography data is published under OGL. Only the 12 codes and names are used | [ITL1 January 2025 names and codes](https://www.data.gov.uk/dataset/international-territorial-levels-level-1-january-2025-names-and-codes-in-the-uk), checked against the ONS ArcGIS service `ITL1_JAN_2025_UK_BGC` |
+| Population band (derived) | GB: postcode units whose populated place is the town, times 39 residents (about 67M / 1.7M). NI: households times 2.4. Bands: 1 under 10k, 2 from 10k, 3 from 25k, 4 from 100k, 5 from 250k, 6 from 1M. It is an estimate for ranking places, not a census count. The census-based Newport (Wales) lands in band 4 and Newport (Isle of Wight) in band 3, so "Newport" stays ambiguous | `scripts/geo/build-uk-geo.ts` |
+| Coordinates | British and Irish National Grid converted to WGS84 with a seven-parameter Helmert transform (about 5 m, no OSTN15 grid). Checked against Leeds, Belfast and Cardiff centres | `scripts/geo/build-uk-geo.ts` |
+| Attribution to show (A26 style notice) | "Contains OS data © Crown copyright and database right 2026. Contains Royal Mail data © Royal Mail copyright and database right 2026. Contains National Statistics data © Crown copyright and database right 2026. Contains public sector information licensed under the Open Government Licence v3.0 (NISRA settlements)." Put it on the About page (Task 044) | Licence files above |
+
+Not committed to the repo: the downloads. Only `src/lib/geo/uk-places.json` (1,489 places, 241 KB) and `src/lib/geo/uk-outcodes.json` (2,863 GB outcodes, 104 KB) are. Steps to rebuild are in `scripts/geo/README.md`.
+
+## A24 — Hacker News Algolia (Phase 2 use)
+
+**Status: partly confirmed** (see also A4). `search_by_date?tags=show_hn` and `query="Launch HN"&tags=story` return hits (1,226 Launch HN stories on 11 Nov 2026). Hits include `author`, which SignalFeed must not store. The rate limit is to be checked in Task 046.
+
+## A25 — Y Combinator directory
+
+**Status: unchanged.** `yc-oss/api` still has no licence (GitHub API `license: null`, last push 11 Nov 2026). No collector is planned.
