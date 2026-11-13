@@ -262,3 +262,59 @@ Each entry records the decision, the alternatives considered, and why. New decis
 
 **Cost.** About 3p a month for the theme check. The whole pipeline is expected to stay under £1 a month inside the £3 cap.
 
+
+## D51. Phase 3 scope: Companies House first, Form D to confirm, no events from filings alone (planning, 12 November 2026)
+- **Chosen:** Companies House linking and company facts come first, because they serve the paying user (small UK agencies and recruiters). SEC Form D is collected to confirm US news rounds and link CIKs. A news round becomes `confirmed` when a filing matches it. Filings never create events on their own in Phase 3: not Form D, not SH01. No extraction change and no paid calls, except the cuttable Task 067.
+- **Alternatives:** events for every Form D issuer (about 17,000 non-fund offerings a year, mostly not startups: real estate, oil and gas, local businesses); events from every SH01 (option exercises, conversions and share-for-share exchanges look the same in the metadata).
+- **Why:** both alternatives would fill the site with things that are not startup raises, and telling them apart needs judgement the data does not support. Stored Form D filings let the go-live review measure how many young tech and health issuers news misses, so the question can be decided on numbers (spec-phase3 section 13.3).
+
+## D52. Companies House through the REST API, not the bulk snapshot or the stream
+- **Chosen:** the public data API with a free key, at no more than 500 requests in five minutes (the limit is 600). Profiles refresh every 90 days, weekly for companies with a recent unconfirmed round.
+- **Alternatives:** the free company data product (a monthly 471 MB zip of CSV, live companies only, no licence on the page); the streaming API (two connections at most, every change on the register).
+- **Why:** SignalFeed needs a few thousand companies, about 3,500 requests a month after a one-off backfill of about 30,000. The snapshot would need unzipping and parsing 5 million rows a month to use a few thousand, and lacks dissolved companies and filing history. The stream suits whole-register mirrors. A shared-address count, which the snapshot could have given, comes from the advanced search instead (A37), with a fallback.
+
+## D53. Registry links: exact name plus a supporting fact, or no link
+- **Chosen:** a company is linked automatically only when exactly one registry company matches its name exactly (or by a previous name), nothing conflicts (incorporated after the first event, dissolved before the last, dormant through a round, no share capital, founded year more than 2 years off), and at least one fact supports it: the grant postcode, a registered office within 25 km of its known town, or an SH01 within 120 days before to 30 days after a reported round. A trading-name prefix match needs both the location and the filing. Everything else is a review candidate or unlinked. Manual decisions are final. A number wanted by two companies makes a merge candidate. Rules are pure functions with a labelled eval that must show no wrong automatic link.
+- **Alternatives:** take the top search result; fuzzy name similarity; an LLM judge; officer names as evidence.
+- **Why:** a wrong link puts another company's age, status and size on a real company's page, and nobody would notice. A missed link only leaves a gap. Short brand names often match an unrelated old company ("Nova Ltd"), so a name alone is never enough. Officer names would help but are personal data (D58). Fuzzy and LLM matching are harder to explain and test, and the review queue already covers the hard cases (D11).
+
+## D54. "Confirmed" means a record shows the event happened; it is derived
+- **Chosen:** a news round is `confirmed` when a matching SH01 or Form D exists in its date window. Amounts, round type and investors stay as reported; `confirms_amount` says when a Form D amount agrees. Confirmations live in a derived table rebuilt by the hourly run, and `events.evidence` follows it. The Phase 2 guard that protected grant events by `evidence = confirmed` changes to "has an `event_record_sources` row" before any news event can be confirmed.
+- **Alternatives:** overwrite amounts and dates from the filing; a separate "verified" column; keep the old guard.
+- **Why:** SH01 metadata cannot give the amount raised, and Form D amounts are often the whole offering, so replacing news facts would make them worse as often as better. The marker says exactly what the record shows. Deriving confirmations keeps them correct when events are re-extracted or merged (D12, D37). Keeping the old guard would stop later news reports from matching a confirmed round and create duplicates.
+
+## D55. SH01: metadata only; reading the documents is deferred
+- **Chosen:** Phase 3 stores SH01 filing metadata (allotment date, statement of capital), which is free and enough to confirm that shares were issued. Reading the amount from the PDF is Task 067, a cuttable last wave that first measures a vision model against Tesseract OCR on 30 labelled documents. Recommended to defer.
+- **Why:** the PDFs are images, so reading them needs OCR or a vision model. A vision read costs about 0.2p a document on `gpt-5.6-luna` if it accepts images (A43). That is under £0.10 a month for documents that confirm news rounds, but £0.75-£1.50 a month for every SH01 of every linked company, most of the £1 normal budget, and then the hardest question remains: was the allotment a raise at all? Accuracy is unmeasured. The pages SignalFeed would send must exclude the presenter's contact details.
+
+## D56. News reports of a grant attach to the grant event
+- **Chosen:** in the resolve step, a news funding round of type `grant` attaches to the company's grant event when the date is within 180 days before to 60 days after the grant start and the amount is within 15% of the grant offer or the project cost (or there is no amount and only one grant in the window). The grant keeps its record facts; reports add headlines and investors. A one-off relink fixes reports stored before Phase 3.
+- **Alternatives:** keep two events and hide one in every query; merge the grant into the news event.
+- **Why:** hiding duplicates would touch every read query and every stats table. Merging into the news event would lose the official amount and date. News often reports the whole project cost, so both figures are compared.
+
+## D57. Registry facts fill gaps; they never overwrite news
+- **Chosen:** the incorporation year fills `founded_year` only when it is empty (source `companies_house`, or `sec_form_d` from a Form D). Registry status is shown from the registry table and never written to `companies.status`. SIC codes give sectors only to companies with no theme sector. The registered office gives a location only when no news town is known, the postcode is not shared by 20 or more active companies, and it agrees with any region the news states.
+- **Alternatives:** the registry always wins; SIC sectors added to theme sectors; the registered office ahead of the news town.
+- **Why:** a company often incorporates a new holding company for a round, so its incorporation date can be years after it was founded. Tech startups pick generic SIC codes (`62020`, `70229`), which would blur sector filters that themes already answer. Registered offices are often a formation agent or accountant in another city. Keeping each fact where it is most reliable, and showing the registry facts beside the news ones, makes conflicts visible instead of hiding them.
+
+## D58. No personal data from registries
+- **Chosen:** the officers, persons with significant control and charges endpoints are never called. Form D related persons, sales recipients, phone numbers and street addresses are stripped before parsing and never stored. SH01 documents are not stored, and Task 067 would read only the allotment pages. The full registered office postcode is stored for the shared-address check but never displayed; pages show the postcode district.
+- **Why:** this extends D19 to official sources. Names of directors, shareholders and promoters are personal data under UK GDPR and are not needed for the product's questions. A small company's registered office can be a director's home, so only the district is shown.
+
+## D59. Company size from the last accounts type, with "full accounts" not meaning large
+- **Chosen:** six bands from `accounts.last_accounts.type`: micro, small (small, total exemption, abridged and similar), medium, "full accounts (size not stated)", dormant, and "no accounts filed yet". Offered as the `cosize` filter.
+- **Alternatives:** employee counts from iXBRL accounts; treating full accounts as large.
+- **Why:** the accounts type is in every profile at no extra cost. Small companies may choose full accounts, so calling them large would be wrong. Employee counts from iXBRL would be more precise and cost no LLM, but need a document fetch per company and a parser; they can come later if the size filter proves useful. The accounts regime may change from April 2028 (A46); the mapping is one table.
+
+## D60. Filter criteria version 3: `evidence` and `cosize`
+- **Chosen:** two new criteria, both defaulting to "no filter": `evidence=confirmed` and `cosize` (multi). `FUNDING_CRITERIA_VERSION` becomes 3, with the same canonical serialisation rules (D41). Version 2 URLs keep their meaning.
+- **Why:** the maintainer asked for a "confirmed" filter, and the size band is the main new targeting fact. New parameters with "no filter" defaults change nothing for old links or a saved search. The sector filter now reads `company_sectors`, falling back to the theme join, so it never returns fewer rows than before.
+
+## D61. Phase 3 decisions confirmed by the maintainer (12 November 2026)
+
+- **Form D confirms only.** A Form D filing confirms a matching news raise and links a US company to its SEC CIK. It never creates an event on its own. Standalone US offerings are a later option (see `docs/roadmap.md`, "Later options").
+- **SH01 reader deferred.** Task 067 is not built in Phase 3. Raises are confirmed from free SH01 metadata (the allotment date). Revisit when there are paying users or a clear need for official amounts.
+- **Partial name matches go to review.** Only exact or near-exact name matches with supporting evidence link automatically. Trading-name prefix matches ("Voltmoss" and "Voltmoss Energy Systems Ltd") go to the review queue.
+- **Companies House incorporation year wins.** When news and Companies House disagree, the page shows the incorporation year and the news year stays stored.
+- **Defaults accepted:** a registered address shared by 20 or more companies is treated as a formation agent's address, not a location. Link review at go-live (Task 066) is a one-off maintainer check of about 50 links.
+

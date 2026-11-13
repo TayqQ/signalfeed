@@ -25,24 +25,38 @@ Goal: answer "which themes are attracting funding, and are they rising?", and la
 ## Phase 3: confirmed raises from filings
 Goal: mark raises as `confirmed` with official data, and fill gaps that news misses.
 
-- **SEC Form D.** Daily EDGAR indexes, Form D XML parsing (structured, no PDFs), descriptive User-Agent, rate limiting below 10 requests/second. Link to companies by name and state. Ignore the "related persons" names.
-- **UK Companies House.**
-  - SH01 share allotments via filing history and the Document API. These are PDFs, often scanned, so the work involves OCR or vision-model cost estimates and a per-document spend limit.
-  - Link to companies via `uk_company_number` (Phase 2 already fills it from grant records where known), and backfill `founded_year` from incorporation dates, which improves acquisition-age data.
-  - Company size from the accounts category (micro, small and so on), which the targeting filters need and Phase 2 cannot get.
-  - Ignore officer and shareholder personal names (UK GDPR).
-- **Matching.** Filing-to-news matching rules, and an `evidence_level` upgrade from `reported` to `confirmed`. This should also match Phase 2's `confirmed` grant events to news reports of the same grant.
+**Planned in `docs/spec-phase3.md`, with tasks 048-067 in `docs/tasks/README.md`** (planning pass of 12 November 2026). No extraction change, and no paid calls outside the cuttable last wave.
+
+- **UK Companies House first** (the paying user's priority). REST API with a free key, 600 requests in five minutes, kept at 500 (D52). The bulk snapshot is not needed.
+  - **Linking** to `uk_company_number` by exact name plus a supporting fact: a grant postcode, a nearby registered office, or an SH01 near a reported round. Ambiguous cases go to an optional review queue (`pnpm registry`) or stay unlinked (D53).
+  - **Facts:** incorporation date (fills an empty `founded_year`, so company and target ages fill in), status, SIC codes (a fallback sector for companies with no theme), registered office postcode district (a new location rule, ignoring formation-agent addresses), and a size band from the last accounts type (D57, D59).
+  - **SH01:** filing metadata only, which confirms that shares were issued near a round but not the amount. Reading the image-only PDFs is a cuttable last wave, recommended to defer (D55).
+  - Officers, PSCs and shareholders are never fetched or stored (D58).
+- **SEC Form D.** Daily EDGAR indexes and Form D XML, User-Agent with a contact email, at most 5 requests a second. Non-fund filings stored with organisation facts only; issuers linked by CIK or name plus a matching round. Related persons are never read. No events from Form D alone in Phase 3 (D51).
+- **Confirmation.** A news round is `confirmed` when an SH01 or a Form D falls in its date window (and, for Form D, amounts agree). Derived and rebuilt like other stats; amounts stay as reported (D54). Phase 2's guard for grant events changes to "created from a record" first.
+- **Grants matched to news.** A news report of an Innovate UK grant attaches to the grant event instead of duplicating it (D56).
+- **UI, minimal.** A "Confirmed" marker and filter, a company size filter (filter criteria version 3, D60), and registry facts on company pages. The full UX/UI overhaul comes after the functionality is complete.
+- **Cost and storage:** £0 a month added; about 20 MB one-off and 2 MB a month.
 
 ## Phase 4: accounts, alerts and the UK leads view
 Goal: personal workflows, and a possible small paid product.
 
 - Authentication, watchlists (companies, themes, investors), and alert rules.
 - A weekly email digest (a transactional email provider's free tier). Scheduled jobs stay outside web requests.
-- **UK leads view:** UK companies that recently raised or won a grant, with company-level data only (Companies House number, SIC codes, registered office, website). No personal contact details without a separate decision. Saved searches and alerts reuse the Phase 2 filter model (D41) unchanged.
+- **UK leads view:** UK companies that recently raised or won a grant, with company-level data only (Companies House number, SIC codes, registered office district and size band from Phase 3, plus website). No personal contact details without a separate decision. Saved searches and alerts reuse the filter model (D41; version 3 since D60) unchanged.
 - **If paid:**
   - payments;
   - move off Vercel Hobby (non-commercial terms);
-  - check RSS publisher terms for commercial use (A2), and confirm commercial reuse of GtR data with UKRI (A17);
+  - check RSS publisher terms for commercial use (A2), confirm commercial reuse of GtR data with UKRI (A17), and of Companies House data (A32);
   - Northern Ireland postcode data carries a separate licence for commercial use (A22);
   - privacy policy and terms;
   - a CLA if dual licensing is wanted.
+
+## Later options (not scheduled)
+
+- **Standalone US Form D offerings as events.** Phase 3 uses Form D only to confirm news raises (D61). Adding the roughly 17,000 non-fund US offerings a year as events of their own would be considered only if both hold:
+  1. users, especially paying ones, show interest in US companies; and
+  2. the offerings are significant enough for the likely paying user, for example above a size floor or in their sectors, rather than thousands of very small raises.
+- **SH01 amounts via a vision model** (deferred Task 067, D61).
+- **Hacker News and GitHub demand signals** (deferred Tasks 046 and 047, D45).
+
