@@ -7,17 +7,28 @@ import type { Db } from "@/db/client";
 import {
   companies,
   companyLocations,
+  chAddressCounts,
+  chCompanies,
   eventSources,
   events,
   extractions,
   grantParticipants,
+  registryLinks,
   sourceItems,
   sources,
 } from "@/db/schema";
-import { outcodeCentroid, outcodeItl1 } from "@/lib/geo/postcode";
+import {
+  outcodeCentroid,
+  outcodeItl1,
+  parseUkPostcode,
+} from "@/lib/geo/postcode";
 import { matchUkCity, normalisePlaceName } from "@/lib/geo/uk-places";
 import { ukRegionFromText } from "@/lib/geo/uk-region-names";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
+import {
+  SHARED_ADDRESS_THRESHOLD,
+  formatPostcode,
+} from "@/pipeline/registry/shared-address";
 import { emptyDiffCounts, writeDiff } from "./diff-write";
 import {
   computeFingerprint,
@@ -30,7 +41,7 @@ import {
 export const LOCATIONS_REBUILD = "locations";
 
 /** Bumped when the location rules change, so the next run rebuilds. */
-export const LOCATIONS_LOGIC_VERSION = "locations-v1";
+export const LOCATIONS_LOGIC_VERSION = "locations-v2";
 
 /** How many unmatched UK city names are logged. */
 const UNMATCHED_LOG_LIMIT = 10;
@@ -74,6 +85,28 @@ export const LOCATION_INPUTS: readonly FingerprintInput[] = [
     sums: [
       grantParticipants.companyId,
       sql`hashtext(coalesce(${grantParticipants.outcode}, ''))`,
+    ],
+  },
+  {
+    table: registryLinks,
+    sums: [
+      registryLinks.companyId,
+      sql`hashtext(${registryLinks.registry}::text || '|' || ${registryLinks.registryId} || '|' || ${registryLinks.status}::text)`,
+    ],
+  },
+  {
+    table: chCompanies,
+    latest: [chCompanies.fetchedAt],
+    sums: [
+      sql`hashtext(${chCompanies.companyNumber} || '|' || coalesce(${chCompanies.officePostcode}, '') || '|' || coalesce(${chCompanies.officeOutcode}, ''))`,
+    ],
+  },
+  {
+    table: chAddressCounts,
+    latest: [chAddressCounts.checkedAt],
+    sums: [
+      chAddressCounts.activeCompanies,
+      sql`hashtext(${chAddressCounts.postcode})`,
     ],
   },
 ];
@@ -163,6 +196,59 @@ async function loadGrantOutcodes(db: Db): Promise<Map<number, string>> {
   return byCompany;
 }
 
+/**
+ * The registered-office outcode of each company with a `linked` Companies
+ * House row (spec-phase3 section 7.3, D61). Fails closed: an office is left
+ * out when its full postcode is not valid, has no stored address count, or
+ * is shared (the count is at or above `SHARED_ADDRESS_THRESHOLD`). It is also
+ * left out when the outcode has no known centroid or area, or disagrees with
+ * the stored outcode.
+ */
+async function loadOfficeOutcodes(db: Db): Promise<Map<number, string>> {
+  const [rows, counts] = await Promise.all([
+    db
+      .select({
+        companyId: registryLinks.companyId,
+        postcode: chCompanies.officePostcode,
+        outcode: chCompanies.officeOutcode,
+      })
+      .from(registryLinks)
+      .innerJoin(
+        chCompanies,
+        eq(chCompanies.companyNumber, registryLinks.registryId),
+      )
+      .where(
+        and(
+          eq(registryLinks.registry, "companies_house"),
+          eq(registryLinks.status, "linked"),
+          isNotNull(chCompanies.officePostcode),
+        ),
+      )
+      .orderBy(asc(registryLinks.companyId)),
+    db.select().from(chAddressCounts),
+  ]);
+  const countByPostcode = new Map(
+    counts.map((row) => [row.postcode, row.activeCompanies]),
+  );
+
+  const byCompany = new Map<number, string>();
+  for (const row of rows) {
+    if (row.postcode === null) continue;
+    const key = formatPostcode(row.postcode);
+    const parsed = parseUkPostcode(row.postcode);
+    if (key === null || parsed === null) continue;
+    const count = countByPostcode.get(key);
+    if (count === undefined || count >= SHARED_ADDRESS_THRESHOLD) continue;
+    const outcode = parsed.outcode.toUpperCase();
+    if (row.outcode && row.outcode.trim().toUpperCase() !== outcode) continue;
+    if (outcodeCentroid(outcode) === null || outcodeItl1(outcode) === null) {
+      continue;
+    }
+    byCompany.set(row.companyId, outcode);
+  }
+  return byCompany;
+}
+
 /** Region text votes from current extractions, by company. */
 async function loadRegionVotes(db: Db): Promise<Map<number, RegionVote[]>> {
   const rows = await db
@@ -221,7 +307,8 @@ export interface ComputedLocations {
 
 /**
  * Applies the rules of spec-phase2 section 9.1 to every non-merged company.
- * The first match wins: grant postcode, UK city, UK region text, non-UK city.
+ * The first match wins: grant postcode, UK city, registered office, UK region
+ * text, non-UK city (spec-phase3 section 7.3).
  * A region from text never overrides a postcode or a town, so a conflict
  * with a town's region is ignored and the town wins.
  */
@@ -230,6 +317,7 @@ export async function computeCompanyLocations(
 ): Promise<ComputedLocations> {
   const grantOutcodes = await loadGrantOutcodes(db);
   const regionVotes = await loadRegionVotes(db);
+  const officeOutcodes = await loadOfficeOutcodes(db);
   const active = await db
     .select({
       id: companies.id,
@@ -292,6 +380,26 @@ export async function computeCompanyLocations(
 
       const key = pickRegionKey(regionVotes.get(company.id) ?? []);
       const region = key ? ukRegionBySlug(key) : null;
+
+      // Registered office. Skipped when the news names a different area.
+      const office = officeOutcodes.get(company.id);
+      const officeCode = office ? outcodeItl1(office) : null;
+      if (office && officeCode && (!region || region.code === officeCode)) {
+        const centroid = outcodeCentroid(office);
+        rows.push({
+          companyId: company.id,
+          countryCode: "GB",
+          itl1Code: officeCode,
+          placeSlug: null,
+          outcode: office,
+          latitude: centroid?.lat ?? null,
+          longitude: centroid?.lon ?? null,
+          precision: "outcode",
+          source: "registered_office",
+        });
+        continue;
+      }
+
       if (region) {
         rows.push({
           companyId: company.id,

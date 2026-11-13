@@ -1,0 +1,472 @@
+{
+  "version": 1,
+  "note": "Labelled confirmation cases for the confirm step (docs/spec-phase3.md sections 9.2 and 12, Task 060). Every company, number and filing is invented. Each case is one company. Amounts are US cents. Fields left out take the defaults in src/pipeline/registry/confirmation-cases.test.ts: a linked registry row, day precision, no amount, a news event (no record source). The label says what a careful person would accept as confirmed: a record that could belong to two rounds confirms neither.",
+  "cases": [
+    {
+      "id": "C1",
+      "tags": ["worked-example", "sh01"],
+      "note": "UK seed on 10 Mar 2026, SH01 allotted 2 Feb 2026, 36 days before. Confirmed; SH01 never confirms the amount.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-03-10" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-02-02" }],
+      "expected": [
+        { "event": "seed", "record": "sh01", "confirmsAmount": false }
+      ]
+    },
+    {
+      "id": "C2",
+      "tags": ["worked-example", "sh01", "window"],
+      "note": "UK seed on 10 Mar 2026, SH01 allotted 1 Sep 2025, 190 days before. Outside the window.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-03-10" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2025-09-01" }],
+      "expected": []
+    },
+    {
+      "id": "C3",
+      "tags": ["worked-example", "form-d", "amount"],
+      "note": "US seed $4.5M on 18 Feb 2026, Form D first sale 5 Jan 2026, $4.4M sold. Confirmed, amount within 2.2%.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-02-18",
+          "amountUsdMinor": 450000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-01-05",
+          "totalOfferingUsdMinor": 500000000,
+          "totalSoldUsdMinor": 440000000
+        }
+      ],
+      "expected": [{ "event": "seed", "record": "d", "confirmsAmount": true }]
+    },
+    {
+      "id": "C4",
+      "tags": ["worked-example", "form-d", "amount"],
+      "note": "US series A $20M on 1 Jun 2026, Form D first sale 10 May 2026, offering $20M, $3M sold so far. Confirmed against the offering.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "a",
+          "roundType": "series_a",
+          "announcedOn": "2026-06-01",
+          "amountUsdMinor": 2000000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-05-10",
+          "totalOfferingUsdMinor": 2000000000,
+          "totalSoldUsdMinor": 300000000
+        }
+      ],
+      "expected": [{ "event": "a", "record": "d", "confirmsAmount": true }]
+    },
+    {
+      "id": "C5",
+      "tags": ["worked-example", "form-d", "amount"],
+      "note": "US series A $20M, Form D offering $3M and $3M sold. 85% apart: a different offering, not confirmed.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "a",
+          "roundType": "series_a",
+          "announcedOn": "2026-06-01",
+          "amountUsdMinor": 2000000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-05-10",
+          "totalOfferingUsdMinor": 300000000,
+          "totalSoldUsdMinor": 300000000
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "C6",
+      "tags": ["worked-example", "sh01", "month"],
+      "note": "UK seed 'around March 2026' (month precision), SH01 allotted 20 Jan 2026. The window is measured from 1 March: 40 days before.",
+      "registry": "companies_house",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-03-15",
+          "datePrecision": "month"
+        }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-01-20" }],
+      "expected": [
+        { "event": "seed", "record": "sh01", "confirmsAmount": false }
+      ]
+    },
+    {
+      "id": "month-after",
+      "tags": ["sh01", "month", "window"],
+      "note": "Month-precision round stored as 20 Mar 2026, SH01 allotted 15 Apr 2026. From 1 March that is 45 days after, outside the 30-day window.",
+      "registry": "companies_house",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-03-20",
+          "datePrecision": "month"
+        }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-04-15" }],
+      "expected": []
+    },
+    {
+      "id": "tranches",
+      "tags": ["sh01", "tranches"],
+      "note": "One series A with two SH01s, before and after the announcement (two closings). Both confirm the one round.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "a", "roundType": "series_a", "announcedOn": "2026-05-12" }
+      ],
+      "sh01": [
+        { "key": "first", "actionDate": "2026-04-02" },
+        { "key": "second", "actionDate": "2026-05-20" }
+      ],
+      "expected": [
+        { "event": "a", "record": "first", "confirmsAmount": false },
+        { "event": "a", "record": "second", "confirmsAmount": false }
+      ]
+    },
+    {
+      "id": "two-rounds-close",
+      "tags": ["sh01", "ambiguous"],
+      "note": "A seed on 10 Feb and a series A on 20 Apr 2026. The SH01 of 25 Feb fits both, so it confirms neither. The SH01 of 15 Apr fits only the series A.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-02-10" },
+        { "key": "a", "roundType": "series_a", "announcedOn": "2026-04-20" }
+      ],
+      "sh01": [
+        { "key": "shared", "actionDate": "2026-02-25" },
+        { "key": "late", "actionDate": "2026-04-15" }
+      ],
+      "expected": [{ "event": "a", "record": "late", "confirmsAmount": false }]
+    },
+    {
+      "id": "duplicate-reports",
+      "tags": ["sh01", "ambiguous"],
+      "note": "The same seed stored as two news events two days apart (not merged). The SH01 fits both, so neither is confirmed.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "one", "roundType": "seed", "announcedOn": "2026-03-10" },
+        { "key": "two", "roundType": "seed", "announcedOn": "2026-03-12" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-03-01" }],
+      "expected": []
+    },
+    {
+      "id": "year-precision",
+      "tags": ["sh01", "precision"],
+      "note": "A round known only by year. Too vague for any window.",
+      "registry": "companies_house",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-01-01",
+          "datePrecision": "year"
+        }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-01-10" }],
+      "expected": []
+    },
+    {
+      "id": "debt-round",
+      "tags": ["sh01", "round-type"],
+      "note": "A venture debt facility. Shares allotted nine days before do not confirm a loan.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "debt", "roundType": "debt", "announcedOn": "2026-03-10" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-03-01" }],
+      "expected": []
+    },
+    {
+      "id": "news-grant",
+      "tags": ["sh01", "round-type"],
+      "note": "A news report of a grant. Grants are not equity; an SH01 near it confirms nothing.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "grant", "roundType": "grant", "announcedOn": "2026-03-10" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-03-01" }],
+      "expected": []
+    },
+    {
+      "id": "record-origin",
+      "tags": ["sh01", "record-origin"],
+      "note": "An event created from an official record. Never confirmed or changed by this step, and keeps its evidence.",
+      "registry": "companies_house",
+      "events": [
+        {
+          "key": "grant",
+          "roundType": "grant",
+          "announcedOn": "2026-03-01",
+          "datePrecision": "month",
+          "recordOrigin": true,
+          "evidence": "confirmed"
+        }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-03-05" }],
+      "expected": []
+    },
+    {
+      "id": "sh01-edge-before",
+      "tags": ["sh01", "window"],
+      "note": "SH01 exactly 120 days before the round: the first day of the window.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-05-01" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-01-01" }],
+      "expected": [
+        { "event": "seed", "record": "sh01", "confirmsAmount": false }
+      ]
+    },
+    {
+      "id": "sh01-edge-after",
+      "tags": ["sh01", "window"],
+      "note": "SH01 31 days after the round: one day past the window.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-05-01" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-06-01" }],
+      "expected": []
+    },
+    {
+      "id": "sh01-no-date",
+      "tags": ["sh01", "window"],
+      "note": "An SH01 with no allotment date. Nothing to compare, so no confirmation.",
+      "registry": "companies_house",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-05-01" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": null }],
+      "expected": []
+    },
+    {
+      "id": "candidate-link",
+      "tags": ["sh01", "link"],
+      "note": "The company has only a review candidate, not a link. The SH01 would fit, but it may belong to another company.",
+      "registry": "companies_house",
+      "linkStatus": "candidate",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-03-10" }
+      ],
+      "sh01": [{ "key": "sh01", "actionDate": "2026-02-20" }],
+      "expected": []
+    },
+    {
+      "id": "form-d-amendment",
+      "tags": ["form-d", "amendment"],
+      "note": "A Form D and its D/A for the same offering. Both fit the one seed and are both stored; the amendment's sold figure and the original's offering each agree with the news amount.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-07-01",
+          "amountUsdMinor": 300000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "original",
+          "dateOfFirstSale": "2026-06-10",
+          "totalOfferingUsdMinor": 300000000,
+          "totalSoldUsdMinor": 100000000
+        },
+        {
+          "key": "amended",
+          "isAmendment": true,
+          "previousKey": "original",
+          "dateOfFirstSale": "2026-06-10",
+          "totalOfferingUsdMinor": 300000000,
+          "totalSoldUsdMinor": 300000000
+        }
+      ],
+      "expected": [
+        { "event": "seed", "record": "amended", "confirmsAmount": true },
+        { "event": "seed", "record": "original", "confirmsAmount": true }
+      ]
+    },
+    {
+      "id": "form-d-no-news-amount",
+      "tags": ["form-d", "amount"],
+      "note": "The news gives no amount. The Form D date fits, so it confirms the round but not an amount.",
+      "registry": "sec_edgar",
+      "events": [
+        { "key": "seed", "roundType": "seed", "announcedOn": "2026-03-01" }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-02-01",
+          "totalOfferingUsdMinor": 200000000,
+          "totalSoldUsdMinor": 200000000
+        }
+      ],
+      "expected": [{ "event": "seed", "record": "d", "confirmsAmount": false }]
+    },
+    {
+      "id": "form-d-indefinite",
+      "tags": ["form-d", "amount"],
+      "note": "An 'Indefinite' offering with nothing sold yet. The date fits; no amount to compare.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-03-01",
+          "amountUsdMinor": 250000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-02-15",
+          "totalOfferingUsdMinor": null,
+          "totalSoldUsdMinor": null
+        }
+      ],
+      "expected": [{ "event": "seed", "record": "d", "confirmsAmount": false }]
+    },
+    {
+      "id": "form-d-loose-amount",
+      "tags": ["form-d", "amount"],
+      "note": "News $10M, Form D offering $7M and $6M sold: 30% apart. Within 50%, so the round is confirmed, but not the amount.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "a",
+          "roundType": "series_a",
+          "announcedOn": "2026-04-01",
+          "amountUsdMinor": 1000000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-03-01",
+          "totalOfferingUsdMinor": 700000000,
+          "totalSoldUsdMinor": 600000000
+        }
+      ],
+      "expected": [{ "event": "a", "record": "d", "confirmsAmount": false }]
+    },
+    {
+      "id": "form-d-too-early",
+      "tags": ["form-d", "window"],
+      "note": "Form D first sale 212 days before the round. An earlier offering.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "a",
+          "roundType": "series_a",
+          "announcedOn": "2026-06-01",
+          "amountUsdMinor": 800000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2025-11-01",
+          "totalOfferingUsdMinor": 800000000,
+          "totalSoldUsdMinor": 800000000
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "form-d-too-late",
+      "tags": ["form-d", "window"],
+      "note": "Form D first sale 49 days after the round. Past the 45-day window.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "a",
+          "roundType": "series_a",
+          "announcedOn": "2026-06-01",
+          "amountUsdMinor": 800000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "dateOfFirstSale": "2026-07-20",
+          "totalOfferingUsdMinor": 800000000,
+          "totalSoldUsdMinor": 800000000
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "form-d-other-cik",
+      "tags": ["form-d", "link"],
+      "note": "A Form D attached to the company earlier, but for a CIK the company is not linked to now. It does not count.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-03-01",
+          "amountUsdMinor": 200000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "otherCik": true,
+          "dateOfFirstSale": "2026-02-10",
+          "totalOfferingUsdMinor": 200000000,
+          "totalSoldUsdMinor": 200000000
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "form-d-merged",
+      "tags": ["form-d", "merge"],
+      "note": "The Form D was attached to a duplicate company that has since been merged into this one. It follows the merge and confirms the survivor's round.",
+      "registry": "sec_edgar",
+      "events": [
+        {
+          "key": "seed",
+          "roundType": "seed",
+          "announcedOn": "2026-03-01",
+          "amountUsdMinor": 200000000
+        }
+      ],
+      "formD": [
+        {
+          "key": "d",
+          "onMergedCompany": true,
+          "dateOfFirstSale": "2026-02-10",
+          "totalOfferingUsdMinor": 210000000,
+          "totalSoldUsdMinor": 200000000
+        }
+      ],
+      "expected": [{ "event": "seed", "record": "d", "confirmsAmount": true }]
+    }
+  ]
+}

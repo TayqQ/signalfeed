@@ -11,9 +11,11 @@ import {
   fundingRounds,
   investors,
   mergeCandidates,
+  registryLinks,
   tags,
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
+import { recordLink } from "@/pipeline/registry/link-store";
 import { addMergeCandidate } from "./merge-candidates";
 import {
   addAlias,
@@ -155,6 +157,7 @@ describe("mergeCompanies", () => {
     await roundFor(merge.id);
     const preview = await previewCompanyMerge(db, merge.id);
     expect(preview.events).toBe(1);
+    expect(preview.registryLinks).toBe(0);
     const [row] = await db
       .select()
       .from(companies)
@@ -162,6 +165,97 @@ describe("mergeCompanies", () => {
     expect(row?.mergedIntoId).toBeNull();
     expect(keep.id).not.toBe(merge.id);
     expect(await db.select().from(entityMerges)).toHaveLength(0);
+  });
+});
+
+describe("mergeCompanies and registry links", () => {
+  const NOW = new Date("2026-11-12T09:00:00Z");
+
+  function chLink(companyId: number, registryId: string) {
+    return recordLink(db, {
+      companyId,
+      registry: "companies_house",
+      registryId,
+      registryName: "ACME LTD",
+      method: "name_location",
+      reason: "test",
+      decidedBy: "auto",
+      now: NOW,
+    });
+  }
+
+  it("moves links to the survivor and keeps the column in step", async () => {
+    const keep = await insertCompany(db, { name: "Acme" });
+    const merge = await insertCompany(db, { name: "Acme Robotics" });
+    await chLink(merge.id, "09876543");
+    expect((await previewCompanyMerge(db, merge.id)).registryLinks).toBe(1);
+
+    await mergeCompanies(db, keep.id, merge.id);
+
+    const [row] = await db.select().from(registryLinks);
+    expect(row).toMatchObject({ companyId: keep.id, status: "linked" });
+    const [kept] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, keep.id));
+    expect(kept?.ukCompanyNumber).toBe("09876543");
+    const [gone] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, merge.id));
+    expect(gone?.ukCompanyNumber).toBeNull();
+  });
+
+  it("keeps the survivor's link and turns the other into a candidate", async () => {
+    const keep = await insertCompany(db, { name: "Acme" });
+    const merge = await insertCompany(db, { name: "Acme Robotics" });
+    await chLink(keep.id, "09876543");
+    await chLink(merge.id, "01234567");
+
+    await mergeCompanies(db, keep.id, merge.id);
+
+    const rows = await db.select().from(registryLinks);
+    expect(rows.every((row) => row.companyId === keep.id)).toBe(true);
+    const linked = rows.filter((row) => row.status === "linked");
+    expect(linked.map((row) => row.registryId)).toEqual(["09876543"]);
+    const candidate = rows.find((row) => row.status === "candidate");
+    expect(candidate).toMatchObject({
+      registryId: "01234567",
+      reason: "from a merge; numbers differ",
+      method: null,
+    });
+    const [kept] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, keep.id));
+    expect(kept?.ukCompanyNumber).toBe("09876543");
+  });
+
+  it("does not leave two rows for one number", async () => {
+    const keep = await insertCompany(db, { name: "Acme" });
+    const merge = await insertCompany(db, { name: "Acme Robotics" });
+    const input = {
+      registry: "companies_house" as const,
+      registryId: "09876543",
+      registryName: "ACME LTD",
+      reason: "test",
+      now: NOW,
+    };
+    await db.insert(registryLinks).values([
+      { ...input, companyId: keep.id, status: "candidate", decidedBy: "auto" },
+      {
+        ...input,
+        companyId: merge.id,
+        status: "rejected",
+        decidedBy: "manual",
+      },
+    ]);
+
+    await mergeCompanies(db, keep.id, merge.id);
+
+    const rows = await db.select().from(registryLinks);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ companyId: keep.id, status: "rejected" });
   });
 });
 
