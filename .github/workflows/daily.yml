@@ -1,11 +1,16 @@
-# Runs the daily jobs: new Innovate UK grants from UKRI Gateway to Research
-# (docs/spec-phase2.md, section 10.2). Collecting grants is free and needs no
-# OPENAI_API_KEY. The hourly run tags and resolves what this collects.
+# Runs the daily jobs (docs/spec-phase2.md section 10.2, docs/spec-phase3.md
+# section 6), in this order:
+#   1. new Innovate UK grants from UKRI Gateway to Research
+#   2. Companies House linking and profile refresh (needs COMPANIES_HOUSE_API_KEY)
+#   3. SEC Form D filings from EDGAR (needs an email address in HTTP_CONTACT)
+# None of them needs OPENAI_API_KEY. The hourly run tags and resolves what the
+# grants step collects. A failing step does not skip the ones after it.
 #
 # It shares the "ingest" concurrency group with the hourly workflow, so the two
-# never overlap. The pipeline's database lock is a second guard.
+# never overlap. Each command also takes the pipeline's database lock.
 #
 # Set the repository variable INGEST_ENABLED to anything but "true" to stop it.
+# Set REGISTRY_ENABLED or FORMD_ENABLED to "false" to pause one step.
 name: Daily
 
 on:
@@ -22,8 +27,11 @@ concurrency:
 
 jobs:
   grants:
+    name: Daily jobs
     runs-on: ubuntu-latest
     if: vars.INGEST_ENABLED == 'true'
+    # At the default limits the registry step takes about 21 minutes
+    # (2,000 requests) and Form D about 10 (3,000 requests).
     timeout-minutes: 60
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -31,6 +39,9 @@ jobs:
       EXTRACTION_MODEL: ${{ vars.EXTRACTION_MODEL }}
       LLM_MONTHLY_CAP_GBP: ${{ vars.LLM_MONTHLY_CAP_GBP }}
       HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
+      MAX_CH_REQUESTS_PER_RUN: ${{ vars.MAX_CH_REQUESTS_PER_RUN }}
+      MAX_EDGAR_DAYS_PER_RUN: ${{ vars.MAX_EDGAR_DAYS_PER_RUN }}
+      MAX_EDGAR_REQUESTS_PER_RUN: ${{ vars.MAX_EDGAR_REQUESTS_PER_RUN }}
       TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}
     steps:
       - uses: actions/checkout@v4
@@ -43,17 +54,53 @@ jobs:
       - name: Collect grants
         run: |
           set -o pipefail
-          pnpm --silent ingest grants --trigger "$TRIGGER" | tee summary.json
+          pnpm --silent ingest grants --trigger "$TRIGGER" | tee grants.json
+      - name: Link companies to Companies House
+        # Runs when an earlier step failed, but not after a cancel.
+        if: ${{ !cancelled() && vars.REGISTRY_ENABLED != 'false' }}
+        timeout-minutes: 25
+        # The key goes to this step only. Without it the run is recorded as
+        # skipped and the step succeeds.
+        env:
+          COMPANIES_HOUSE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API_KEY }}
+        run: |
+          set -o pipefail
+          pnpm --silent ingest registry --trigger "$TRIGGER" | tee registry.json
+      - name: Collect SEC Form D filings
+        if: ${{ !cancelled() && vars.FORMD_ENABLED != 'false' }}
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          pnpm --silent ingest formd --trigger "$TRIGGER" | tee formd.json
       - name: Write the step summary
         if: always()
         run: |
-          [ -s summary.json ] || exit 0
           node -e '
-            const s = JSON.parse(require("fs").readFileSync("summary.json", "utf8"));
-            const g = s.stats && s.stats.grantCollect;
-            const rows = g
-              ? [
-                  ["Status", s.status],
+            const fs = require("fs");
+            const read = (file) => {
+              try {
+                const text = fs.readFileSync(file, "utf8").trim();
+                return text ? JSON.parse(text) : null;
+              } catch {
+                return null;
+              }
+            };
+            const sum = (counts) => Object.values(counts || {}).reduce((a, n) => a + (n || 0), 0);
+            // A missing step result means that step failed; the run error says why.
+            const rebuilt = (step) => (step ? (step.skipped ? "skipped: no change" : "rebuilt") : "failed");
+            const table = (title, s, rows) => {
+              const body = !s
+                ? [["Result", "not run, or stopped before a summary (see the log)"]]
+                : !s.ran
+                  ? [["Ran", "no: another run held the lock"]]
+                  : [["Status", s.status], ...rows(s.stats || {})];
+              return [`### ${title}`, "", "| Step | Result |", "|---|---|", ...body.map(([a, b]) => `| ${a} | ${b} |`), ""];
+            };
+            const lines = [
+              ...table("Grants", read("grants.json"), (t) => {
+                const g = t.grantCollect;
+                if (!g) return [];
+                return [
                   ["Pages fetched", g.pagesFetched],
                   ["Projects found", g.projectsFound],
                   ["New projects", g.projectsInserted],
@@ -61,8 +108,45 @@ jobs:
                   ["Participants skipped (not organisations)", g.participantsSkipped],
                   ["Organisations fetched", g.orgsFetched],
                   ["Organisations failed", g.orgsFailed],
-                ]
-              : [["Ran", String(s.ran)]];
-            const lines = ["| Step | Result |", "|---|---|", ...rows.map(([a, b]) => `| ${a} | ${b} |`)];
-            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+                ];
+              }),
+              ...table("Companies House", read("registry.json"), (t) => {
+                const r = t.registry;
+                if (!r) return [["Registry", "failed"], ["Confirmations", rebuilt(t.confirm)], ["Locations", rebuilt(t.locations)], ["Sectors", rebuilt(t.sectors)]];
+                if (r.skipped) return [["Registry", "skipped: no COMPANIES_HOUSE_API_KEY"]];
+                return [
+                  ["Companies searched", r.companiesSearched],
+                  ["Linked", sum(r.linkedByMethod)],
+                  ["Candidates for review", r.candidates],
+                  ["Links demoted to review", r.linksDemoted ?? 0],
+                  ["Profiles fetched", r.profilesFetched],
+                  ["Profiles refreshed", r.profilesRefreshed],
+                  ["SH01 filings stored", r.filingsStored],
+                  ["Requests", r.requests],
+                  ["Stopped early", r.rateLimited ? "rate limited" : r.stoppedAtLimit ? "request limit" : "no"],
+                  ["Confirmations", rebuilt(t.confirm)],
+                  ["Ambiguous records", t.confirm ? (t.confirm.ambiguousRecords ?? 0) : "-"],
+                  ["Locations", rebuilt(t.locations)],
+                  ["Sectors", rebuilt(t.sectors)],
+                ];
+              }),
+              ...table("SEC Form D", read("formd.json"), (t) => {
+                const f = t.formD;
+                if (!f) return [["Form D", "failed"]];
+                return [
+                  ["Index days fetched", f.daysFetched],
+                  ["Days with no index", f.daysMissing],
+                  ["Filings stored", f.filingsStored],
+                  ["Funds skipped", f.fundsSkipped],
+                  ["Parse failures", f.parseFailures],
+                  ["Linked by CIK", f.linkedByCik],
+                  ["Linked by name", f.linkedByName],
+                  ["Candidates for review", f.candidates],
+                  ["Requests", f.requests],
+                  ["Confirmations", rebuilt(t.confirm)],
+                  ["Ambiguous records", t.confirm ? (t.confirm.ambiguousRecords ?? 0) : "-"],
+                ];
+              }),
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '

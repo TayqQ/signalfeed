@@ -12,30 +12,47 @@ import type {
   LlmCompleteResult,
 } from "@/core/ports";
 import { ExtractionValidationError } from "@/core/errors";
+import type { RegistryCompanyFacts } from "@/core/registry";
 import {
+  chFilings,
+  companies,
   companyLocations,
+  companySectors,
   companyThemes,
+  derivedRebuilds,
   events,
+  formDFilings,
   fundingRounds,
   grantParticipants,
   ingestRuns,
   llmUsage,
+  registryLinks,
   sourceItems,
   themes,
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { createBudgetGuard } from "./budget/budget-guard";
 import { createFakeEmbeddingClient } from "./embed/testing";
+import type { EdgarClient } from "./filings/edgar-client";
+import { createFakeEdgarClient, EDGAR_FIXTURE_DAY } from "./filings/testing";
 import { collectGrantsStep } from "./grants/collect-grants";
 import { GRANT_TAGS_SCHEMA_NAME } from "./grants/grant-tag-prompt";
 import { createGtrClient, type GtrClient } from "./grants/gtr-client";
 import { ensureGtrSource } from "./grants/store-grants";
 import { fakeGtr, syntheticPage } from "./grants/testing";
 import { singleConnectionLock, withIngestLock } from "./lock";
+import type { ChClient } from "./registry/ch-client";
+import { recordLink } from "./registry/link-store";
+import { storeChCompany } from "./registry/store-registry";
+import { fakeChClient } from "./registry/testing";
 import {
+  FormDContactError,
   reextractStep,
+  relinkGrantsStep,
   runAll,
+  runFormD,
   runGrants,
+  runRegistry,
   themesStep,
   type PipelineDeps,
 } from "./run";
@@ -214,6 +231,27 @@ function gtrClient(projects = 1): GtrClient {
   });
 }
 
+/** Fails the test on any call: `run` must never reach a registry. */
+function forbidden(name: string) {
+  return () => {
+    throw new Error(`${name} must not be called`);
+  };
+}
+
+const forbiddenCh: ChClient = {
+  searchCompanies: forbidden("Companies House search"),
+  getCompany: forbidden("Companies House profile"),
+  getCapitalFilings: forbidden("Companies House filings"),
+  countActiveAtPostcode: forbidden("Companies House address count"),
+  requestsMade: forbidden("Companies House request count"),
+};
+
+const forbiddenEdgar: EdgarClient = {
+  getFormIndex: forbidden("EDGAR index"),
+  getFormD: forbidden("EDGAR Form D"),
+  requestCount: forbidden("EDGAR request count"),
+};
+
 function deps(
   llm: LlmClient | null,
   collector: Collector,
@@ -222,15 +260,24 @@ function deps(
     max?: number;
     embedder?: EmbeddingClient | null;
     gtr?: GtrClient;
+    companiesHouse?: ChClient | null;
+    edgar?: EdgarClient | null;
+    log?: string[];
+    now?: Date;
   } = {},
 ): PipelineDeps {
-  const clock = { now: () => NOW };
+  const clock = { now: () => overrides.now ?? NOW };
   return {
     db: testDb.db,
     collector,
     llm,
     embedder: overrides.embedder ?? null,
     gtr: overrides.gtr ?? gtrClient(),
+    companiesHouse:
+      overrides.companiesHouse === undefined
+        ? forbiddenCh
+        : overrides.companiesHouse,
+    edgar: overrides.edgar === undefined ? forbiddenEdgar : overrides.edgar,
     budget: createBudgetGuard({
       db: testDb.db,
       clock,
@@ -246,8 +293,13 @@ function deps(
       maxEmbeddingsPerRun: 2000,
       maxThemeNamesPerRun: 20,
       maxGrantTaggingsPerRun: 200,
+      maxChRequestsPerRun: 2000,
+      maxEdgarDaysPerRun: 10,
+      maxEdgarRequestsPerRun: 3000,
     },
-    log: () => undefined,
+    log: (message) => {
+      overrides.log?.push(message);
+    },
   };
 }
 
@@ -276,6 +328,7 @@ describe("runAll", () => {
     expect(summary.stats?.extract.itemsExtracted).toBe(2);
     expect(summary.stats?.resolve.eventsCreated).toBe(2);
     expect(summary.stats?.resolve.investorsCreated).toBe(1);
+    expect(summary.stats?.resolve.grantReportsAttached).toBe(0);
     expect(summary.stats?.spendUsdMicros).toBeGreaterThan(0);
 
     const [round] = await testDb.db.select().from(fundingRounds);
@@ -521,6 +574,14 @@ describe("runAll, Phase 2 steps", () => {
     expect(new Set(themed.map((row) => row.companyId)).size).toBe(3);
     // Locations ran after grant resolution: the grant company has a postcode.
     expect(await testDb.db.select().from(companyLocations)).not.toHaveLength(0);
+    // Confirm and sectors ran after them: sectors come from the named theme.
+    expect(stats.confirm).toMatchObject({ eventsConfirmed: 0 });
+    expect(stats.confirm?.skipped).toBeUndefined();
+    expect(stats.sectors?.skipped).toBeUndefined();
+    expect(stats.sectors?.rowsBySource.theme).toBeGreaterThan(0);
+    expect(
+      (await testDb.db.select().from(companySectors)).map((row) => row.sector),
+    ).toContain("software-ai");
 
     const purposes = (await testDb.db.select().from(llmUsage)).map(
       (row) => row.purpose,
@@ -649,6 +710,8 @@ describe("runAll, Phase 2 steps", () => {
     });
     expect(stats.locations?.skipped).toBe(true);
     expect(stats.stats?.skipped).toBe(true);
+    expect(stats.confirm?.skipped).toBe(true);
+    expect(stats.sectors?.skipped).toBe(true);
     expect(stats.spendUsdMicros).toBe(0);
     expect(await testDb.db.select().from(events)).toHaveLength(
       eventsAfterFirst,
@@ -785,6 +848,332 @@ describe("runGrants", () => {
     );
     expect(summary).toEqual({ ran: false });
     expect(await testDb.db.select().from(ingestRuns)).toHaveLength(0);
+  });
+});
+
+/** A company linked to a Companies House number, with news seed rounds. */
+async function linkedUkCompany(options: {
+  slug: string;
+  number: string;
+  rounds: string[];
+  decidedBy?: "auto" | "manual";
+}): Promise<{ id: number; eventIds: number[] }> {
+  const [company] = await testDb.db
+    .insert(companies)
+    .values({
+      slug: options.slug,
+      name: options.slug,
+      normalisedName: options.slug,
+      countryCode: "GB",
+    })
+    .returning();
+  const eventIds: number[] = [];
+  for (const announcedOn of options.rounds) {
+    const [event] = await testDb.db
+      .insert(events)
+      .values({
+        type: "funding_round",
+        companyId: company!.id,
+        announcedOn,
+        sourceCount: 1,
+      })
+      .returning();
+    await testDb.db
+      .insert(fundingRounds)
+      .values({ eventId: event!.id, roundType: "seed" });
+    eventIds.push(event!.id);
+  }
+  const decidedBy = options.decidedBy ?? "manual";
+  await recordLink(testDb.db, {
+    companyId: company!.id,
+    registry: "companies_house",
+    registryId: options.number,
+    registryName: `${options.slug.toUpperCase()} LTD`,
+    method: decidedBy === "manual" ? "manual" : "name_filing",
+    reason: "test",
+    decidedBy,
+    now: NOW,
+  });
+  return { id: company!.id, eventIds };
+}
+
+async function storedSh01(companyNumber: string, actionDate: string) {
+  await testDb.db.insert(chFilings).values({
+    companyNumber,
+    transactionId: `tx-${companyNumber}-${actionDate}`,
+    type: "SH01",
+    category: "capital",
+    filedOn: actionDate,
+    actionDate,
+  });
+}
+
+function chProfile(
+  overrides: Partial<RegistryCompanyFacts> = {},
+): RegistryCompanyFacts {
+  return {
+    companyNumber: "13579246",
+    name: "BRIGHTWELL LTD",
+    previousNames: [],
+    status: "active",
+    companyType: "ltd",
+    incorporatedOn: "2022-06-01",
+    ceasedOn: null,
+    sicCodes: ["62012"],
+    officePostcode: "LS1 4AP",
+    officeOutcode: "LS1",
+    accountsType: null,
+    accountsMadeUpTo: null,
+    etag: "etag-1",
+    ...overrides,
+  };
+}
+
+async function onlyRun() {
+  const runs = await testDb.db.select().from(ingestRuns);
+  expect(runs).toHaveLength(1);
+  return runs[0]!;
+}
+
+describe("runAll, Phase 3 steps", () => {
+  it("confirms from stored records, counts ambiguous ones and calls no registry", async () => {
+    const one = await linkedUkCompany({
+      slug: "alder",
+      number: "11111111",
+      rounds: ["2026-03-10"],
+    });
+    await storedSh01("11111111", "2026-02-25");
+    const two = await linkedUkCompany({
+      slug: "birch",
+      number: "22222222",
+      rounds: ["2026-02-10", "2026-04-20"],
+    });
+    await storedSh01("22222222", "2026-02-25");
+    const log: string[] = [];
+
+    // The default deps fail the test if either registry client is called.
+    const summary = await runAll(
+      deps(null, fakeCollector({}), { log }),
+      lock(),
+      "schedule",
+    );
+
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.confirm).toMatchObject({
+      eventsConfirmed: 1,
+      eventsSetToReported: 0,
+      ambiguousRecords: 1,
+    });
+    expect(summary.stats?.sectors?.skipped).toBeUndefined();
+    expect(summary.stats?.registry).toBeUndefined();
+    expect(summary.stats?.formD).toBeUndefined();
+    const evidence = await testDb.db
+      .select({ id: events.id, evidence: events.evidence })
+      .from(events)
+      .orderBy(asc(events.id));
+    expect(evidence).toEqual([
+      { id: one.eventIds[0], evidence: "confirmed" },
+      { id: two.eventIds[0], evidence: "reported" },
+      { id: two.eventIds[1], evidence: "reported" },
+    ]);
+    expect(log.filter((line) => line.startsWith("Ambiguous"))).toHaveLength(1);
+    const run = await onlyRun();
+    expect(run.stats).toMatchObject({
+      confirm: { eventsConfirmed: 1, ambiguousRecords: 1 },
+      sectors: { rowsBySource: { sic: 0 } },
+    });
+  });
+});
+
+describe("runRegistry", () => {
+  it("records a skipped run without a key and runs nothing else", async () => {
+    const summary = await runRegistry(
+      deps(null, fakeCollector({}), { companiesHouse: null }),
+      lock(),
+      "schedule",
+    );
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.registry).toMatchObject({
+      skipped: true,
+      requests: 0,
+    });
+    expect(summary.stats?.confirm).toBeUndefined();
+    expect(summary.stats?.sectors).toBeUndefined();
+    const run = await onlyRun();
+    expect(run.status).toBe("succeeded");
+    expect(run.stats).toMatchObject({ registry: { skipped: true } });
+    expect(await testDb.db.select().from(derivedRebuilds)).toEqual([]);
+  });
+
+  it("refreshes, counts demotions, then rebuilds confirm, locations and sectors", async () => {
+    const company = await linkedUkCompany({
+      slug: "brightwell",
+      number: "13579246",
+      rounds: ["2024-03-10", "2026-05-01"],
+      decidedBy: "auto",
+    });
+    await storeChCompany(
+      testDb.db,
+      chProfile(),
+      new Date(NOW.getTime() - 100 * 24 * 60 * 60 * 1000),
+    );
+    const dissolved = chProfile({
+      status: "dissolved",
+      ceasedOn: "2026-03-01",
+      etag: "etag-2",
+    });
+
+    const summary = await runRegistry(
+      deps(null, fakeCollector({}), {
+        companiesHouse: fakeChClient({ companies: [dissolved] }),
+      }),
+      lock(),
+      "manual",
+    );
+
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.registry).toMatchObject({
+      profilesRefreshed: 1,
+      linksDemoted: 1,
+    });
+    expect(summary.stats?.registry?.skipped).toBeUndefined();
+    expect(summary.stats?.confirm).toMatchObject({ ambiguousRecords: 0 });
+    expect(summary.stats?.locations).toBeDefined();
+    expect(summary.stats?.sectors).toBeDefined();
+    const [link] = await testDb.db
+      .select()
+      .from(registryLinks)
+      .where(eq(registryLinks.companyId, company.id));
+    expect(link?.status).toBe("candidate");
+    const run = await onlyRun();
+    expect(run.stats).toMatchObject({
+      registry: { linksDemoted: 1 },
+      confirm: {},
+      locations: {},
+      sectors: {},
+    });
+  });
+
+  it("keeps to a --max-requests override", async () => {
+    await linkedUkCompany({
+      slug: "brightwell",
+      number: "13579246",
+      rounds: ["2026-05-01"],
+    });
+    const client = fakeChClient({ companies: [chProfile()] });
+    const summary = await runRegistry(
+      deps(null, fakeCollector({}), { companiesHouse: client }),
+      lock(),
+      "manual",
+      { maxRequests: 1 },
+    );
+    expect(summary.status).toBe("succeeded");
+    expect(client.requestsMade()).toBeLessThanOrEqual(1);
+    expect(summary.stats?.registry?.requests).toBeLessThanOrEqual(1);
+  });
+
+  it("records a failing registry step and still runs the local steps", async () => {
+    const broken: ChClient = {
+      ...fakeChClient(),
+      requestsMade: () => {
+        throw new Error("registry exploded");
+      },
+    };
+    const summary = await runRegistry(
+      deps(null, fakeCollector({}), { companiesHouse: broken }),
+      lock(),
+      "schedule",
+    );
+    expect(summary.status).toBe("failed");
+    expect(summary.stats?.registry).toBeUndefined();
+    expect(summary.stats?.confirm).toBeDefined();
+    expect(summary.stats?.locations).toBeDefined();
+    expect(summary.stats?.sectors).toBeDefined();
+    const run = await onlyRun();
+    expect(run.status).toBe("failed");
+    expect(run.error).toMatch(/registry: registry exploded/);
+    expect(run.stats).toMatchObject({ confirm: {}, sectors: {} });
+  });
+});
+
+describe("runFormD", () => {
+  const AFTER_FIXTURE_DAY = new Date("2026-11-12T15:00:00Z");
+
+  it("refuses a contact with no email address, before taking the lock", async () => {
+    let asked = false;
+    const watched = {
+      tryAcquire: () => {
+        asked = true;
+        return Promise.resolve(true);
+      },
+      release: () => Promise.resolve(),
+    };
+    await expect(
+      runFormD(
+        deps(null, fakeCollector({}), { edgar: null }),
+        watched,
+        "schedule",
+      ),
+    ).rejects.toThrow(FormDContactError);
+    await expect(
+      runFormD(
+        deps(null, fakeCollector({}), { edgar: null }),
+        lock(),
+        "manual",
+      ),
+    ).rejects.toThrow(/HTTP_CONTACT to contain an email address/);
+    expect(asked).toBe(false);
+    expect(await testDb.db.select().from(ingestRuns)).toEqual([]);
+  });
+
+  it("collects and links filings, confirms, and records the run", async () => {
+    const edgar = createFakeEdgarClient();
+    const summary = await runFormD(
+      deps(null, fakeCollector({}), { edgar, now: AFTER_FIXTURE_DAY }),
+      lock(),
+      "schedule",
+      { since: EDGAR_FIXTURE_DAY, maxDays: 1, maxRequests: 50 },
+    );
+    expect(summary.status).toBe("succeeded");
+    expect(edgar.requests[0]).toBe(`index:${EDGAR_FIXTURE_DAY}`);
+    expect(summary.stats?.formD).toMatchObject({ daysFetched: 1 });
+    expect(summary.stats?.formD?.filingsStored).toBeGreaterThan(0);
+    expect(summary.stats?.formD?.fundsSkipped).toBeGreaterThan(0);
+    expect(summary.stats?.formD?.requests).toBe(edgar.requests.length);
+    expect(summary.stats?.confirm).toBeDefined();
+    expect(await testDb.db.select().from(formDFilings)).toHaveLength(
+      summary.stats!.formD!.filingsStored,
+    );
+    const run = await onlyRun();
+    expect(run.status).toBe("succeeded");
+    expect(run.stats).toMatchObject({ formD: { daysFetched: 1 }, confirm: {} });
+  });
+
+  it("records a failing collection and still links and confirms", async () => {
+    const edgar: EdgarClient = {
+      ...createFakeEdgarClient(),
+      getFormIndex: () => Promise.reject(new Error("index exploded")),
+    };
+    const summary = await runFormD(
+      deps(null, fakeCollector({}), { edgar, now: AFTER_FIXTURE_DAY }),
+      lock(),
+      "schedule",
+      { since: EDGAR_FIXTURE_DAY, maxDays: 1 },
+    );
+    expect(summary.status).toBe("failed");
+    expect(summary.stats?.formD).toMatchObject({ filingsStored: 0 });
+    expect(summary.stats?.confirm).toBeDefined();
+    const run = await onlyRun();
+    expect(run.error).toMatch(/formd collection: index exploded/);
+  });
+});
+
+describe("relinkGrantsStep", () => {
+  it("finds nothing to move on an empty database", async () => {
+    const result = await relinkGrantsStep(deps(null, fakeCollector({})), {
+      dryRun: true,
+    });
+    expect(result).toMatchObject({ dryRun: true, pairs: [], sourcesMoved: 0 });
   });
 });
 

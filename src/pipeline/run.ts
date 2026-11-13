@@ -1,16 +1,20 @@
 import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type {
   CollectStats,
+  ConfirmStats,
   DerivedStats,
   EmbedStats,
   ExtractStats,
+  FormDStats,
   FxStats,
   GrantCollectStats,
   GrantResolveStats,
   IngestStats,
   LocationStats,
   PrefilterStats,
+  RegistryStats,
   ResolveStats,
+  SectorStats,
   ThemeStats,
 } from "@/core/domain";
 import type { IngestStatus, IngestTrigger, SourceKind } from "@/core/enums";
@@ -38,6 +42,10 @@ import {
 } from "@/db/schema";
 import { embedTagsStep, tagEmbeddingIdentity } from "./embed/embed-tags";
 import { extractItem } from "./extract/extract-item";
+import { collectFormDStep } from "./filings/collect-form-d";
+import type { EdgarClient } from "./filings/edgar-client";
+import { linkFormDFilings } from "./filings/link-form-d";
+import { emptyFormDStats } from "./filings/store-form-d";
 import { isCandidate } from "./extract/prefilter";
 import { estimateCost } from "./extract/pricing";
 import {
@@ -45,6 +53,10 @@ import {
   type CollectGrantsOptions,
 } from "./grants/collect-grants";
 import type { GtrClient } from "./grants/gtr-client";
+import {
+  relinkGrantReports,
+  type RelinkGrantsResult,
+} from "./grants/relink-grants";
 import { resolveGrantsStep } from "./grants/resolve-grants";
 import { tagGrantsStep } from "./grants/tag-grants";
 import {
@@ -53,10 +65,14 @@ import {
   buildUserPrompt,
 } from "./extract/prompt";
 import { type IngestLock, withIngestLock } from "./lock";
+import type { ChClient } from "./registry/ch-client";
+import { confirmStep } from "./registry/confirm-events";
+import { registryStep as companiesHouseStep } from "./registry/registry-step";
 import { recomputeEvent } from "./resolve/canonicalise";
 import { resolveExtraction } from "./resolve/resolve-extraction";
 import { SOURCES } from "./sources";
 import { rebuildCompanyLocations } from "./stats/company-locations";
+import { rebuildCompanySectors } from "./stats/company-sectors";
 import { rebuildStatsStep } from "./stats/rebuild-stats";
 import {
   insertExtraction,
@@ -103,6 +119,12 @@ export interface PipelineConfig {
   maxEmbeddingsPerRun: number;
   maxThemeNamesPerRun: number;
   maxGrantTaggingsPerRun: number;
+  /** `MAX_CH_REQUESTS_PER_RUN`. */
+  maxChRequestsPerRun: number;
+  /** `MAX_EDGAR_DAYS_PER_RUN`. */
+  maxEdgarDaysPerRun: number;
+  /** `MAX_EDGAR_REQUESTS_PER_RUN`. */
+  maxEdgarRequestsPerRun: number;
 }
 
 export interface PipelineDeps {
@@ -116,6 +138,16 @@ export interface PipelineDeps {
   embedder: EmbeddingClient | null;
   /** Gateway to Research. Used only by `pnpm ingest grants`, never by `run`. */
   gtr: GtrClient;
+  /**
+   * Companies House. Null without `COMPANIES_HOUSE_API_KEY`. Used only by
+   * `pnpm ingest registry`, never by `run`.
+   */
+  companiesHouse: ChClient | null;
+  /**
+   * SEC EDGAR. Null when `HTTP_CONTACT` has no email address. Used only by
+   * `pnpm ingest formd`, never by `run`.
+   */
+  edgar: EdgarClient | null;
   budget: BudgetGuard;
   fx: FxProvider;
   clock: Clock;
@@ -303,6 +335,7 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
     eventsUpdated: 0,
     mergeCandidatesCreated: 0,
     extractionsFailed: 0,
+    grantReportsAttached: 0,
   };
   const before = await resolutionCounts(deps.db);
   const pending = await listUnresolvedExtractions(deps.db, STEP_BATCH_LIMIT);
@@ -314,6 +347,8 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
       stats.companiesCreated += outcome.companiesCreated;
       stats.eventsCreated += outcome.eventsCreated;
       stats.eventsUpdated += outcome.eventsUpdated;
+      stats.grantReportsAttached =
+        (stats.grantReportsAttached ?? 0) + outcome.grantReportsAttached;
     } catch (error) {
       stats.extractionsFailed = (stats.extractionsFailed ?? 0) + 1;
       deps.log(
@@ -729,6 +764,146 @@ export async function phase2Steps(
   };
 }
 
+// Phase 3 steps (spec-phase3 section 6). The local ones run in `run`; the
+// registry and Form D steps run only from their own commands, in the daily
+// workflow. Each catches its own errors, like the Phase 2 steps.
+
+/**
+ * Step 13: rebuild `event_confirmations` and `events.evidence`. Local, free.
+ * `confirmStep` logs one line per ambiguous record, so the lines are counted.
+ */
+export async function confirmEventsStep(
+  deps: PipelineDeps,
+  { force = false }: { force?: boolean } = {},
+): Promise<StepOutcome<ConfirmStats>> {
+  let ambiguousRecords = 0;
+  try {
+    const stats = await confirmStep({
+      db: deps.db,
+      clock: deps.clock,
+      force,
+      log: (message) => {
+        ambiguousRecords += 1;
+        deps.log(message);
+      },
+    });
+    return {
+      stats: { ...stats, ambiguousRecords },
+      errors: [],
+      stopsPaidSteps: false,
+    };
+  } catch (error) {
+    return { errors: [failure("confirm", error)], stopsPaidSteps: false };
+  }
+}
+
+/** Step 14: rebuild `company_sectors` when its inputs changed. Local, free. */
+export async function sectorsStep(
+  deps: PipelineDeps,
+  { force = false }: { force?: boolean } = {},
+): Promise<StepOutcome<SectorStats>> {
+  try {
+    const stats = await rebuildCompanySectors({
+      db: deps.db,
+      clock: deps.clock,
+      force,
+    });
+    return { stats, errors: [], stopsPaidSteps: false };
+  } catch (error) {
+    return { errors: [failure("sectors", error)], stopsPaidSteps: false };
+  }
+}
+
+/** The line `refreshProfiles` logs for each automatic link it demotes. */
+const DEMOTED_LINE = /link demoted to review/;
+
+/**
+ * The Companies House step. Skipped without a client. Rate limits and the
+ * request limit end it early with a normal result.
+ */
+export async function companiesHouseRegistryStep(
+  deps: PipelineDeps,
+  { maxRequests }: { maxRequests?: number } = {},
+): Promise<StepOutcome<RegistryStats>> {
+  let linksDemoted = 0;
+  try {
+    const stats = await companiesHouseStep({
+      db: deps.db,
+      client: deps.companiesHouse,
+      clock: deps.clock,
+      maxRequests: maxRequests ?? deps.config.maxChRequestsPerRun,
+      log: (message) => {
+        if (DEMOTED_LINE.test(message)) linksDemoted += 1;
+        deps.log(message);
+      },
+    });
+    return {
+      stats: stats.skipped ? stats : { ...stats, linksDemoted },
+      errors: [],
+      stopsPaidSteps: false,
+    };
+  } catch (error) {
+    return { errors: [failure("registry", error)], stopsPaidSteps: false };
+  }
+}
+
+export interface FormDStepOptions {
+  since?: string;
+  maxDays?: number;
+  maxRequests?: number;
+}
+
+/**
+ * Form D collection, then linking. Linking runs even when collection
+ * failed, so filings stored earlier are still linked.
+ */
+export async function formDStep(
+  deps: PipelineDeps,
+  edgar: EdgarClient,
+  options: FormDStepOptions = {},
+): Promise<StepOutcome<FormDStats>> {
+  const stats = emptyFormDStats();
+  const errors: string[] = [];
+  try {
+    await collectFormDStep({
+      db: deps.db,
+      edgar,
+      clock: deps.clock,
+      since: options.since,
+      maxDays: options.maxDays ?? deps.config.maxEdgarDaysPerRun,
+      maxRequests: options.maxRequests ?? deps.config.maxEdgarRequestsPerRun,
+      log: deps.log,
+      stats,
+    });
+  } catch (error) {
+    errors.push(failure("formd collection", error));
+  }
+  try {
+    await linkFormDFilings({
+      db: deps.db,
+      now: deps.clock.now(),
+      stats,
+      log: deps.log,
+    });
+  } catch (error) {
+    errors.push(failure("formd linking", error));
+  }
+  return { stats, errors, stopsPaidSteps: false };
+}
+
+/** Steps 13 and 14, after the Phase 2 steps. */
+async function phase3LocalSteps(deps: PipelineDeps): Promise<{
+  confirm?: ConfirmStats;
+  sectors?: SectorStats;
+  errors: string[];
+}> {
+  const confirm = await confirmEventsStep(deps);
+  const sectors = await sectorsStep(deps);
+  const errors = [...confirm.errors, ...sectors.errors];
+  for (const message of errors) deps.log(`Step failed: ${message}`);
+  return { confirm: confirm.stats, sectors: sectors.stats, errors };
+}
+
 export interface RunSummary {
   ran: boolean;
   status?: IngestStatus;
@@ -741,7 +916,7 @@ async function spendSoFar(budget: BudgetGuard): Promise<number> {
   return spentUsdMicros;
 }
 
-/** One locked, idempotent ingest run. Spec section 7, and spec-phase2 section 6. */
+/** One locked, idempotent ingest run. Spec section 7, spec-phase2 section 6 and spec-phase3 section 6. */
 export async function runAll(
   deps: PipelineDeps,
   lock: IngestLock,
@@ -766,6 +941,8 @@ export async function runAll(
       } = await phase2Steps(scoped, {
         paidAllowed: !extractPaused && !extract.providerError,
       });
+      const { errors: phase3Errors, ...phase3 } =
+        await phase3LocalSteps(scoped);
       const monthToDate = await spendSoFar(deps.budget);
 
       const budgetPaused = extractPaused || phase2Paused;
@@ -776,6 +953,7 @@ export async function runAll(
         resolve,
         fx,
         ...phase2,
+        ...phase3,
         spendUsdMicros: monthToDate - spentBefore,
         monthToDateUsdMicros: monthToDate,
         capGbp: deps.config.capGbp,
@@ -786,6 +964,7 @@ export async function runAll(
           ? [`extraction: ${extract.providerError}`]
           : []),
         ...errors,
+        ...phase3Errors,
       ];
       let status: IngestStatus = "succeeded";
       if (budgetPaused) status = "budget_paused";
@@ -794,6 +973,82 @@ export async function runAll(
         status,
         stats,
         error: problems.length > 0 ? problems.join("; ") : null,
+      });
+      return { ran: true, status, runId: run.id, stats };
+    } catch (error) {
+      await finishRun(deps.db, run.id, {
+        status: "failed",
+        stats: null,
+        error: describe(error),
+      });
+      throw error;
+    }
+  });
+  return locked.ran ? locked.result : { ran: false };
+}
+
+/**
+ * Stats for a run that does none of the Phase 1 steps: their parts are zero,
+ * so the stored stats keep the shape the status page reads.
+ */
+async function emptyRunStats(deps: PipelineDeps): Promise<IngestStats> {
+  return {
+    collect: {
+      sourcesAttempted: 0,
+      sourcesNotModified: 0,
+      sourcesFailed: 0,
+      itemsFound: 0,
+      itemsInserted: 0,
+    },
+    prefilter: { itemsChecked: 0, itemsPassed: 0, itemsFilteredOut: 0 },
+    extract: {
+      itemsAttempted: 0,
+      itemsExtracted: 0,
+      itemsRelevant: 0,
+      itemsErrored: 0,
+      itemsFailed: 0,
+      ...(deps.llm ? {} : { skipped: true }),
+    },
+    resolve: {
+      extractionsResolved: 0,
+      companiesCreated: 0,
+      investorsCreated: 0,
+      eventsCreated: 0,
+      eventsUpdated: 0,
+      mergeCandidatesCreated: 0,
+    },
+    fx: { ratesFetched: 0, eventsConverted: 0, eventsMissingRate: 0 },
+    spendUsdMicros: 0,
+    monthToDateUsdMicros: await spendSoFar(deps.budget),
+    capGbp: deps.config.capGbp,
+    budgetPaused: false,
+  };
+}
+
+/**
+ * One locked, recorded run of a free command. `body` returns the stats and
+ * any step failures; a failure marks the run `failed` but keeps the stats.
+ * An unexpected error marks it `failed` and is rethrown.
+ */
+async function recordedRun(
+  deps: PipelineDeps,
+  lock: IngestLock,
+  trigger: IngestTrigger,
+  body: (
+    scoped: PipelineDeps,
+  ) => Promise<{ stats: IngestStats; errors: string[] }>,
+): Promise<RunSummary> {
+  const locked = await withIngestLock(lock, async () => {
+    const run = await startRun(deps.db, trigger);
+    const scoped: PipelineDeps = { ...deps, runId: run.id };
+    try {
+      const { stats, errors } = await body(scoped);
+      for (const message of errors) deps.log(`Step failed: ${message}`);
+      const status: IngestStatus = errors.length > 0 ? "failed" : "succeeded";
+      await finishRun(deps.db, run.id, {
+        status,
+        stats,
+        error: errors.length > 0 ? errors.join("; ") : null,
       });
       return { ran: true, status, runId: run.id, stats };
     } catch (error) {
@@ -824,67 +1079,115 @@ export async function runGrants(
   trigger: IngestTrigger,
   options: GrantsRunOptions = {},
 ): Promise<RunSummary> {
-  const locked = await withIngestLock(lock, async () => {
-    const run = await startRun(deps.db, trigger);
-    try {
-      const grantCollect: GrantCollectStats = await collectGrantsStep({
-        db: deps.db,
-        gtr: deps.gtr,
-        since: options.since,
-        maxPages: options.maxPages,
-        maxOrgFetches: options.maxOrgFetches,
-        now: () => deps.clock.now(),
-      });
-      const monthToDate = await spendSoFar(deps.budget);
-      // The Phase 1 parts are zero: this run collects grants only.
-      const stats: IngestStats = {
-        collect: {
-          sourcesAttempted: 0,
-          sourcesNotModified: 0,
-          sourcesFailed: 0,
-          itemsFound: 0,
-          itemsInserted: 0,
-        },
-        prefilter: { itemsChecked: 0, itemsPassed: 0, itemsFilteredOut: 0 },
-        extract: {
-          itemsAttempted: 0,
-          itemsExtracted: 0,
-          itemsRelevant: 0,
-          itemsErrored: 0,
-          itemsFailed: 0,
-          ...(deps.llm ? {} : { skipped: true }),
-        },
-        resolve: {
-          extractionsResolved: 0,
-          companiesCreated: 0,
-          investorsCreated: 0,
-          eventsCreated: 0,
-          eventsUpdated: 0,
-          mergeCandidatesCreated: 0,
-        },
-        fx: { ratesFetched: 0, eventsConverted: 0, eventsMissingRate: 0 },
-        grantCollect,
-        spendUsdMicros: 0,
-        monthToDateUsdMicros: monthToDate,
-        capGbp: deps.config.capGbp,
-        budgetPaused: false,
-      };
-      await finishRun(deps.db, run.id, {
-        status: "succeeded",
-        stats,
-        error: null,
-      });
-      return { ran: true, status: "succeeded" as const, runId: run.id, stats };
-    } catch (error) {
-      await finishRun(deps.db, run.id, {
-        status: "failed",
-        stats: null,
-        error: describe(error),
-      });
-      throw error;
-    }
+  return recordedRun(deps, lock, trigger, async (scoped) => {
+    // Unlike the Phase 3 steps, a grants failure is thrown, as before.
+    const grantCollect: GrantCollectStats = await collectGrantsStep({
+      db: scoped.db,
+      gtr: scoped.gtr,
+      since: options.since,
+      maxPages: options.maxPages,
+      maxOrgFetches: options.maxOrgFetches,
+      now: () => scoped.clock.now(),
+    });
+    return {
+      stats: { ...(await emptyRunStats(scoped)), grantCollect },
+      errors: [],
+    };
   });
-  return locked.ran ? locked.result : { ran: false };
+}
+
+export interface RegistryRunOptions {
+  /** Overrides `MAX_CH_REQUESTS_PER_RUN` (backfills). */
+  maxRequests?: number;
+}
+
+/**
+ * `pnpm ingest registry`: the Companies House step, then confirm, locations
+ * and sectors, so new links show in the same run. Without a key the run is
+ * recorded with `registry.skipped` and nothing else runs. A failing step
+ * never stops the ones after it.
+ */
+export async function runRegistry(
+  deps: PipelineDeps,
+  lock: IngestLock,
+  trigger: IngestTrigger,
+  options: RegistryRunOptions = {},
+): Promise<RunSummary> {
+  return recordedRun(deps, lock, trigger, async (scoped) => {
+    const errors: string[] = [];
+    const track = <T>(outcome: StepOutcome<T>): T | undefined => {
+      errors.push(...outcome.errors);
+      return outcome.stats;
+    };
+    const base = await emptyRunStats(scoped);
+    const registry = track(
+      await companiesHouseRegistryStep(scoped, {
+        maxRequests: options.maxRequests,
+      }),
+    );
+    if (registry?.skipped) return { stats: { ...base, registry }, errors };
+
+    const confirm = track(await confirmEventsStep(scoped));
+    const locations = track(await locationsStep(scoped));
+    const sectors = track(await sectorsStep(scoped));
+    return {
+      stats: { ...base, registry, confirm, locations, sectors },
+      errors,
+    };
+  });
+}
+
+/** `HTTP_CONTACT` has no email address, so EDGAR may not be called. */
+export class FormDContactError extends Error {
+  constructor() {
+    super(
+      "formd needs HTTP_CONTACT to contain an email address (SEC EDGAR fair access). Nothing was fetched.",
+    );
+    this.name = "FormDContactError";
+  }
+}
+
+export type FormDRunOptions = FormDStepOptions;
+
+/**
+ * `pnpm ingest formd`: collect Form D filings, link issuers, then confirm.
+ * Refuses, before taking the lock or recording a run, when `HTTP_CONTACT`
+ * has no email address.
+ */
+export async function runFormD(
+  deps: PipelineDeps,
+  lock: IngestLock,
+  trigger: IngestTrigger,
+  options: FormDRunOptions = {},
+): Promise<RunSummary> {
+  const edgar = deps.edgar;
+  if (!edgar) throw new FormDContactError();
+  return recordedRun(deps, lock, trigger, async (scoped) => {
+    const errors: string[] = [];
+    const track = <T>(outcome: StepOutcome<T>): T | undefined => {
+      errors.push(...outcome.errors);
+      return outcome.stats;
+    };
+    const base = await emptyRunStats(scoped);
+    const formD = track(await formDStep(scoped, edgar, options));
+    const confirm = track(await confirmEventsStep(scoped));
+    return { stats: { ...base, formD, confirm }, errors };
+  });
+}
+
+/**
+ * `pnpm ingest relink-grants`: the one-off relink of news grant reports to
+ * grant events (spec-phase3 section 9.4). Run under the lock by the CLI.
+ */
+export function relinkGrantsStep(
+  deps: PipelineDeps,
+  { dryRun = false }: { dryRun?: boolean } = {},
+): Promise<RelinkGrantsResult> {
+  return relinkGrantReports({
+    db: deps.db,
+    now: () => deps.clock.now(),
+    dryRun,
+  });
 }
 
 export interface ReextractOptions {
