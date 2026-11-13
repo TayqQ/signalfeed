@@ -15,6 +15,7 @@ import {
   type Recording,
 } from "./recording";
 import { renderReport, renderTable, scoreRecording } from "./report";
+import { renderLinkReport, runLinkEval } from "./links";
 import { renderResolutionReport, runResolutionEval } from "./resolution";
 import {
   TAG_EMBEDDING_TEMPLATE,
@@ -56,6 +57,7 @@ import {
 
 const REPORT_PATH = "docs/eval-results.md";
 const RESOLUTION_REPORT_PATH = "docs/resolution-eval-results.md";
+const LINK_REPORT_PATH = "docs/link-eval-results.md";
 const LIVE_CAP_USD_MICROS = 1_000_000;
 /** Cap for one `--themes --check --live` run: the verdicts cost cents. */
 const THEME_CHECK_LIVE_CAP_USD_MICROS = 100_000;
@@ -65,6 +67,7 @@ const USAGE = `Usage: pnpm eval <mode>
   --replay [--model <id>]        Score committed recordings. No network, no cost
   --live --model <id> [...]      Call the model on every case and record it. Costs money
   --resolution                   Score company and event merging. No network, no cost
+  --links                        Score the registry link rules on labelled cases. No network, no cost
   --themes                       Sweep the theme threshold on the recorded embeddings. No network, no cost
   --themes --live                Embed the labelled tags once and record them. Costs well under $0.001
   --themes [--live] --model <id> The same with another embedding model. Prints the sweep; the report stays the default model's
@@ -413,6 +416,7 @@ async function main(): Promise<number> {
       live: { type: "boolean", default: false },
       replay: { type: "boolean", default: false },
       resolution: { type: "boolean", default: false },
+      links: { type: "boolean", default: false },
       themes: { type: "boolean", default: false },
       check: { type: "boolean", default: false },
       describe: { type: "boolean", default: false },
@@ -440,6 +444,14 @@ async function main(): Promise<number> {
     writeFileSync(RESOLUTION_REPORT_PATH, body);
     console.log(body);
     return 0;
+  }
+
+  if (values.links) {
+    const result = runLinkEval();
+    const body = renderLinkReport(result);
+    writeFileSync(LINK_REPORT_PATH, body);
+    console.log(body);
+    return result.total.wrongLinks === 0 ? 0 : 1;
   }
 
   if (values.themes) {
