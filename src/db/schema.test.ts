@@ -7,20 +7,38 @@ import { eq, type SQL, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ALIAS_SOURCES, LLM_PURPOSES, SOURCE_KINDS } from "@/core/enums";
+import {
+  ALIAS_SOURCES,
+  FOUNDED_YEAR_SOURCES,
+  LINK_DECIDED_BY,
+  LLM_PURPOSES,
+  LOCATION_SOURCES,
+  RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  REGISTRY_LINK_STATUSES,
+  REGISTRY_SEARCH_OUTCOMES,
+  SECTOR_SOURCES,
+  SOURCE_KINDS,
+} from "@/core/enums";
 import type { ExtractionV1 } from "@/core/extraction-schema";
 import type { Db } from "./client";
 import {
   acquisitions,
+  chAddressCounts,
   companies,
   companyAliases,
   companyLocations,
+  companySectors,
   EMBEDDING_DIMENSIONS,
+  edgarIndexDays,
+  eventConfirmations,
   eventInvestors,
   eventRecordSources,
   events,
   eventSources,
   extractions,
+  formDFilings,
   fundingRoundMomentum,
   fundingRounds,
   grantProjects,
@@ -29,6 +47,7 @@ import {
   launches,
   launchMetricSnapshots,
   llmUsage,
+  registryLinks,
   sourceItems,
   sources,
   tags,
@@ -41,18 +60,25 @@ import { createTestDb, type TestDb } from "./testing";
 
 const EXPECTED_TABLES = [
   "acquisitions",
+  "ch_address_counts",
+  "ch_companies",
+  "ch_filings",
   "companies",
   "company_aliases",
   "company_locations",
+  "company_sectors",
   "company_tags",
   "company_themes",
   "derived_rebuilds",
+  "edgar_index_days",
   "entity_merges",
+  "event_confirmations",
   "event_investors",
   "event_record_sources",
   "event_sources",
   "events",
   "extractions",
+  "form_d_filings",
   "funding_round_momentum",
   "funding_rounds",
   "fx_rates",
@@ -67,6 +93,8 @@ const EXPECTED_TABLES = [
   "launches",
   "llm_usage",
   "merge_candidates",
+  "registry_links",
+  "registry_searches",
   "source_item_texts",
   "source_items",
   "sources",
@@ -94,6 +122,19 @@ const PHASE_2_PRIMARY_KEYS: Record<string, string[]> = {
   weekly_totals: ["week_start"],
 };
 
+/** Primary key columns of every Phase 3 table, in key order. */
+const PHASE_3_PRIMARY_KEYS: Record<string, string[]> = {
+  ch_address_counts: ["postcode"],
+  ch_companies: ["company_number"],
+  ch_filings: ["id"],
+  company_sectors: ["company_id", "sector"],
+  edgar_index_days: ["day"],
+  event_confirmations: ["event_id", "record_kind", "record_id"],
+  form_d_filings: ["id"],
+  registry_links: ["id"],
+  registry_searches: ["company_id", "registry"],
+};
+
 const MIGRATIONS_FOLDER = fileURLToPath(
   new URL("../../drizzle", import.meta.url),
 );
@@ -102,6 +143,13 @@ function migrationFiles(): string[] {
   return readdirSync(MIGRATIONS_FOLDER)
     .filter((name) => name.endsWith(".sql"))
     .sort();
+}
+
+/** The migration file whose name starts with `prefix`, such as "0003_". */
+function migrationFile(prefix: string): string {
+  const file = migrationFiles().find((name) => name.startsWith(prefix));
+  if (!file) throw new Error(`No migration starting with ${prefix}`);
+  return file;
 }
 
 function migrationStatements(file: string): string[] {
@@ -478,23 +526,76 @@ async function insertTheme(slug = "ai-agents") {
   return { theme: theme!, tag };
 }
 
+/** Primary key columns of every table, by table name. */
+async function primaryKeys(): Promise<Record<string, string[]>> {
+  const rows = await selectRows<{ table_name: string; columns: string[] }>(
+    sql`
+      SELECT tc.table_name,
+             array_agg(kcu.column_name::text ORDER BY kcu.ordinal_position) AS columns
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu
+        ON kcu.constraint_name = tc.constraint_name
+       AND kcu.table_schema = tc.table_schema
+      WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'
+      GROUP BY tc.table_name
+    `,
+  );
+  return Object.fromEntries(rows.map((row) => [row.table_name, row.columns]));
+}
+
+const asPgArray = (values: readonly string[]) => `{${values.join(",")}}`;
+
+/**
+ * Applies every migration before `file`, inserts rows that use only old enum
+ * values, applies `file`, and checks the rows are unchanged.
+ */
+async function expectRowsUntouchedBy(file: string): Promise<void> {
+  const client = await newPglite();
+  try {
+    for (const earlier of migrationFiles().filter((name) => name < file)) {
+      for (const statement of migrationStatements(earlier)) {
+        await client.exec(statement);
+      }
+    }
+    await client.exec(`
+      INSERT INTO sources (slug, name, kind, url)
+        VALUES ('old-feed', 'Old feed', 'rss', 'https://example.com/feed');
+      INSERT INTO companies (slug, name, normalised_name, founded_year, founded_year_source)
+        VALUES ('acme', 'Acme', 'acme', 2021, 'news');
+      INSERT INTO company_aliases (company_id, alias, normalised_alias, source)
+        VALUES (1, 'Acme Ltd', 'acme', 'extraction');
+      INSERT INTO llm_usage (purpose, model, input_tokens, output_tokens, cost_usd_micros)
+        VALUES ('extraction', 'gpt-4.1-nano', 10, 5, 1);
+    `);
+    const snapshot = `
+      SELECT (SELECT row_to_json(s) FROM sources s) AS source,
+             (SELECT row_to_json(c) FROM companies c) AS company,
+             (SELECT row_to_json(a) FROM company_aliases a) AS alias,
+             (SELECT row_to_json(u) FROM llm_usage u) AS usage
+    `;
+    const before = await client.query(snapshot);
+
+    for (const statement of migrationStatements(file)) {
+      await client.exec(statement);
+    }
+
+    expect((await client.query(snapshot)).rows).toEqual(before.rows);
+  } finally {
+    await client.close();
+  }
+}
+
+/** Phase migrations may only add: no DROP, no column type change, no UPDATE. */
+function expectAdditiveOnly(file: string): void {
+  const text = readFileSync(`${MIGRATIONS_FOLDER}/${file}`, "utf8");
+  expect(text).not.toMatch(/\bDROP\b/i);
+  expect(text).not.toMatch(/ALTER COLUMN/i);
+  expect(text).not.toMatch(/^\s*UPDATE\b/im);
+}
+
 describe("phase 2 migration", () => {
   it("gives every new table its primary key", async () => {
-    const rows = await selectRows<{ table_name: string; columns: string[] }>(
-      sql`
-        SELECT tc.table_name,
-               array_agg(kcu.column_name::text ORDER BY kcu.ordinal_position) AS columns
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu
-          ON kcu.constraint_name = tc.constraint_name
-         AND kcu.table_schema = tc.table_schema
-        WHERE tc.table_schema = 'public' AND tc.constraint_type = 'PRIMARY KEY'
-        GROUP BY tc.table_name
-      `,
-    );
-    const keys = Object.fromEntries(
-      rows.map((row) => [row.table_name, row.columns]),
-    );
+    const keys = await primaryKeys();
     for (const [table, columns] of Object.entries(PHASE_2_PRIMARY_KEYS)) {
       expect(keys[table], table).toEqual(columns);
     }
@@ -510,7 +611,6 @@ describe("phase 2 migration", () => {
              enum_range(NULL::llm_purpose)::text AS llm_purpose,
              enum_range(NULL::alias_source)::text AS alias_source
     `);
-    const asPgArray = (values: readonly string[]) => `{${values.join(",")}}`;
     expect(row).toEqual({
       source_kind: asPgArray(SOURCE_KINDS),
       llm_purpose: asPgArray(LLM_PURPOSES),
@@ -549,39 +649,7 @@ describe("phase 2 migration", () => {
   });
 
   it("leaves existing rows untouched when it appends enum values", async () => {
-    const client = await newPglite();
-    try {
-      const [phase2, ...earlier] = migrationFiles().reverse();
-      for (const file of earlier.reverse()) {
-        for (const statement of migrationStatements(file)) {
-          await client.exec(statement);
-        }
-      }
-      await client.exec(`
-        INSERT INTO sources (slug, name, kind, url)
-          VALUES ('old-feed', 'Old feed', 'rss', 'https://example.com/feed');
-        INSERT INTO companies (slug, name, normalised_name)
-          VALUES ('acme', 'Acme', 'acme');
-        INSERT INTO company_aliases (company_id, alias, normalised_alias, source)
-          VALUES (1, 'Acme Ltd', 'acme', 'extraction');
-        INSERT INTO llm_usage (purpose, model, input_tokens, output_tokens, cost_usd_micros)
-          VALUES ('extraction', 'gpt-4.1-nano', 10, 5, 1);
-      `);
-      const snapshot = `
-        SELECT (SELECT row_to_json(s) FROM sources s) AS source,
-               (SELECT row_to_json(a) FROM company_aliases a) AS alias,
-               (SELECT row_to_json(u) FROM llm_usage u) AS usage
-      `;
-      const before = await client.query(snapshot);
-
-      for (const statement of migrationStatements(phase2!)) {
-        await client.exec(statement);
-      }
-
-      expect((await client.query(snapshot)).rows).toEqual(before.rows);
-    } finally {
-      await client.close();
-    }
+    await expectRowsUntouchedBy(migrationFile("0002_"));
   }, 30_000);
 
   it("is a no-op when applied a second time", async () => {
@@ -600,12 +668,7 @@ describe("phase 2 migration", () => {
   }, 30_000);
 
   it("has no DROP, column type change or UPDATE", () => {
-    const phase2 = migrationFiles().find((file) => file.startsWith("0002_"));
-    expect(phase2).toBeDefined();
-    const text = readFileSync(`${MIGRATIONS_FOLDER}/${phase2}`, "utf8");
-    expect(text).not.toMatch(/\bDROP\b/i);
-    expect(text).not.toMatch(/ALTER COLUMN/i);
-    expect(text).not.toMatch(/^\s*UPDATE\b/im);
+    expectAdditiveOnly(migrationFile("0002_"));
   });
 });
 
@@ -795,5 +858,200 @@ describe("grants", () => {
           .values({ projectId: project!.id, abstract: "a".repeat(1500) }),
       ),
     ).toBeUndefined();
+  });
+});
+
+async function insertLink(
+  companyId: number,
+  registryId: string,
+  status: "linked" | "candidate" | "rejected",
+  registry: "companies_house" | "sec_edgar" = "companies_house",
+) {
+  return db.insert(registryLinks).values({
+    companyId,
+    registry,
+    registryId,
+    registryName: "ACME ROBOTICS LTD",
+    status,
+    method: status === "linked" ? "name_filing" : null,
+    reason: "test",
+    decidedBy: "auto",
+  });
+}
+
+describe("phase 3 migration", () => {
+  it("gives every new table its primary key", async () => {
+    const keys = await primaryKeys();
+    for (const [table, columns] of Object.entries(PHASE_3_PRIMARY_KEYS)) {
+      expect(keys[table], table).toEqual(columns);
+    }
+  });
+
+  it("matches the appended and new enum values in src/core/enums.ts", async () => {
+    const [row] = await selectRows<Record<string, string>>(sql`
+      SELECT enum_range(NULL::alias_source)::text AS alias_source,
+             enum_range(NULL::founded_year_source)::text AS founded_year_source,
+             enum_range(NULL::llm_purpose)::text AS llm_purpose,
+             enum_range(NULL::location_source)::text AS location_source,
+             enum_range(NULL::record_kind)::text AS record_kind,
+             enum_range(NULL::registry_kind)::text AS registry_kind,
+             enum_range(NULL::registry_link_status)::text AS registry_link_status,
+             enum_range(NULL::registry_link_method)::text AS registry_link_method,
+             enum_range(NULL::link_decided_by)::text AS link_decided_by,
+             enum_range(NULL::registry_search_outcome)::text AS registry_search_outcome,
+             enum_range(NULL::sector_source)::text AS sector_source
+    `);
+    expect(row).toEqual({
+      alias_source: asPgArray(ALIAS_SOURCES),
+      founded_year_source: asPgArray(FOUNDED_YEAR_SOURCES),
+      llm_purpose: asPgArray(LLM_PURPOSES),
+      location_source: asPgArray(LOCATION_SOURCES),
+      record_kind: asPgArray(RECORD_KINDS),
+      registry_kind: asPgArray(REGISTRY_KINDS),
+      registry_link_status: asPgArray(REGISTRY_LINK_STATUSES),
+      registry_link_method: asPgArray(REGISTRY_LINK_METHODS),
+      link_decided_by: asPgArray(LINK_DECIDED_BY),
+      registry_search_outcome: asPgArray(REGISTRY_SEARCH_OUTCOMES),
+      sector_source: asPgArray(SECTOR_SOURCES),
+    });
+  });
+
+  it("leaves existing rows untouched", async () => {
+    await expectRowsUntouchedBy(migrationFile("0003_"));
+  }, 30_000);
+
+  it("has no DROP, column type change or UPDATE", () => {
+    expectAdditiveOnly(migrationFile("0003_"));
+  });
+
+  it("allows one linked row per company and registry", async () => {
+    const company = await insertCompany();
+    await insertLink(company.id, "09876543", "linked");
+
+    expect(await sqlState(insertLink(company.id, "01234567", "linked"))).toBe(
+      UNIQUE_VIOLATION,
+    );
+    expect(
+      await sqlState(insertLink(company.id, "01234567", "candidate")),
+    ).toBeUndefined();
+    expect(
+      await sqlState(insertLink(company.id, "1999999", "linked", "sec_edgar")),
+    ).toBeUndefined();
+  });
+
+  it("allows one linked row per registry number", async () => {
+    const first = await insertCompany("acme-robotics");
+    const second = await insertCompany("acmerobotics");
+    await insertLink(first.id, "09876543", "linked");
+
+    expect(await sqlState(insertLink(second.id, "09876543", "linked"))).toBe(
+      UNIQUE_VIOLATION,
+    );
+  });
+
+  it("allows candidates for the same number on two companies", async () => {
+    const first = await insertCompany("acme-robotics");
+    const second = await insertCompany("acmerobotics");
+
+    await insertLink(first.id, "09876543", "candidate");
+    await insertLink(second.id, "09876543", "candidate");
+    await insertLink(second.id, "01234567", "rejected");
+
+    expect(await db.select().from(registryLinks)).toHaveLength(3);
+  });
+
+  it("requires a method on a linked row", async () => {
+    const company = await insertCompany();
+
+    expect(
+      await sqlState(
+        db.insert(registryLinks).values({
+          companyId: company.id,
+          registry: "companies_house",
+          registryId: "09876543",
+          registryName: "ACME ROBOTICS LTD",
+          status: "linked",
+          reason: "test",
+          decidedBy: "auto",
+        }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+  });
+
+  it("rejects negative amounts and counts", async () => {
+    const source = await insertSource("sec-edgar");
+    const filing = {
+      sourceId: source.id,
+      accessionNumber: "0001999999-26-000001",
+      cik: "1999999",
+      issuerName: "Orbital Forge, Inc.",
+      isAmendment: false,
+      filedOn: "2026-01-16",
+    };
+
+    expect(
+      await sqlState(
+        db.insert(formDFilings).values({ ...filing, totalSoldUsdMinor: -1 }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db.insert(chAddressCounts).values({
+          postcode: "EC2A 4NE",
+          activeCompanies: -1,
+          checkedAt: new Date(),
+        }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db
+          .insert(edgarIndexDays)
+          .values({ day: "2026-01-16", status: "done", fundSkipped: -1 }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db.insert(edgarIndexDays).values({ day: "2026-01-17", status: "late" }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db.insert(formDFilings).values({
+          ...filing,
+          totalOfferingUsdMinor: null,
+          totalSoldUsdMinor: 440_000_000,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("cascades event deletes to confirmations and accepts the new record kinds", async () => {
+    const { event, company } = await insertFundedEvent();
+    await db.insert(eventConfirmations).values([
+      {
+        eventId: event.id,
+        recordKind: "ch_allotment",
+        recordId: 1,
+        rule: "ch_allotment_window",
+        recordDate: "2026-08-01",
+      },
+      {
+        eventId: event.id,
+        recordKind: "sec_form_d",
+        recordId: 1,
+        rule: "form_d_window",
+        recordDate: "2026-08-05",
+        confirmsAmount: true,
+      },
+    ]);
+    await db
+      .insert(companySectors)
+      .values({ companyId: company.id, sector: "software-ai", source: "sic" });
+
+    await db.delete(events).where(eq(events.id, event.id));
+
+    expect(await db.select().from(eventConfirmations)).toEqual([]);
+    expect(await db.select().from(companySectors)).toHaveLength(1);
   });
 });

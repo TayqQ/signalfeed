@@ -12,9 +12,14 @@ import type {
   InvestorRole,
   LaunchKind,
   LocationPrecision,
+  RecordKind,
+  RegistryKind,
+  RegistryLinkMethod,
+  RegistryLinkStatus,
   RoundType,
   SourceItemStatus,
 } from "./enums";
+import type { CompanySizeBand } from "./registry";
 import type { Sector } from "./sectors";
 
 // Read models are plain JSON-serialisable data so they survive the page cache:
@@ -70,6 +75,13 @@ export interface FundingCriteria {
   /** Located companies within `km` of a UK place. */
   near?: { placeSlug: string; km: NearRadiusKm };
   momentum?: MomentumFilter;
+  /** Phase 3 (D60): only events confirmed by an official record. */
+  evidence?: "confirmed";
+  /**
+   * Phase 3 (D60): the company's size band from its last accounts; a round
+   * matches any of them. Companies with no Companies House link never match.
+   */
+  companySizes?: CompanySizeBand[];
 }
 
 /** How to show the matches. Not part of a saved search. */
@@ -111,6 +123,17 @@ export interface RoundMomentum {
   stepUpBasisOn: string | null;
 }
 
+/** An official record that confirms an event (spec-phase3 section 9). */
+export interface EventConfirmation {
+  kind: RecordKind;
+  /** YYYY-MM-DD: the allotment date, the Form D first sale, or the grant start. */
+  recordDate: string;
+  /** True only when the record's amount agrees with the reported one. */
+  confirmsAmount: boolean;
+  /** The marker wording, such as "Confirmed: shares allotted on 2 February 2026 (Companies House SH01)". */
+  text: string;
+}
+
 export interface FundingRow {
   eventId: number;
   companySlug: string;
@@ -130,8 +153,10 @@ export interface FundingRow {
   tags: TagRef[];
   /** Equity rounds only; null for debt and grant rounds. */
   momentum?: RoundMomentum | null;
-  /** `confirmed` for grants from an official record. */
+  /** `confirmed` for grants and for news rounds confirmed by a filing. */
   evidence?: EvidenceLevel;
+  /** The closest confirming record. Null or unset when not confirmed. */
+  confirmation?: EventConfirmation | null;
 }
 
 export interface Page<T> {
@@ -156,6 +181,8 @@ interface CompanyEventBase {
   evidence: EvidenceLevel;
   sourceCount: number;
   sources: EventSourceLink[];
+  /** Closest record first. Empty or unset when not confirmed. */
+  confirmations?: EventConfirmation[];
 }
 
 export interface EventInvestor extends InvestorRef {
@@ -210,6 +237,47 @@ export interface CompanyLocationView {
   countryCode: string;
 }
 
+/** A SIC code with its description; `label` is null for an unknown code. */
+export interface SicCodeView {
+  code: string;
+  label: string | null;
+}
+
+/**
+ * The company's Companies House record (spec-phase3 section 11). Never holds
+ * the full registered office postcode.
+ */
+export interface CompaniesHouseView {
+  companyNumber: string;
+  url: string;
+  /** The name Companies House gives. */
+  name: string;
+  /** Companies House's own wording, such as "Active" or "In Administration". */
+  statusLabel: string;
+  /** Such as "Private limited company". */
+  typeLabel: string;
+  /** YYYY-MM-DD. Shown as the incorporation date, beside any news founded year (D61). */
+  incorporatedOn: string;
+  ceasedOn: string | null;
+  sicCodes: SicCodeView[];
+  sizeBand: CompanySizeBand;
+  /** YYYY-MM-DD of the last accounts, or null when none are filed. */
+  accountsMadeUpTo: string | null;
+  /** Postcode district, such as "LS1". */
+  officeOutcode: string | null;
+}
+
+export interface SecFilerView {
+  cik: string;
+  url: string;
+}
+
+/** Linked registry records only. Candidates and rejected links are never shown. */
+export interface CompanyRegistryView {
+  companiesHouse: CompaniesHouseView | null;
+  sec: SecFilerView | null;
+}
+
 export interface CompanyDetail {
   id: number;
   slug: string;
@@ -239,6 +307,8 @@ export interface CompanyDetail {
   location?: CompanyLocationView | null;
   /** Equity rounds in the 24 months to today, counted at read time. */
   roundsInLast24Months?: number;
+  /** Null when the company has no linked registry record. */
+  registry?: CompanyRegistryView | null;
 }
 
 export interface InvestorRoundRow extends FundingRow {
@@ -282,6 +352,52 @@ export interface StatusSummary {
   capGbp: number | null;
   /** Latest stored rate. Null falls back to 1.0, as the budget guard does. */
   usdPerGbp: number | null;
+  registry?: RegistryStatus;
+  formD?: FormDStatus;
+  confirmations?: ConfirmationStatus;
+}
+
+// Phase 3 status counts (spec-phase3 section 11).
+
+export interface RegistryLinkCounts {
+  /** Every status is present; zero when there are none. `candidate` is the open review queue. */
+  byStatus: Record<RegistryLinkStatus, number>;
+  /** `linked` rows only. Every method is present; zero when there are none. */
+  linkedByMethod: Record<RegistryLinkMethod, number>;
+}
+
+export interface RegistryStatus {
+  /** Every registry is present. */
+  links: Record<RegistryKind, RegistryLinkCounts>;
+  /** Companies whose latest Companies House search found nothing. */
+  searchedNoMatch: number;
+  /** Linked profiles not fetched for more than 90 days. */
+  profilesOlderThan90Days: number;
+  /** From the latest run with registry stats; null before the first. */
+  lastRun: {
+    requests: number;
+    profilesRefreshed: number;
+    stoppedAtLimit: boolean;
+    rateLimited: boolean;
+    /** True when the run had no Companies House key. */
+    skipped: boolean;
+  } | null;
+}
+
+export interface FormDStatus {
+  /** YYYY-MM-DD of the latest index day marked `done`; null before the first. */
+  lastDoneDay: string | null;
+  filingsStored: number;
+  fundsSkipped: number;
+  /** Stored filings linked to a company. */
+  filingsLinked: number;
+}
+
+export interface ConfirmationStatus {
+  /** Rows of `event_confirmations`. Every kind is present. */
+  byRecordKind: Record<RecordKind, number>;
+  /** News events (no record source) with `evidence = confirmed`. */
+  newsEventsConfirmed: number;
 }
 
 // Themes and trends (docs/spec-phase2.md sections 7, 8 and 12).

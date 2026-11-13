@@ -32,3 +32,11 @@ REVOKE ALL ON source_item_texts FROM signalfeed_web;
 
 -- Grant project abstracts are LLM input only and are never shown.
 REVOKE ALL ON grant_project_texts FROM signalfeed_web;
+
+-- Phase 3 (Task 051) needs no new revoke. None of its tables holds article text,
+-- abstracts or personal data: registry_links, registry_searches, ch_companies,
+-- ch_filings, ch_address_counts, form_d_filings, edgar_index_days,
+-- event_confirmations and company_sectors hold organisation facts only (D58).
+-- ch_companies.office_postcode is a company's public registered office. The web
+-- role keeps read access, as for grant_participants.postcode, but pages never
+-- display it; they show the postcode district.

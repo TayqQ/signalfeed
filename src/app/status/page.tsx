@@ -1,7 +1,21 @@
 import type { Metadata } from "next";
-import type { EventType, IngestStatus, SourceItemStatus } from "@/core/enums";
-import { EVENT_TYPES, SOURCE_ITEM_STATUSES } from "@/core/enums";
-import { LLM_PURPOSES, type LlmPurpose } from "@/core/enums";
+import type {
+  EventType,
+  IngestStatus,
+  RecordKind,
+  SourceItemStatus,
+} from "@/core/enums";
+import {
+  EVENT_TYPES,
+  LLM_PURPOSES,
+  RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  SOURCE_ITEM_STATUSES,
+  type LlmPurpose,
+  type RegistryKind,
+  type RegistryLinkMethod,
+} from "@/core/enums";
 import type { IngestRunSummary } from "@/core/read-models";
 import {
   getStatusSummary,
@@ -154,6 +168,8 @@ function formatPurpose(purpose: LlmPurpose): string {
       return "Tagging";
     case "eval":
       return "Eval";
+    case "document_reading":
+      return "Document reading";
     default: {
       const exhaustive: never = purpose;
       return exhaustive;
@@ -164,7 +180,7 @@ function formatPurpose(purpose: LlmPurpose): string {
 function SpendByPurpose({ summary }: { summary: StatusReport }) {
   const byPurpose = summary.phase2.spendByPurposeUsdMicros;
   return (
-    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
       {LLM_PURPOSES.map((purpose) => (
         <div
           key={purpose}
@@ -285,6 +301,179 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
         />
       </section>
     </>
+  );
+}
+
+const REGISTRY_LABELS: Record<RegistryKind, string> = {
+  companies_house: "Companies House",
+  sec_edgar: "SEC EDGAR",
+};
+
+const METHOD_LABELS: Record<RegistryLinkMethod, string> = {
+  grant_number: "Grant number",
+  name_grant_postcode: "Name and grant postcode",
+  name_filing: "Name and filing",
+  name_location: "Name and location",
+  prefix_filing_location: "Name prefix, filing and location",
+  form_d_round: "Form D and round",
+  manual: "Manual",
+};
+
+function formatRecordKind(kind: RecordKind): string {
+  switch (kind) {
+    case "ukri_grant":
+      return "Grant records";
+    case "ch_allotment":
+      return "SH01 allotments";
+    case "sec_form_d":
+      return "Form D filings";
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function RegistrySections({ summary }: { summary: StatusReport }) {
+  const { registry, formD, confirmations } = summary;
+  const run = registry.lastRun;
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold">Registry and filings</h2>
+      <p className="mt-1 text-sm text-zinc-600">
+        Open candidates wait for a person to review them. A &ldquo;confirmed
+        news event&rdquo; is a news round that an official filing matches.
+      </p>
+      <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-zinc-50 text-zinc-600">
+            <tr>
+              <th className="px-3 py-2 font-medium">Registry</th>
+              <th className="px-3 py-2 font-medium text-right">Linked</th>
+              <th className="px-3 py-2 font-medium text-right">
+                Open candidates
+              </th>
+              <th className="px-3 py-2 font-medium text-right">Rejected</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200">
+            {REGISTRY_KINDS.map((kind) => {
+              const counts = registry.links[kind].byStatus;
+              return (
+                <tr key={kind} className="text-zinc-800">
+                  <td className="px-3 py-2">{REGISTRY_LABELS[kind]}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {counts.linked}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {counts.candidate}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {counts.rejected}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="mt-6 text-sm font-medium text-zinc-700">
+        Links by method
+      </h3>
+      <div className="mt-2 overflow-x-auto rounded-lg border border-zinc-200">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-zinc-50 text-zinc-600">
+            <tr>
+              <th className="px-3 py-2 font-medium">Method</th>
+              {REGISTRY_KINDS.map((kind) => (
+                <th key={kind} className="px-3 py-2 font-medium text-right">
+                  {REGISTRY_LABELS[kind]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200">
+            {REGISTRY_LINK_METHODS.map((method) => (
+              <tr key={method} className="text-zinc-800">
+                <td className="px-3 py-2">{METHOD_LABELS[method]}</td>
+                {REGISTRY_KINDS.map((kind) => (
+                  <td key={kind} className="px-3 py-2 text-right tabular-nums">
+                    {registry.links[kind].linkedByMethod[method]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="mt-6 text-sm font-medium text-zinc-700">
+        Companies House
+      </h3>
+      <StatGrid
+        items={[
+          { label: "Searched, no match", value: registry.searchedNoMatch },
+          {
+            label: "Profiles older than 90 days",
+            value: registry.profilesOlderThan90Days,
+          },
+          {
+            label: "Last run requests",
+            value: run ? run.requests : "No run yet",
+          },
+          {
+            label: "Last run profiles refreshed",
+            value: run ? run.profilesRefreshed : "No run yet",
+          },
+        ]}
+      />
+      {run?.skipped ? (
+        <p className="mt-3 text-sm text-zinc-700">
+          The last registry run was skipped because no Companies House key is
+          set.
+        </p>
+      ) : null}
+      {run?.stoppedAtLimit ? (
+        <p className="mt-3 text-sm text-amber-900">
+          The last registry run stopped at its request limit. The rest waits for
+          the next run.
+        </p>
+      ) : null}
+      {run?.rateLimited ? (
+        <p className="mt-3 text-sm text-amber-900">
+          Companies House answered &ldquo;too many requests&rdquo; (429) in the
+          last registry run, and the run stopped.
+        </p>
+      ) : null}
+
+      <h3 className="mt-6 text-sm font-medium text-zinc-700">SEC Form D</h3>
+      <StatGrid
+        items={[
+          {
+            label: "Last index day done (UTC)",
+            value: formD.lastDoneDay ?? "Never",
+          },
+          { label: "Filings stored", value: formD.filingsStored },
+          { label: "Funds skipped", value: formD.fundsSkipped },
+          { label: "Filings linked to a company", value: formD.filingsLinked },
+        ]}
+      />
+
+      <h3 className="mt-6 text-sm font-medium text-zinc-700">Confirmations</h3>
+      <StatGrid
+        items={[
+          ...RECORD_KINDS.map((kind) => ({
+            label: formatRecordKind(kind),
+            value: confirmations.byRecordKind[kind],
+          })),
+          {
+            label: "News events confirmed",
+            value: confirmations.newsEventsConfirmed,
+          },
+        ]}
+      />
+    </section>
   );
 }
 
@@ -517,6 +706,7 @@ export default async function StatusPage() {
             counts={summary.eventCountsByType}
           />
           <Phase2Sections phase2={summary.phase2} />
+          <RegistrySections summary={summary} />
         </>
       ) : null}
     </main>

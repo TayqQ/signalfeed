@@ -1,4 +1,10 @@
-import type { LlmPurpose, LocationPrecision, SourceKind } from "./enums";
+import type {
+  LlmPurpose,
+  LocationPrecision,
+  RegistryLinkMethod,
+  SectorSource,
+  SourceKind,
+} from "./enums";
 
 /** ISO 4217 currency code, upper case (e.g. "GBP", "USD", "EUR"). */
 export type CurrencyCode = string;
@@ -101,6 +107,8 @@ export interface ResolveStats {
   mergeCandidatesCreated: number;
   /** Extractions that threw while resolving; retried on the next run. */
   extractionsFailed?: number;
+  /** News grant reports attached to a grant event (Phase 3, D56). */
+  grantReportsAttached?: number;
 }
 
 export interface FxStats {
@@ -194,9 +202,76 @@ export interface DerivedStats {
   skipped?: boolean;
 }
 
+// Phase 3 step stats (docs/spec-phase3.md section 6).
+
+/** `pnpm ingest registry`: Companies House linking and profile refresh. */
+export interface RegistryStats {
+  companiesSearched: number;
+  /** Automatic links made this run. Methods with none may be missing. */
+  linkedByMethod: Partial<Record<RegistryLinkMethod, number>>;
+  /** Candidate rows recorded for review. */
+  candidates: number;
+  /** Searches that found nothing usable. */
+  none: number;
+  /** Companies with no usable name (search outcome `skipped`). */
+  companiesSkipped: number;
+  profilesFetched: number;
+  profilesRefreshed: number;
+  filingsStored: number;
+  /** Shared-address checks made (cache hits included). */
+  addressChecks: number;
+  requests: number;
+  /** True when Companies House answered 429 twice and the step stopped. */
+  rateLimited: boolean;
+  /** True when the step stopped at `MAX_CH_REQUESTS_PER_RUN`. */
+  stoppedAtLimit: boolean;
+  /** Automatic links sent back to review after a refreshed profile conflicted. */
+  linksDemoted?: number;
+  /** True when no `COMPANIES_HOUSE_API_KEY` is set. Counts are then zero. */
+  skipped?: boolean;
+}
+
+/** `pnpm ingest formd`: EDGAR daily indexes, Form D filings and CIK links. */
+export interface FormDStats {
+  daysFetched: number;
+  /** Days with no index (weekends, holidays). */
+  daysMissing: number;
+  filingsFound: number;
+  filingsStored: number;
+  /** Pooled investment funds: counted, never stored. */
+  fundsSkipped: number;
+  parseFailures: number;
+  linkedByCik: number;
+  linkedByName: number;
+  candidates: number;
+  requests: number;
+}
+
+/** Rebuild of `event_confirmations` and `events.evidence` (spec-phase3 section 9). */
+export interface ConfirmStats {
+  confirmations: DiffCounts;
+  /** News events set to `confirmed`. */
+  eventsConfirmed: number;
+  /** News events set back to `reported`. */
+  eventsSetToReported: number;
+  /** Records that fitted more than one event, so confirmed none. */
+  ambiguousRecords?: number;
+  /** True when the input fingerprint had not changed. Counts are then zero. */
+  skipped?: boolean;
+}
+
+/** Rebuild of `company_sectors` (spec-phase3 section 7.3). */
+export interface SectorStats {
+  written: DiffCounts;
+  /** Rows after the rebuild, by source. Zero when skipped. */
+  rowsBySource: Record<SectorSource, number>;
+  /** True when the input fingerprint had not changed. Counts are then zero. */
+  skipped?: boolean;
+}
+
 /**
- * Stored as `ingest_runs.stats`. Phase 2 fields are optional, because runs
- * stored before Phase 2 do not have them.
+ * Stored as `ingest_runs.stats`. Phase 2 and Phase 3 fields are optional,
+ * because runs stored before them do not have them.
  */
 export interface IngestStats {
   collect: CollectStats;
@@ -210,6 +285,10 @@ export interface IngestStats {
   themes?: ThemeStats;
   locations?: LocationStats;
   stats?: DerivedStats;
+  registry?: RegistryStats;
+  formD?: FormDStats;
+  confirm?: ConfirmStats;
+  sectors?: SectorStats;
   spendUsdMicros: number;
   monthToDateUsdMicros: number;
   capGbp: number;
