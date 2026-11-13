@@ -19,6 +19,18 @@ function eventDate(event: CompanyEvent): string {
   return `Around ${approximate ?? event.announcedOn}`;
 }
 
+function Confirmations({ event }: { event: CompanyEvent }) {
+  const confirmations = event.confirmations ?? [];
+  if (confirmations.length === 0) return null;
+  return (
+    <ul className="mt-1 space-y-1 text-sm text-quiet">
+      {confirmations.map((confirmation) => (
+        <li key={confirmation.text}>{confirmation.text}</li>
+      ))}
+    </ul>
+  );
+}
+
 function EventBody({ event }: { event: CompanyEvent }) {
   switch (event.type) {
     case "funding_round":
@@ -34,6 +46,7 @@ function EventBody({ event }: { event: CompanyEvent }) {
               roundType={event.roundType}
             />
           </div>
+          <Confirmations event={event} />
           <InvestorList investors={event.investors} />
           {event.roundType === "grant" ? (
             <p className="mt-1 text-sm text-quiet">

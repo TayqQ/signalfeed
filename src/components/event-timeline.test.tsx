@@ -191,4 +191,41 @@ describe("EventTimeline momentum and grants", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/we have recorded/)).toBeNull();
   });
+
+  it("lists confirmations under the amount", () => {
+    const text =
+      "Confirmed: shares allotted on 2 February 2026 (Companies House SH01)";
+    render(
+      <EventTimeline
+        events={[
+          {
+            ...funding,
+            confirmations: [
+              {
+                kind: "ch_allotment",
+                recordDate: "2026-02-02",
+                confirmsAmount: false,
+                text,
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
+  it("shows both the GtR source line and attached news headlines on a grant", () => {
+    render(
+      <EventTimeline
+        events={[{ ...funding, roundType: "grant", momentum: null }]}
+      />,
+    );
+    expect(
+      screen.getByText("Source: UKRI Gateway to Research"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Acme raises £4M" }),
+    ).toBeInTheDocument();
+  });
 });

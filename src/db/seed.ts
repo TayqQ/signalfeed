@@ -9,21 +9,26 @@ import { createPipelineDb, type Db } from "./client";
 import {
   EMBEDDING_DIMENSIONS,
   acquisitions,
+  chCompanies,
+  chFilings,
   companies,
   companyAliases,
   companyLocations,
   companyTags,
   companyThemes,
+  eventConfirmations,
   eventInvestors,
   eventSources,
   events,
   extractions,
+  formDFilings,
   fundingRoundMomentum,
   fundingRounds,
   ingestRuns,
   investors,
   launches,
   llmUsage,
+  registryLinks,
   sourceItems,
   sources,
   tagThemes,
@@ -558,6 +563,96 @@ async function insertMomentum(
   await db.insert(fundingRoundMomentum).values(rows);
 }
 
+/**
+ * Phase 3 registry rows: a linked UK company with an SH01 confirmation, a
+ * dormant one, and a US company with a Form D confirmation. All invented.
+ */
+async function insertRegistry(
+  db: Db,
+  data: SeedDataset,
+  companyIds: Map<string, number>,
+  eventIds: number[],
+): Promise<void> {
+  const registry = data.registry;
+  if (registry.chCompanies.length > 0) {
+    await db.insert(chCompanies).values(registry.chCompanies);
+  }
+
+  await db.insert(registryLinks).values(
+    registry.links.map((link) => ({
+      companyId: requireId(companyIds, "company", link.companySlug),
+      registry: link.registry,
+      registryId: link.registryId,
+      registryName: link.registryName,
+      status: "linked" as const,
+      method: link.method,
+      reason: link.reason,
+      decidedBy: "auto" as const,
+    })),
+  );
+
+  const filingIds = new Map<string, number>();
+  if (registry.chFilings.length > 0) {
+    const rows = await db
+      .insert(chFilings)
+      .values(registry.chFilings)
+      .returning({ id: chFilings.id, key: chFilings.transactionId });
+    for (const row of rows) filingIds.set(row.key, row.id);
+  }
+
+  if (registry.formDFilings.length > 0) {
+    const [edgar] = await db
+      .insert(sources)
+      .values({
+        slug: registry.edgarSource.slug,
+        name: registry.edgarSource.name,
+        kind: registry.edgarSource.kind,
+        url: registry.edgarSource.url,
+        priority: registry.edgarSource.priority,
+      })
+      .returning({ id: sources.id });
+    if (!edgar) throw new Error("EDGAR source insert failed");
+    const rows = await db
+      .insert(formDFilings)
+      .values(
+        registry.formDFilings.map(({ companySlug, ...filing }) => ({
+          ...filing,
+          sourceId: edgar.id,
+          isAmendment: false,
+          securities: ["equity"],
+          exemptions: ["06b"],
+          companyId: requireId(companyIds, "company", companySlug),
+          linkedAt: new Date(),
+        })),
+      )
+      .returning({
+        id: formDFilings.id,
+        key: formDFilings.accessionNumber,
+      });
+    for (const row of rows) filingIds.set(row.key, row.id);
+  }
+
+  if (registry.confirmations.length > 0) {
+    await db.insert(eventConfirmations).values(
+      registry.confirmations.map((confirmation) => {
+        const eventId = eventIds[confirmation.eventIndex];
+        const recordId = filingIds.get(confirmation.recordKey);
+        if (eventId == null || recordId == null) {
+          throw new Error(`Missing seed record ${confirmation.recordKey}`);
+        }
+        return {
+          eventId,
+          recordKind: confirmation.recordKind,
+          recordId,
+          rule: confirmation.rule,
+          recordDate: confirmation.recordDate,
+          confirmsAmount: confirmation.confirmsAmount,
+        };
+      }),
+    );
+  }
+}
+
 async function insertAll(db: Db, data: SeedDataset, now: Date): Promise<void> {
   const companyIds = await insertCompanies(db, data);
   await insertAliases(db, data, companyIds);
@@ -580,6 +675,7 @@ async function insertAll(db: Db, data: SeedDataset, now: Date): Promise<void> {
   await insertWeeklyTotals(db, data);
   await insertLocations(db, data, companyIds);
   await insertMomentum(db, data, companyIds, eventIds);
+  await insertRegistry(db, data, companyIds, eventIds);
 }
 
 /** Inserts fictional local data. Returns false when the seed company is already present. */

@@ -16,10 +16,16 @@ import type {
   SortDirection,
 } from "@/core/read-models";
 import { ROUND_TYPES } from "@/core/enums";
+import {
+  COMPANY_SIZE_BANDS,
+  companySizeBandFromSlug,
+  companySizeBandSlug,
+} from "@/core/registry";
+import type { CompanySizeBand } from "@/core/registry";
 import type { RoundType } from "@/core/enums";
 import { isSector, SECTORS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
-import { findPlaceBySlug } from "@/lib/geo/uk-places";
+import { findPlaceBySlug, matchUkCity } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { fromMinorUnits, toMinorUnits } from "@/lib/money";
 import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
@@ -39,8 +45,11 @@ const MAX_CITIES = 10;
  * - 2: grants are excluded unless `round=grant` is selected (D44), and the
  *   targeting parameters `theme`, `sector`, `ukregion`, `city`, `near`, `km`
  *   and `momentum` were added. Serialisation became canonical.
+ * - 3: Phase 3 added `evidence` (only `confirmed`) and `cosize` (company size
+ *   bands, D60). Both default to "no filter", so version 2 URLs parse to the
+ *   same criteria. The new keys come after the version 2 keys.
  */
-export const FUNDING_CRITERIA_VERSION = 2;
+export const FUNDING_CRITERIA_VERSION = 3;
 
 const roundSchema = z.enum(ROUND_TYPES);
 const sortSchema = z.enum(FUNDING_SORTS);
@@ -187,16 +196,48 @@ function parseThemeSlug(value: string): string | undefined {
   return parseSlug(value.trim());
 }
 
+/**
+ * Resolves a place slug or a place name (any case) to a canonical slug.
+ * Unknown and ambiguous names give undefined.
+ */
+function resolveNearSlug(value: string): string | undefined {
+  const text = value.trim();
+  const lower = text.toLowerCase();
+  if (findPlaceBySlug(lower)) return lower;
+  const match = matchUkCity(text);
+  return match && "place" in match ? match.place.slug : undefined;
+}
+
+/**
+ * The "near" text the visitor typed when it did not resolve to a UK place,
+ * so the page can say so. Undefined when `near` is empty or resolved.
+ */
+export function unresolvedNearName(
+  searchParams: FundingSearchParams,
+): string | undefined {
+  const near = readFirst(searchParams, "near");
+  if (near == null || near.length > MAX_CITY_LENGTH) return undefined;
+  return resolveNearSlug(near) ? undefined : near;
+}
+
 function parseNear(
   near: string | undefined,
   km: string | undefined,
 ): FundingCriteria["near"] {
   if (near == null) return undefined;
-  const placeSlug = near.trim().toLowerCase();
-  if (!findPlaceBySlug(placeSlug)) return undefined;
+  const placeSlug = resolveNearSlug(near);
+  if (!placeSlug) return undefined;
   const radius = km == null ? Number.NaN : Number(km);
   const known = NEAR_RADII_KM.find((value) => value === radius);
   return { placeSlug, km: known ?? DEFAULT_NEAR_KM };
+}
+
+function parseEvidence(value: string | undefined): "confirmed" | undefined {
+  return value?.toLowerCase() === "confirmed" ? "confirmed" : undefined;
+}
+
+function parseCompanySize(value: string): CompanySizeBand | undefined {
+  return companySizeBandFromSlug(value.trim().toLowerCase()) ?? undefined;
 }
 
 function parseMomentum(value: string | undefined): MomentumFilter | undefined {
@@ -337,6 +378,20 @@ export function parseFundingCriteria(
   const momentum = parseMomentum(readFirst(searchParams, "momentum"));
   if (momentum) criteria.momentum = momentum;
 
+  const evidence = parseEvidence(readFirst(searchParams, "evidence"));
+  if (evidence) criteria.evidence = evidence;
+
+  const companySizes = uniqueParsed(
+    readMany(searchParams, "cosize"),
+    parseCompanySize,
+  );
+  if (companySizes) {
+    criteria.companySizes = canonical(
+      companySizes,
+      orderBy(COMPANY_SIZE_BANDS),
+    );
+  }
+
   return criteria;
 }
 
@@ -409,6 +464,13 @@ function appendCriteria(
   if (criteria.tag) params.set("tag", criteria.tag);
   if (criteria.investorSlug) params.set("investor", criteria.investorSlug);
   if (criteria.momentum) params.set("momentum", criteria.momentum);
+  if (criteria.evidence === "confirmed") params.set("evidence", "confirmed");
+  for (const band of canonical(
+    criteria.companySizes ?? [],
+    orderBy(COMPANY_SIZE_BANDS),
+  )) {
+    params.append("cosize", companySizeBandSlug(band));
+  }
 }
 
 /**

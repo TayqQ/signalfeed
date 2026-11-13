@@ -1,5 +1,8 @@
 import type { FundingFilters } from "@/core/read-models";
-import { FundingFiltersForm } from "@/components/funding-filters-form";
+import {
+  FundingFiltersForm,
+  PlaceSuggestions,
+} from "@/components/funding-filters-form";
 import { FundingTable } from "@/components/funding-table";
 import { Pagination } from "@/components/pagination";
 import {
@@ -14,6 +17,7 @@ import {
   parseFundingFilters,
   serialiseFundingCriteria,
   serialiseFundingFilters,
+  unresolvedNearName,
 } from "@/lib/funding-filters";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +31,9 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const filters = parseFundingFilters(await searchParams);
+  const params = await searchParams;
+  const filters = parseFundingFilters(params);
+  const unknownNear = unresolvedNearName(params);
   const key = serialiseFundingFilters(filters);
   const [page, themes, unlocated] = await Promise.all([
     cached(() => listFundingRounds(getWebDb(), filters), ["funding", key]),
@@ -59,6 +65,8 @@ export default async function HomePage({
         from.
       </p>
 
+      <PlaceSuggestions />
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside>
           <details className="lg:hidden" open={hasActiveFilters(filters)}>
@@ -83,6 +91,12 @@ export default async function HomePage({
           <p className="mb-3 text-sm tabular-nums text-quiet" role="status">
             {page.total === 1 ? "1 round" : `${page.total} rounds`}
           </p>
+          {unknownNear ? (
+            <p className="mb-3 max-w-2xl text-sm" role="alert">
+              We couldn&apos;t find a UK town called &lsquo;{unknownNear}
+              &rsquo;. The distance filter was not applied.
+            </p>
+          ) : null}
           {filters.near ? (
             <p className="mb-3 max-w-2xl text-sm text-quiet">
               {unlocated === 1

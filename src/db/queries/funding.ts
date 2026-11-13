@@ -10,10 +10,11 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import type { EvidenceLevel, RoundType } from "@/core/enums";
-import { ROUND_TYPES } from "@/core/enums";
+import type { EvidenceLevel, RecordKind, RoundType } from "@/core/enums";
+import { RECORD_KINDS, ROUND_TYPES } from "@/core/enums";
 import type { Money } from "@/core/domain";
 import type {
+  EventConfirmation,
   FundingFilters,
   FundingRow,
   FundingSort,
@@ -22,25 +23,36 @@ import type {
   RoundMomentum,
   TagRef,
 } from "@/core/read-models";
+import type { CompanySizeBand } from "@/core/registry";
 import { effectiveRoundTypes } from "@/lib/funding-filters";
 import { boundingBox } from "@/lib/geo/distance";
 import { findPlaceBySlug, normalisePlaceName } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { normaliseCompanyName } from "@/lib/normalise";
+import { confirmationText } from "@/lib/registry/confirmation-text";
+import {
+  knownAccountsTypes,
+  sizeBandForAccounts,
+} from "@/lib/registry/company-size";
 import { countriesInRegion, REGIONS, type Region } from "@/lib/regions";
 import { SIZE_BAND_RANGES, SIZE_BANDS } from "@/lib/size-bands";
 import type { Db } from "../client";
 import {
+  chCompanies,
   companies,
   companyAliases,
   companyLocations,
+  companySectors,
   companyTags,
   companyThemes,
+  eventConfirmations,
   eventInvestors,
   events,
+  formDFilings,
   fundingRoundMomentum,
   fundingRounds,
   investors,
+  registryLinks,
   tags,
   themes,
 } from "../schema";
@@ -141,6 +153,51 @@ function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+/** `accounts_type` as `sizeBandForAccounts` reads it: trimmed, lower case, never null. */
+const ACCOUNTS_KEY = sql`lower(btrim(coalesce(${chCompanies.accountsType}, '')))`;
+
+/**
+ * The company's size band, mapped in SQL from the table in `company-size.ts`,
+ * so the two cannot drift. The lists come from `knownAccountsTypes()` grouped
+ * by `sizeBandForAccounts`. A blank type is `no_accounts_yet` and an unknown
+ * type is `full_accounts`, as in TypeScript. Companies with no linked
+ * Companies House record never match.
+ */
+function companySizeCondition(bands: readonly CompanySizeBand[]): SQL {
+  const known = knownAccountsTypes();
+  const wanted = new Set(bands);
+  const alternatives: SQL[] = [];
+  for (const band of wanted) {
+    const types = known.filter((type) => sizeBandForAccounts(type) === band);
+    const inList: SQL | null =
+      types.length > 0 ? sql`${ACCOUNTS_KEY} in ${types}` : null;
+    if (band === "no_accounts_yet") {
+      alternatives.push(
+        inList
+          ? sql`(${ACCOUNTS_KEY} = '' or ${inList})`
+          : sql`${ACCOUNTS_KEY} = ''`,
+      );
+    } else if (band === "full_accounts") {
+      const unknown = sql`(${ACCOUNTS_KEY} <> '' and ${ACCOUNTS_KEY} not in ${known})`;
+      alternatives.push(inList ? sql`(${inList} or ${unknown})` : unknown);
+    } else if (inList) {
+      alternatives.push(inList);
+    }
+  }
+  const any = or(...alternatives);
+  if (!any) return sql`false`;
+  return sql`exists (
+    select 1
+    from ${registryLinks}
+    inner join ${chCompanies}
+      on ${chCompanies.companyNumber} = ${registryLinks.registryId}
+    where ${registryLinks.companyId} = ${companies.id}
+      and ${registryLinks.registry} = 'companies_house'
+      and ${registryLinks.status} = 'linked'
+      and (${any})
+  )`;
+}
+
 /** Theme and location filters, and momentum (spec sections 9.2 and 8.3). */
 function targetingConditions(filters: FundingFilters): SQL[] {
   const conditions: SQL[] = [];
@@ -172,13 +229,28 @@ function targetingConditions(filters: FundingFilters): SQL[] {
   }
 
   if (filters.sectors && filters.sectors.length > 0) {
-    conditions.push(sql`exists (
-      select 1
-      from ${companyThemes}
-      inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
-      where ${companyThemes.companyId} = ${companies.id}
-        and ${inArray(themes.sector, [...filters.sectors])}
+    // company_sectors or the theme join, so a sector filter never returns
+    // fewer rows while company_sectors is still empty (spec-phase3 section 11).
+    const sectors = [...filters.sectors];
+    conditions.push(sql`(
+      exists (
+        select 1
+        from ${companySectors}
+        where ${companySectors.companyId} = ${companies.id}
+          and ${inArray(companySectors.sector, sectors)}
+      )
+      or exists (
+        select 1
+        from ${companyThemes}
+        inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
+        where ${companyThemes.companyId} = ${companies.id}
+          and ${inArray(themes.sector, sectors)}
+      )
     )`);
+  }
+
+  if (filters.companySizes && filters.companySizes.length > 0) {
+    conditions.push(companySizeCondition(filters.companySizes));
   }
 
   if (filters.ukRegions && filters.ukRegions.length > 0) {
@@ -294,6 +366,10 @@ function fundingWhere(filters: FundingFilters, query: string | null): SQL {
   ];
 
   if (query) conditions.push(textMatch(query));
+
+  if (filters.evidence === "confirmed") {
+    conditions.push(eq(events.evidence, "confirmed"));
+  }
 
   // Grants are hidden unless `grant` is selected (D44).
   const rounds = effectiveRoundTypes(filters).filter(isRoundType);
@@ -650,6 +726,109 @@ export async function countUnlocatedCompanies(
   return asCount(counted?.total);
 }
 
+// Confirmation markers (spec-phase3 section 9).
+
+export interface ConfirmationTarget {
+  eventId: number;
+  /** The date the record is measured against. */
+  announcedOn: string;
+  evidence: EvidenceLevel;
+  isGrant: boolean;
+}
+
+function dayNumber(isoDate: string): number {
+  const [year, month, day] = isoDate.slice(0, 10).split("-").map(Number);
+  return Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1) / 86_400_000;
+}
+
+function kindRank(kind: RecordKind): number {
+  return RECORD_KINDS.indexOf(kind);
+}
+
+/**
+ * The confirmations of each event, closest first: record date nearest the
+ * event's date, then record kind, then record id. Wording comes from
+ * `confirmationText`, built here from the row's fields. A confirmed grant
+ * event with no confirmation row gets a grant confirmation. Events with
+ * nothing to show are left out of the map.
+ */
+export async function loadConfirmations(
+  db: Db,
+  targets: readonly ConfirmationTarget[],
+): Promise<Map<number, EventConfirmation[]>> {
+  const result = new Map<number, EventConfirmation[]>();
+  if (targets.length === 0) return result;
+  const byEvent = new Map(targets.map((target) => [target.eventId, target]));
+
+  const rows = await db
+    .select({
+      eventId: eventConfirmations.eventId,
+      kind: eventConfirmations.recordKind,
+      recordId: eventConfirmations.recordId,
+      recordDate: eventConfirmations.recordDate,
+      confirmsAmount: eventConfirmations.confirmsAmount,
+      soldUsdMinor: formDFilings.totalSoldUsdMinor,
+    })
+    .from(eventConfirmations)
+    .leftJoin(
+      formDFilings,
+      and(
+        eq(eventConfirmations.recordKind, "sec_form_d"),
+        eq(formDFilings.id, eventConfirmations.recordId),
+      ),
+    )
+    .where(inArray(eventConfirmations.eventId, [...byEvent.keys()]));
+
+  const grouped = new Map<number, typeof rows>();
+  for (const row of rows) {
+    const list = grouped.get(row.eventId);
+    if (list) list.push(row);
+    else grouped.set(row.eventId, [row]);
+  }
+
+  for (const target of targets) {
+    const own = grouped.get(target.eventId) ?? [];
+    const eventDay = dayNumber(target.announcedOn);
+    own.sort(
+      (a, b) =>
+        Math.abs(dayNumber(a.recordDate) - eventDay) -
+          Math.abs(dayNumber(b.recordDate) - eventDay) ||
+        kindRank(a.kind) - kindRank(b.kind) ||
+        a.recordId - b.recordId,
+    );
+    const list: EventConfirmation[] = own.map((row) => ({
+      kind: row.kind,
+      recordDate: row.recordDate.slice(0, 10),
+      confirmsAmount: row.confirmsAmount,
+      text: confirmationText({
+        kind: row.kind,
+        recordDate: row.recordDate.slice(0, 10),
+        confirmsAmount: row.confirmsAmount,
+        amountUsdMinor: row.kind === "sec_form_d" ? row.soldUsdMinor : null,
+      }),
+    }));
+    if (
+      list.length === 0 &&
+      target.isGrant &&
+      target.evidence === "confirmed"
+    ) {
+      const recordDate = target.announcedOn.slice(0, 10);
+      list.push({
+        kind: "ukri_grant",
+        recordDate,
+        confirmsAmount: true,
+        text: confirmationText({
+          kind: "ukri_grant",
+          recordDate,
+          confirmsAmount: true,
+        }),
+      });
+    }
+    if (list.length > 0) result.set(target.eventId, list);
+  }
+  return result;
+}
+
 export async function listFundingRounds(
   db: Db,
   filters: FundingFilters,
@@ -678,8 +857,21 @@ export async function listFundingRounds(
       .offset((page - 1) * pageSize),
   ]);
 
+  const confirmations = await loadConfirmations(
+    db,
+    rows.map((row) => ({
+      eventId: row.eventId,
+      announcedOn: row.announcedOn,
+      evidence: row.evidence,
+      isGrant: row.roundType === "grant",
+    })),
+  );
+
   return {
-    items: rows.map((row) => toFundingRow(row)),
+    items: rows.map((row) => ({
+      ...toFundingRow(row),
+      confirmation: confirmations.get(row.eventId)?.[0] ?? null,
+    })),
     total: asCount(counted[0]?.total),
     page,
     pageSize,
