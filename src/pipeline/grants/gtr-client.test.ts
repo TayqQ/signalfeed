@@ -79,27 +79,92 @@ describe("createGtrClient", () => {
     expect(sleep.mock.calls).toEqual([[1000], [1000]]);
   });
 
-  it("retries once after 10 seconds on 429", async () => {
+  const page = () => jsonResponse(loadGtrFixture("projects-page.json"));
+  const noJitter = () => 0.5;
+
+  it("retries a 503 and then succeeds", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse("down", 503))
+      .mockResolvedValueOnce(page());
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const client = createGtrClient({ http: { get }, sleep, random: noJitter });
+    const result = await client.listInnovateUkProjects(1);
+    expect(result.project).toHaveLength(3);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(sleep.mock.calls).toEqual([[2000]]);
+  });
+
+  it("retries a 429", async () => {
     const get = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse("slow down", 429))
-      .mockResolvedValueOnce(
-        jsonResponse(loadGtrFixture("projects-page.json")),
-      );
+      .mockResolvedValueOnce(page());
     const sleep = vi.fn().mockResolvedValue(undefined);
-    const client = createGtrClient({ http: { get }, sleep });
-    const page = await client.listInnovateUkProjects(1);
-    expect(page.project).toHaveLength(3);
+    const client = createGtrClient({ http: { get }, sleep, random: noJitter });
+    const result = await client.listInnovateUkProjects(1);
+    expect(result.project).toHaveLength(3);
     expect(get).toHaveBeenCalledTimes(2);
-    expect(sleep.mock.calls).toEqual([[10_000]]);
   });
 
-  it("retries once on 5xx, then throws", async () => {
+  it.each([500, 502, 504])("retries HTTP %i", async (status) => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse("x", status))
+      .mockResolvedValueOnce(page());
+    const client = createGtrClient({
+      http: { get },
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+    await client.listInnovateUkProjects(1);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a network error", async () => {
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("The operation timed out"))
+      .mockResolvedValueOnce(page());
+    const client = createGtrClient({
+      http: { get },
+      sleep: vi.fn().mockResolvedValue(undefined),
+    });
+    await client.listInnovateUkProjects(1);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("backs off 2, 5, 15 then 30 seconds, and then throws", async () => {
     const get = vi.fn().mockResolvedValue(jsonResponse("down", 503));
     const sleep = vi.fn().mockResolvedValue(undefined);
+    const client = createGtrClient({ http: { get }, sleep, random: noJitter });
+    await expect(client.listInnovateUkProjects(1)).rejects.toThrow(
+      "GtR projects page 1 failed: HTTP 503",
+    );
+    expect(get).toHaveBeenCalledTimes(5);
+    expect(sleep.mock.calls).toEqual([[2000], [5000], [15000], [30000]]);
+  });
+
+  it("keeps jitter within 25 per cent", async () => {
+    const get = vi.fn().mockResolvedValue(jsonResponse("down", 503));
+    const low = vi.fn().mockResolvedValue(undefined);
+    const high = vi.fn().mockResolvedValue(undefined);
+    await createGtrClient({ http: { get }, sleep: low, random: () => 0 })
+      .listInnovateUkProjects(1)
+      .catch(() => undefined);
+    await createGtrClient({ http: { get }, sleep: high, random: () => 1 })
+      .listInnovateUkProjects(1)
+      .catch(() => undefined);
+    expect(low.mock.calls[0]).toEqual([1500]);
+    expect(high.mock.calls[0]).toEqual([2500]);
+  });
+
+  it("does not retry a 404", async () => {
+    const get = vi.fn().mockResolvedValue(jsonResponse("gone", 404));
+    const sleep = vi.fn().mockResolvedValue(undefined);
     const client = createGtrClient({ http: { get }, sleep });
-    await expect(client.listInnovateUkProjects(1)).rejects.toThrow("HTTP 503");
-    expect(get).toHaveBeenCalledTimes(2);
+    await expect(client.listInnovateUkProjects(1)).rejects.toThrow("HTTP 404");
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
   });
 
   it("does not retry other errors", async () => {

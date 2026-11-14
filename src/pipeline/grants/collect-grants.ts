@@ -15,6 +15,17 @@ import { ensureGtrSource, storeProjects } from "./store-grants";
 export const GRANTS_BACKFILL_START = "2024-04-01";
 
 const STOP_AFTER_SEEN_PAGES = 3;
+/** Organisation fetches stop after this many failures in a row. */
+const STOP_AFTER_ORG_FAILURES = 3;
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function recordError(stats: GrantCollectStats, error: unknown): void {
+  stats.errorCount = (stats.errorCount ?? 0) + 1;
+  stats.lastError = message(error);
+}
 
 export interface CollectGrantsOptions {
   db: Db;
@@ -30,6 +41,11 @@ export interface CollectGrantsOptions {
  * Walk Innovate UK projects newest first, then fetch each new organisation
  * once. Stops after 3 pages with no unseen project, at `maxPages`, or when
  * project start dates fall before `since`.
+ *
+ * A page that still fails after the client's retries ends the walk. What is
+ * stored stays, the error goes in the stats, and the next run carries on
+ * from the data that is missing. If the very first page fails, nothing was
+ * fetched and the error is thrown.
  */
 export async function collectGrantsStep(
   options: CollectGrantsOptions,
@@ -49,8 +65,17 @@ export async function collectGrantsStep(
   const sourceId = await ensureGtrSource(db);
 
   let pagesWithoutNew = 0;
+  let walkFailed = false;
   for (let page = 1; page <= maxPages; page += 1) {
-    const response = await gtr.listInnovateUkProjects(page);
+    let response: Awaited<ReturnType<GtrClient["listInnovateUkProjects"]>>;
+    try {
+      response = await gtr.listInnovateUkProjects(page);
+    } catch (error) {
+      if (stats.pagesFetched === 0) throw error;
+      recordError(stats, error);
+      walkFailed = true;
+      break;
+    }
     stats.pagesFetched += 1;
     if (response.project.length === 0) break;
 
@@ -78,7 +103,10 @@ export async function collectGrantsStep(
     }
   }
 
-  await fetchOrganisations(db, gtr, maxOrgFetches, now, stats);
+  // After a failed page the API is unwell, so leave organisations to the next run.
+  if (!walkFailed) {
+    await fetchOrganisations(db, gtr, maxOrgFetches, now, stats);
+  }
   await db
     .update(sources)
     .set({ lastFetchedAt: now() })
@@ -122,13 +150,20 @@ async function fetchOrganisations(
     .orderBy(grantParticipants.gtrOrgId)
     .limit(maxOrgFetches);
 
+  let failuresInARow = 0;
   for (const { gtrOrgId } of pending) {
     let details: OrganisationDetails;
     try {
       details = organisationDetails(await gtr.getOrganisation(gtrOrgId));
-    } catch {
+      failuresInARow = 0;
+    } catch (error) {
       // Left unfetched, so the next run tries again.
       stats.orgsFailed += 1;
+      failuresInARow += 1;
+      if (failuresInARow >= STOP_AFTER_ORG_FAILURES) {
+        recordError(stats, error);
+        return;
+      }
       continue;
     }
     await db

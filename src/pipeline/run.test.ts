@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SourceConfig } from "@/core/domain";
+import type { HttpGetOptions } from "@/core/ports";
 import type { ExtractedEventV1, ExtractionV1 } from "@/core/extraction-schema";
 import type {
   Collector,
@@ -39,7 +40,7 @@ import { collectGrantsStep } from "./grants/collect-grants";
 import { GRANT_TAGS_SCHEMA_NAME } from "./grants/grant-tag-prompt";
 import { createGtrClient, type GtrClient } from "./grants/gtr-client";
 import { ensureGtrSource } from "./grants/store-grants";
-import { fakeGtr, syntheticPage } from "./grants/testing";
+import { fakeGtr, jsonResponse, syntheticPage } from "./grants/testing";
 import { singleConnectionLock, withIngestLock } from "./lock";
 import type { ChClient } from "./registry/ch-client";
 import { recordLink } from "./registry/link-store";
@@ -834,6 +835,46 @@ describe("runGrants", () => {
     expect(run?.status).toBe("succeeded");
     expect(run?.stats).toMatchObject({ grantCollect: { projectsInserted: 2 } });
     expect(await testDb.db.select().from(grantParticipants)).toHaveLength(2);
+  });
+
+  it("records a persistent page failure as a green run with the error kept", async () => {
+    const fake = fakeGtr((page) => syntheticPage(page, 2));
+    const http = {
+      get: (url: string, options?: HttpGetOptions) =>
+        /[?&]p=2\b/.test(url)
+          ? Promise.resolve(jsonResponse("down", 503))
+          : fake.fetcher.get(url, options),
+    };
+    const gtr = createGtrClient({ http, sleep: () => Promise.resolve() });
+    const summary = await runGrants(
+      deps(null, fakeCollector({}), { gtr }),
+      lock(),
+      "schedule",
+      { maxPages: 3 },
+    );
+    // The CLI exits 1 only for "failed", so this exits 0.
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.grantCollect).toMatchObject({
+      pagesFetched: 1,
+      projectsInserted: 2,
+      errorCount: 1,
+      lastError: "GtR projects page 2 failed: HTTP 503",
+    });
+    const [run] = await testDb.db.select().from(ingestRuns);
+    expect(run?.status).toBe("succeeded");
+    expect(run?.error).toContain("HTTP 503");
+  });
+
+  it("fails the run when nothing could be fetched", async () => {
+    const http = {
+      get: () => Promise.resolve(jsonResponse("down", 503)),
+    };
+    const gtr = createGtrClient({ http, sleep: () => Promise.resolve() });
+    await expect(
+      runGrants(deps(null, fakeCollector({}), { gtr }), lock(), "schedule"),
+    ).rejects.toThrow("HTTP 503");
+    const [run] = await testDb.db.select().from(ingestRuns);
+    expect(run?.status).toBe("failed");
   });
 
   it("does no work when the lock is already held", async () => {

@@ -129,6 +129,9 @@ export interface GrantCollectStats {
   participantsSkipped: number;
   orgsFetched: number;
   orgsFailed: number;
+  /** Set only when the run stopped early on an error that survived retries. */
+  errorCount?: number;
+  lastError?: string;
 }
 
 /** Grant tagging and resolution, the first Phase 2 step of `pnpm ingest run`. */
