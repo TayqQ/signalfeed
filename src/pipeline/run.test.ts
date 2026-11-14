@@ -294,6 +294,7 @@ function deps(
       maxEmbeddingsPerRun: 2000,
       maxThemeNamesPerRun: 20,
       maxGrantTaggingsPerRun: 200,
+      maxGrantOrgFetchesPerRun: 1500,
       maxChRequestsPerRun: 2000,
       maxEdgarDaysPerRun: 10,
       maxEdgarRequestsPerRun: 3000,

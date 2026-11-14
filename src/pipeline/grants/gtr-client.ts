@@ -13,7 +13,8 @@ export const GTR_API_BASE = "https://gtr.ukri.org/gtr/api/";
 /** The most Gateway to Research lets us ask for in one page. */
 export const GTR_PAGE_SIZE = 100;
 
-const MIN_GAP_MS = 1_000;
+/** UKRI documents up to 10 requests a second (A18, "to be confirmed"). We stay at 3. */
+export const GTR_DEFAULT_REQUESTS_PER_SECOND = 3;
 /** Waits before retry 1 to 4. About 2, 5, 15 and 30 seconds, before jitter. */
 export const GTR_RETRY_WAITS_MS: readonly number[] = [
   2_000, 5_000, 15_000, 30_000,
@@ -30,6 +31,8 @@ export interface GtrClient {
 
 export interface GtrClientOptions {
   http: HttpFetcher;
+  /** Requests a second. Defaults to `GTR_DEFAULT_REQUESTS_PER_SECOND`. */
+  requestsPerSecond?: number;
   /** Test double. Production waits for real. */
   sleep?: (ms: number) => Promise<void>;
   /** Test double for jitter. Returns a number from 0 up to 1. */
@@ -47,7 +50,8 @@ function errorText(error: unknown): string {
 }
 
 /**
- * Adapter over `HttpFetcher`. It waits 1 second between requests and asks for
+ * Adapter over `HttpFetcher`. It spaces requests to at most
+ * `requestsPerSecond` (3 by default) and asks for
  * JSON. It retries transient failures (HTTP 429, 500, 502, 503, 504 and
  * network errors or timeouts) up to 4 times, waiting about 2, 5, 15 and 30
  * seconds with jitter. Other 4xx answers are not retried.
@@ -57,6 +61,12 @@ function errorText(error: unknown): string {
 export function createGtrClient(options: GtrClientOptions): GtrClient {
   const sleep = options.sleep ?? realSleep;
   const random = options.random ?? Math.random;
+  const perSecond =
+    options.requestsPerSecond ?? GTR_DEFAULT_REQUESTS_PER_SECOND;
+  if (!Number.isFinite(perSecond) || perSecond <= 0) {
+    throw new Error("GtR requestsPerSecond must be a positive number");
+  }
+  const minGapMs = Math.ceil(1_000 / perSecond);
   let requested = false;
 
   async function getJson<T>(
@@ -65,7 +75,7 @@ export function createGtrClient(options: GtrClientOptions): GtrClient {
     label: string,
   ): Promise<T> {
     const url = `${GTR_API_BASE}${path}`;
-    if (requested) await sleep(MIN_GAP_MS);
+    if (requested) await sleep(minGapMs);
     requested = true;
 
     const request = () =>

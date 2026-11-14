@@ -61,7 +61,7 @@ Options:
   --since YYYY-MM-DD          grants: skip projects that start before this date.
                               formd: first EDGAR day to collect
   --max-pages <n>             grants: most project pages to fetch (default 30)
-  --max-orgs <n>              grants: most organisations to fetch (default 1500)
+  --max-orgs <n>              grants: most organisations to fetch (default 1500, or MAX_GRANT_ORG_FETCHES_PER_RUN)
   --max-requests <n>          registry: most Companies House requests (default
                               MAX_CH_REQUESTS_PER_RUN). formd: most EDGAR
                               requests (default MAX_EDGAR_REQUESTS_PER_RUN)

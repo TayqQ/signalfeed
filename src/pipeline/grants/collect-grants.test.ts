@@ -42,6 +42,7 @@ describe("collectGrantsStep", () => {
       participantsSkipped: 2,
       orgsFetched: 3,
       orgsFailed: 0,
+      orgsSkipped: 0,
     });
 
     const participants = await testDb.db.select().from(grantParticipants);
@@ -136,6 +137,56 @@ describe("collectGrantsStep", () => {
     // Page 1 starts 9 June, page 2 starts 8 June, page 3 starts 7 June.
     expect(fake.pageRequests).toEqual([1, 2, 3]);
     expect(stats.projectsInserted).toBe(2);
+  });
+
+  it("does not fetch organisations whose name is not a company form", async () => {
+    const { gtr, fake } = setup(fixturePage);
+    const [source] = await testDb.db
+      .insert(sources)
+      .values({ slug: "ukri-gtr", name: "GtR", kind: "ukri_gtr", url: "x" })
+      .returning();
+    const [project] = await testDb.db
+      .insert(grantProjects)
+      .values({
+        sourceId: source!.id,
+        gtrProjectId: "p1",
+        title: "Invented project",
+        grantCategory: "Grant",
+        leadFunder: "Innovate UK",
+        status: "Active",
+        gtrUrl: "https://gtr.ukri.org/project/p1",
+      })
+      .returning();
+    const row = (gtrOrgId: string, organisationName: string) => ({
+      projectId: project!.id,
+      gtrOrgId,
+      organisationName,
+      role: "participant" as const,
+    });
+    await testDb.db
+      .insert(grantParticipants)
+      .values([
+        row("org-uni", "University of Example"),
+        row("org-sole", "Jane Example T/A Example Design"),
+        row("org-co", "Example Robotics Ltd"),
+        row("org-cic", "Example Makers Community Interest Company"),
+      ]);
+
+    const stats = await collectGrantsStep({
+      db: testDb.db,
+      gtr,
+      maxPages: 0,
+      maxOrgFetches: 2,
+    });
+    expect(stats.orgsSkipped).toBe(2);
+    expect(stats.orgsFetched).toBe(2);
+    expect([...fake.orgRequests].sort()).toEqual(["org-cic", "org-co"]);
+    const rows = await testDb.db.select().from(grantParticipants);
+    const skipped = rows.filter((r) => r.orgFetchedAt === null);
+    expect(skipped.map((r) => r.gtrOrgId).sort()).toEqual([
+      "org-sole",
+      "org-uni",
+    ]);
   });
 
   it("respects maxOrgFetches across runs", async () => {

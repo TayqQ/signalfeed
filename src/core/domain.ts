@@ -129,6 +129,12 @@ export interface GrantCollectStats {
   participantsSkipped: number;
   orgsFetched: number;
   orgsFailed: number;
+  /**
+   * Stored participants whose name is not a company form, left without an
+   * organisation fetch (no `organisations/{id}` request). Normally 0, because
+   * the same rule already stops them being stored.
+   */
+  orgsSkipped: number;
   /** Set only when the run stopped early on an error that survived retries. */
   errorCount?: number;
   lastError?: string;

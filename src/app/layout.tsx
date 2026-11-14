@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Schibsted_Grotesk } from "next/font/google";
+import { pageRobots } from "@/lib/indexing";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
@@ -14,6 +15,8 @@ export const metadata: Metadata = {
   title: "SignalFeed",
   description:
     "Startup funding rounds, acquisitions and launches, extracted from public news feeds and linked back to the original articles.",
+  // Off until launch. Set SITE_INDEXING=true to allow indexing.
+  robots: pageRobots(process.env),
 };
 
 export default function RootLayout({

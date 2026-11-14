@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSiteIndexingEnabled,
   parseNoLlmPipelineEnv,
   parsePipelineEnv,
   parseWebEnv,
@@ -34,6 +35,8 @@ describe("parsePipelineEnv", () => {
       MAX_THEME_NAMES_PER_RUN: 20,
       MAX_GRANT_TAGGINGS_PER_RUN: 200,
       THEME_CHECK_MODEL: "gpt-5.6-luna",
+      GTR_REQUESTS_PER_SECOND: 3,
+      MAX_GRANT_ORG_FETCHES_PER_RUN: 1500,
       MAX_CH_REQUESTS_PER_RUN: 2000,
       MAX_EDGAR_DAYS_PER_RUN: 10,
       MAX_EDGAR_REQUESTS_PER_RUN: 3000,
@@ -256,7 +259,10 @@ describe("web env", () => {
       MAX_EDGAR_REQUESTS_PER_RUN: "",
     });
     expect(env).toEqual({ DATABASE_URL: secrets.DATABASE_URL });
-    expect(Object.keys(webEnvSchema.shape)).toEqual(["DATABASE_URL"]);
+    expect(Object.keys(webEnvSchema.shape)).toEqual([
+      "DATABASE_URL",
+      "SITE_INDEXING",
+    ]);
   });
 
   it("ignores OPENAI_API_KEY", () => {
@@ -273,5 +279,42 @@ describe("web env", () => {
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).missingKeys).toEqual(["DATABASE_URL"]);
     expect((error as ConfigError).message).not.toContain("sk-test");
+  });
+});
+
+describe("grants speed settings and site indexing", () => {
+  it("reads the GtR rate and the organisation cap", () => {
+    const env = parsePipelineEnv({
+      ...secrets,
+      GTR_REQUESTS_PER_SECOND: "5",
+      MAX_GRANT_ORG_FETCHES_PER_RUN: "800",
+    });
+    expect(env.GTR_REQUESTS_PER_SECOND).toBe(5);
+    expect(env.MAX_GRANT_ORG_FETCHES_PER_RUN).toBe(800);
+  });
+
+  it.each(["0", "-1", "11", "fast"])(
+    "rejects GTR_REQUESTS_PER_SECOND %s",
+    (v) => {
+      expect(() =>
+        parsePipelineEnv({ ...secrets, GTR_REQUESTS_PER_SECOND: v }),
+      ).toThrow(ConfigError);
+    },
+  );
+
+  it("treats SITE_INDEXING as optional in the web schema", () => {
+    expect(parseWebEnv({ DATABASE_URL: "postgres://x" })).toEqual({
+      DATABASE_URL: "postgres://x",
+    });
+    expect(
+      parseWebEnv({ DATABASE_URL: "postgres://x", SITE_INDEXING: "true" })
+        .SITE_INDEXING,
+    ).toBe("true");
+  });
+
+  it("enables indexing only for the exact value true", () => {
+    expect(isSiteIndexingEnabled({})).toBe(false);
+    expect(isSiteIndexingEnabled({ SITE_INDEXING: "TRUE" })).toBe(false);
+    expect(isSiteIndexingEnabled({ SITE_INDEXING: "true" })).toBe(true);
   });
 });
