@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { HttpFetcher } from "@/core/ports";
+import type { HttpFetcher, HttpResponse } from "@/core/ports";
 import {
   gtrOrganisationSchema,
   gtrProjectsPageSchema,
@@ -14,7 +14,12 @@ export const GTR_API_BASE = "https://gtr.ukri.org/gtr/api/";
 export const GTR_PAGE_SIZE = 100;
 
 const MIN_GAP_MS = 1_000;
-const RETRY_WAIT_MS = 10_000;
+/** Waits before retry 1 to 4. About 2, 5, 15 and 30 seconds, before jitter. */
+export const GTR_RETRY_WAITS_MS: readonly number[] = [
+  2_000, 5_000, 15_000, 30_000,
+];
+const JITTER = 0.25;
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
 const ORGANISATION_ID = /^[0-9A-Za-z-]+$/;
 
 export interface GtrClient {
@@ -27,6 +32,8 @@ export interface GtrClientOptions {
   http: HttpFetcher;
   /** Test double. Production waits for real. */
   sleep?: (ms: number) => Promise<void>;
+  /** Test double for jitter. Returns a number from 0 up to 1. */
+  random?: () => number;
 }
 
 function realSleep(ms: number): Promise<void> {
@@ -35,13 +42,21 @@ function realSleep(ms: number): Promise<void> {
   });
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
- * Adapter over `HttpFetcher`. It waits 1 second between requests, asks for
- * JSON, and retries once, after 10 seconds, on HTTP 429 or 5xx.
+ * Adapter over `HttpFetcher`. It waits 1 second between requests and asks for
+ * JSON. It retries transient failures (HTTP 429, 500, 502, 503, 504 and
+ * network errors or timeouts) up to 4 times, waiting about 2, 5, 15 and 30
+ * seconds with jitter. Other 4xx answers are not retried.
+ * `HttpResponse` does not expose `Retry-After`, so it is not honoured.
  * It has no method for people, so person endpoints cannot be requested.
  */
 export function createGtrClient(options: GtrClientOptions): GtrClient {
   const sleep = options.sleep ?? realSleep;
+  const random = options.random ?? Math.random;
   let requested = false;
 
   async function getJson<T>(
@@ -55,13 +70,26 @@ export function createGtrClient(options: GtrClientOptions): GtrClient {
 
     const request = () =>
       options.http.get(url, { headers: { Accept: "application/json" } });
-    let response = await request();
-    if (response.status === 429 || response.status >= 500) {
-      await sleep(RETRY_WAIT_MS);
-      response = await request();
+    let response: HttpResponse | undefined;
+    let failure = "";
+    for (let attempt = 0; ; attempt += 1) {
+      let transient: boolean;
+      try {
+        response = await request();
+        transient = TRANSIENT_STATUSES.has(response.status);
+        failure = `HTTP ${response.status}`;
+      } catch (error) {
+        response = undefined;
+        transient = true;
+        failure = errorText(error);
+      }
+      if (!transient) break;
+      const base = GTR_RETRY_WAITS_MS[attempt];
+      if (base === undefined) break;
+      await sleep(Math.round(base * (1 + JITTER * (random() * 2 - 1))));
     }
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`GtR ${label} failed: HTTP ${response.status}`);
+    if (!response || response.status < 200 || response.status >= 300) {
+      throw new Error(`GtR ${label} failed: ${failure}`);
     }
 
     let json: unknown;

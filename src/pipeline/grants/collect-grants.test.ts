@@ -1,9 +1,15 @@
+import type { HttpFetcher } from "@/core/ports";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { grantParticipants, grantProjects, sources } from "@/db/schema";
 import { collectGrantsStep, grantCoverage } from "./collect-grants";
 import { createGtrClient, GTR_API_BASE } from "./gtr-client";
-import { fakeGtr, loadGtrFixture, syntheticPage } from "./testing";
+import {
+  fakeGtr,
+  jsonResponse,
+  loadGtrFixture,
+  syntheticPage,
+} from "./testing";
 
 let testDb: TestDb;
 beforeEach(async () => {
@@ -213,5 +219,106 @@ describe("collectGrantsStep", () => {
       expect(url).not.toMatch(/person/i);
       expect(url).toMatch(/\/(projects\.json\?|organisations\/[0-9A-Za-z-]+$)/);
     }
+  });
+});
+
+/** Wraps the fake so that chosen project pages answer with a failing status. */
+function flaky(failures: Record<number, number[]>) {
+  const fake = fakeGtr((page) => syntheticPage(page, 2));
+  const left = new Map(
+    Object.entries(failures).map(([k, v]) => [Number(k), [...v]]),
+  );
+  const attempts = new Map<number, number>();
+  const sleep = vi.fn().mockResolvedValue(undefined);
+  const http: HttpFetcher = {
+    get: (url, options) => {
+      const match = /projects\.json\?.*[?&]?p=(\d+)/.exec(url);
+      const page = match?.[1] ? Number(match[1]) : null;
+      if (page !== null) {
+        attempts.set(page, (attempts.get(page) ?? 0) + 1);
+        const status = left.get(page)?.shift();
+        if (status !== undefined) {
+          return Promise.resolve(jsonResponse("error", status));
+        }
+      }
+      return fake.fetcher.get(url, options);
+    },
+  };
+  const gtr = createGtrClient({ http, sleep, random: () => 0.5 });
+  return { gtr, attempts, sleep };
+}
+
+describe("collectGrantsStep retries and partial progress", () => {
+  it("carries on after a 503 that clears on retry", async () => {
+    const { gtr, attempts } = flaky({ 2: [503] });
+    const stats = await collectGrantsStep({ db: testDb.db, gtr, maxPages: 3 });
+    expect(attempts.get(2)).toBe(2);
+    expect(stats).toMatchObject({ pagesFetched: 3, projectsInserted: 6 });
+    expect(stats.errorCount).toBeUndefined();
+    expect(stats.lastError).toBeUndefined();
+  });
+
+  it("retries a 429", async () => {
+    const { gtr, attempts } = flaky({ 1: [429] });
+    const stats = await collectGrantsStep({ db: testDb.db, gtr, maxPages: 1 });
+    expect(attempts.get(1)).toBe(2);
+    expect(stats.projectsInserted).toBe(2);
+  });
+
+  it("keeps stored pages and records the error when a 503 persists", async () => {
+    const { gtr, attempts } = flaky({ 2: [503, 503, 503, 503, 503, 503] });
+    const stats = await collectGrantsStep({ db: testDb.db, gtr, maxPages: 5 });
+    expect(attempts.get(2)).toBe(5);
+    expect(attempts.get(3)).toBeUndefined();
+    expect(stats).toMatchObject({
+      pagesFetched: 1,
+      projectsInserted: 2,
+      errorCount: 1,
+      lastError: "GtR projects page 2 failed: HTTP 503",
+    });
+    expect(await testDb.db.select().from(grantProjects)).toHaveLength(2);
+    // Organisations wait for the next run while the API is unwell.
+    expect(stats.orgsFetched).toBe(0);
+
+    // The next run finds the missing data and fetches the organisations.
+    const next = flaky({});
+    const again = await collectGrantsStep({
+      db: testDb.db,
+      gtr: next.gtr,
+      maxPages: 3,
+    });
+    expect(again.errorCount).toBeUndefined();
+    expect(again.projectsInserted).toBe(4);
+    expect(again.orgsFetched).toBe(6);
+  });
+
+  it("does not retry a 404, and stops the walk", async () => {
+    const { gtr, attempts, sleep } = flaky({ 2: [404] });
+    const stats = await collectGrantsStep({ db: testDb.db, gtr, maxPages: 5 });
+    expect(attempts.get(2)).toBe(1);
+    expect(sleep).not.toHaveBeenCalledWith(2000);
+    expect(stats).toMatchObject({
+      projectsInserted: 2,
+      errorCount: 1,
+      lastError: "GtR projects page 2 failed: HTTP 404",
+    });
+  });
+
+  it("throws when the first page fails, as nothing was fetched", async () => {
+    const { gtr } = flaky({ 1: [503, 503, 503, 503, 503] });
+    await expect(
+      collectGrantsStep({ db: testDb.db, gtr, maxPages: 3 }),
+    ).rejects.toThrow("HTTP 503");
+  });
+
+  it("stops fetching organisations after 3 failures in a row", async () => {
+    const fake = fakeGtr((page) => syntheticPage(page, 5), {
+      failOrgs: Array.from({ length: 5 }, (_, i) => `org-1-${i}`),
+    });
+    const gtr = createGtrClient({ http: fake.fetcher, sleep: vi.fn() });
+    const stats = await collectGrantsStep({ db: testDb.db, gtr, maxPages: 1 });
+    expect(stats.orgsFailed).toBe(3);
+    expect(stats.errorCount).toBe(1);
+    expect(stats.lastError).toContain("HTTP 500");
   });
 });

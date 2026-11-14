@@ -1841,6 +1841,124 @@
       "expected": { "outcome": "candidates" }
     },
     {
+      "id": "ch-57",
+      "kind": "companies_house",
+      "tags": ["country-hint", "filing"],
+      "note": "D62. No country stated; searched because the round is in GBP. The rules are unchanged: an exact name with an SH01 40 days before the round links.",
+      "company": {
+        "names": ["Harrowgate Labs"],
+        "countryCode": null,
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-20",
+            "amountUsdMinor": 190000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14876543",
+            "name": "HARROWGATE LABS LTD",
+            "incorporatedOn": "2023-02-14",
+            "officePostcode": "M1 3HU"
+          },
+          "filings": [{ "actionDate": "2026-03-11", "filedOn": "2026-03-20" }]
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "14876543" }
+    },
+    {
+      "id": "ch-58",
+      "kind": "companies_house",
+      "tags": ["country-hint", "trading-name"],
+      "note": "D62. No country stated; searched because UKTN reported it. Only a prefix match exists, with an SH01 in the window. Prefix matches go to review (D61), and a hint never changes that.",
+      "company": {
+        "names": ["Quillmere"],
+        "countryCode": null,
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-05-12",
+            "amountUsdMinor": 250000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "15123987",
+            "name": "QUILLMERE ENERGY SYSTEMS LTD",
+            "incorporatedOn": "2024-01-09",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2026-04-28", "filedOn": "2026-05-06" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-59",
+      "kind": "companies_house",
+      "tags": ["country-hint", "short-name", "same-name-different-company"],
+      "note": "D62. No country stated; a US company raising in USD but reported by UKTN. An unrelated UK company has the exact name and no SH01 near the round. No signal, so review, never a link.",
+      "company": {
+        "names": ["Brindle"],
+        "countryCode": null,
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-06-02",
+            "amountUsdMinor": 1200000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "08765432",
+            "name": "BRINDLE LIMITED",
+            "incorporatedOn": "2013-09-30",
+            "officePostcode": "BS1 4DJ",
+            "accountsType": "micro-entity",
+            "accountsMadeUpTo": "2025-09-30"
+          },
+          "filings": [{ "actionDate": "2019-05-01", "filedOn": "2019-05-10" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-60",
+      "kind": "companies_house",
+      "tags": ["country-hint", "too-young"],
+      "note": "D62. No country stated; searched because the extraction names Bristol. The only exact match was incorporated after the first event, so nothing is linked or proposed.",
+      "company": {
+        "names": ["Larchway Health"],
+        "countryCode": null,
+        "events": [
+          {
+            "roundType": "pre_seed",
+            "announcedOn": "2025-03-01",
+            "amountUsdMinor": 60000000
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "16001234",
+            "name": "LARCHWAY HEALTH LTD",
+            "incorporatedOn": "2025-09-15",
+            "officePostcode": "BS2 0JA"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "none" }
+    },
+    {
       "id": "fd-01",
       "kind": "sec_form_d",
       "tags": ["worked-example", "form-d"],

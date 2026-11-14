@@ -55,3 +55,14 @@ export const SOURCES: SourceConfig[] = [
     enabled: false,
   },
 ];
+
+/**
+ * Sources that report on companies from one country only (D62). A report
+ * from one of these is a hint for registry searches, never a stated country:
+ * it is not written to `companies.country_code`. UKTN covers UK tech. No
+ * source is US-only: TechCrunch and Crunchbase News report worldwide.
+ * Review this list when a source is added.
+ */
+export const SOURCE_COUNTRY_HINTS: Readonly<Record<string, "GB" | "US">> = {
+  "uktech-news": "GB",
+};

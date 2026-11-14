@@ -1036,19 +1036,23 @@ async function recordedRun(
   trigger: IngestTrigger,
   body: (
     scoped: PipelineDeps,
-  ) => Promise<{ stats: IngestStats; errors: string[] }>,
+  ) => Promise<{ stats: IngestStats; errors: string[]; warnings?: string[] }>,
 ): Promise<RunSummary> {
   const locked = await withIngestLock(lock, async () => {
     const run = await startRun(deps.db, trigger);
     const scoped: PipelineDeps = { ...deps, runId: run.id };
     try {
-      const { stats, errors } = await body(scoped);
+      const { stats, errors, warnings = [] } = await body(scoped);
       for (const message of errors) deps.log(`Step failed: ${message}`);
+      for (const message of warnings)
+        deps.log(`Step stopped early: ${message}`);
       const status: IngestStatus = errors.length > 0 ? "failed" : "succeeded";
+      // A warning keeps the run green but leaves its text on the run row.
+      const notes = errors.length > 0 ? errors : warnings;
       await finishRun(deps.db, run.id, {
         status,
         stats,
-        error: errors.length > 0 ? errors.join("; ") : null,
+        error: notes.length > 0 ? notes.join("; ") : null,
       });
       return { ran: true, status, runId: run.id, stats };
     } catch (error) {
@@ -1080,7 +1084,8 @@ export async function runGrants(
   options: GrantsRunOptions = {},
 ): Promise<RunSummary> {
   return recordedRun(deps, lock, trigger, async (scoped) => {
-    // Unlike the Phase 3 steps, a grants failure is thrown, as before.
+    // Unlike the Phase 3 steps, a failure with nothing fetched is thrown, as
+    // before. A page that fails after retries is a warning: data is kept.
     const grantCollect: GrantCollectStats = await collectGrantsStep({
       db: scoped.db,
       gtr: scoped.gtr,
@@ -1092,6 +1097,9 @@ export async function runGrants(
     return {
       stats: { ...(await emptyRunStats(scoped)), grantCollect },
       errors: [],
+      warnings: grantCollect.lastError
+        ? [`grants stopped early: ${grantCollect.lastError}`]
+        : [],
     };
   });
 }

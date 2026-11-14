@@ -41,6 +41,7 @@ describe("link eval", () => {
       "ltd-limited",
       "same-name-different-company",
       "form-d",
+      "country-hint",
     ]) {
       expect(tags, tag).toContain(tag);
     }
