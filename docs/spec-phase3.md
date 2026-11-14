@@ -156,7 +156,7 @@ No new port. Both clients are adapters over `HttpFetcher`, which already takes h
 
 The rules run per company in the `registry` step. They are pure functions (`src/pipeline/registry/link-rules.ts`) over the company's facts and the API responses, so they are unit-tested and replayed by the link eval (section 12) with no network.
 
-**Which companies are searched.** Companies not merged, with `country_code = GB`, or with a grant participant, or with a UK `company_locations` row. Companies with no normalised name of at least 3 characters are skipped (`outcome = skipped`).
+**Which companies are searched** (D62). Companies not merged and not linked, with evidence (`country_code = GB`, a grant participant, or a UK `company_locations` row) or, when `country_code` is null or GB, a hint: a funding round in GBP (`gbp`), a report from a UK-only source in `SOURCE_COUNTRY_HINTS` (`uk_source`, today only `uktech-news`), or a UK town or region in the company's current extractions or `companies.city` (`uk_place`). A known country other than GB never takes a hint. Hints only choose who is searched: the rules below are the same for every company, and a hinted country is never written to `companies.country_code`. The queue runs by tier, then newest event: a grant with a company number; other evidence; two or more hints; a GBP round or a UK-only source; a UK place only. A link or candidate for a company searched on hints alone ends its reason with "searched on hint: …; country not stated", so `pnpm registry list` shows why it appeared, and the run logs how many were searched on each hint. Companies with no normalised name of at least 3 characters are skipped (`outcome = skipped`).
 
 **Names.** The registry normaliser is `normaliseCompanyName` (Phase 1: lower case, no diacritics, legal suffixes removed, punctuation removed), plus `&` read as "and". A name matches **exactly** when the normalised registry name, or one of its `previous_names`, equals the company's normalised name or one of its aliases. It matches **by prefix** when the normalised registry name starts with the company's normalised name followed by a space ("tidewell platform" for "tidewell"). Nothing else is a match. "UK", "Holdings" and similar words are not stripped, because they usually name a different legal entity.
 
@@ -263,7 +263,7 @@ For each day not in `edgar_index_days`, oldest first, up to yesterday: fetch the
 The direction is filing to company, because there are far more Form D issuers than news companies.
 
 1. **By CIK.** A company already linked to this CIK owns the filing.
-2. **By name.** Otherwise, find non-merged companies whose normalised name or alias equals the normalised issuer name (legal suffixes such as Inc, LLC and Corp are already removed). Companies with a known country other than `US`, or linked to another CIK, conflict.
+2. **By name.** Otherwise, find non-merged companies whose normalised name or alias equals the normalised issuer name (legal suffixes such as Inc, LLC and Corp are already removed). Companies with a known country other than `US`, or linked to another CIK, conflict. A company with no country is already considered (D62), so hints do not widen this pool; they only explain a review row. When the country is null, the reason ends "searched on hint: usd; country not stated" for a USD round or a US-only source (none is configured), or "country not stated, no US hint".
 3. **Decide.** Link (method `form_d_round`) when exactly one company is left and it has a funding round that the Form D confirms by the rules in section 9.2 (date window and amounts). The link and the confirmation then come from the same evidence.
 4. **Otherwise.** If exactly one company is left and it has a funding round within 365 days of the filing, record a `candidate`. Else nothing. This keeps common names ("Atlas", "Nova") out of the review queue.
 5. On linking, fill `sec_cik`, and fill an empty `founded_year` from `year_of_inc` (source `sec_form_d`).
@@ -377,7 +377,7 @@ The sector filter reads `company_sectors` **or** the old theme join, so it never
 
 | Item | Volume a month | Cost a month |
 |---|---|---|
-| Companies House API | about 3,500 requests (250 new companies × about 5, 1,700 refreshes, 200 filing checks, 200 address checks) | £0 |
+| Companies House API | about 3,500 requests (250 new companies × about 5, 1,700 refreshes, 200 filing checks, 200 address checks), plus about 150-450 for companies searched on country hints (D62) | £0 |
 | SEC EDGAR | about 5,000 requests (22 indexes, about 4,800 XML files) | £0 |
 | GitHub Actions | about 5-15 extra minutes a day on a public repo | £0 |
 | Neon compute | daily runs of a few minutes; the hourly confirm and sector steps are usually skipped | £0 |

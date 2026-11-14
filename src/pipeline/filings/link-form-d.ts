@@ -20,10 +20,13 @@ import type { Db } from "@/db/client";
 import {
   companies,
   companyAliases,
+  eventSources,
   events,
   formDFilings,
   fundingRounds,
   registryLinks,
+  sourceItems,
+  sources,
 } from "@/db/schema";
 import { normaliseCompanyName } from "@/lib/normalise";
 import type { ConfirmableEvent } from "@/pipeline/registry/confirm-rules";
@@ -36,6 +39,11 @@ import {
   type FormDLinkResult,
 } from "@/pipeline/registry/link-rules";
 import { recordCandidate, recordLink } from "@/pipeline/registry/link-store";
+import {
+  formDHints,
+  formDSearchNote,
+  sourceSlugsFor,
+} from "@/pipeline/registry/search-hints";
 import { emptyFormDStats } from "./store-form-d";
 
 const REGISTRY = "sec_edgar" as const;
@@ -56,6 +64,8 @@ interface CompanyFacts {
   company: FormDLinkCompany;
   /** The raw names, for prefix checks: the company name first. */
   names: string[];
+  /** Added to link and candidate reasons when the country is not stated (D62). */
+  searchNote: string | null;
 }
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
@@ -221,7 +231,8 @@ async function loadCompanies(
   const out = new Map<number, CompanyFacts>();
   for (const ids of chunks([...new Set(companyIds)], CHUNK)) {
     if (ids.length === 0) continue;
-    const [base, aliases, eventRows, links] = await Promise.all([
+    const usSlugs = sourceSlugsFor("US");
+    const [base, aliases, eventRows, links, usReports] = await Promise.all([
       db
         .select({
           id: companies.id,
@@ -255,6 +266,7 @@ async function loadCompanies(
           datePrecision: events.datePrecision,
           roundType: fundingRounds.roundType,
           amountUsdMinor: fundingRounds.amountUsdMinor,
+          currency: fundingRounds.currency,
         })
         .from(events)
         .leftJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
@@ -277,12 +289,34 @@ async function loadCompanies(
             ),
           ),
         ),
+      // Reports from US-only sources (D62). None are configured today.
+      usSlugs.length === 0
+        ? Promise.resolve([])
+        : db
+            .selectDistinct({ companyId: events.companyId, slug: sources.slug })
+            .from(eventSources)
+            .innerJoin(events, eq(events.id, eventSources.eventId))
+            .innerJoin(
+              sourceItems,
+              eq(sourceItems.id, eventSources.sourceItemId),
+            )
+            .innerJoin(sources, eq(sources.id, sourceItems.sourceId))
+            .where(
+              and(
+                inArray(events.companyId, ids),
+                inArray(sources.slug, usSlugs),
+              ),
+            ),
     ]);
 
     const aliasesBy = new Map<number, string[]>();
     for (const row of aliases) pushTo(aliasesBy, row.companyId, row.alias);
     const eventsBy = new Map<number, ConfirmableEvent[]>();
+    const currenciesBy = new Map<number, (string | null)[]>();
+    const slugsBy = new Map<number, string[]>();
+    for (const row of usReports) pushTo(slugsBy, row.companyId, row.slug);
     for (const row of eventRows) {
+      pushTo(currenciesBy, row.companyId, row.currency ?? null);
       pushTo(eventsBy, row.companyId, {
         id: row.id,
         type: row.type,
@@ -306,8 +340,14 @@ async function loadCompanies(
         row.foundedYearSource === "sec_form_d"
           ? null
           : row.foundedYear;
+      const hints = formDHints({
+        countryCode: row.countryCode,
+        currencies: currenciesBy.get(row.id) ?? [],
+        sourceSlugs: slugsBy.get(row.id) ?? [],
+      });
       out.set(row.id, {
         names,
+        searchNote: formDSearchNote(row.countryCode, hints),
         company: {
           companyId: row.id,
           names,
@@ -377,6 +417,12 @@ interface LinkContext {
   facts: Map<number, CompanyFacts>;
 }
 
+/** The reason with the company's search note, if it has one (D62). */
+function withNote(ctx: LinkContext, companyId: number, reason: string): string {
+  const note = ctx.facts.get(companyId)?.searchNote ?? null;
+  return note === null ? reason : `${reason}; ${note}`;
+}
+
 /** Exact-name companies for a filing, or prefix-name companies when none. */
 function namedCompanies(
   ctx: LinkContext,
@@ -408,7 +454,7 @@ async function applyLink(
     registryId: filing.cik,
     registryName: filing.issuerName,
     method: result.method,
-    reason: result.reason,
+    reason: withNote(ctx, result.companyId, result.reason),
     decidedBy: "auto",
     now: ctx.now,
   });
@@ -438,7 +484,7 @@ async function applyCandidate(
     registry: REGISTRY,
     registryId: filing.cik,
     registryName: filing.issuerName,
-    reason,
+    reason: withNote(ctx, companyId, reason),
     now: ctx.now,
   });
   if (inserted) ctx.stats.candidates += 1;

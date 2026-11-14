@@ -538,6 +538,10 @@ All of them make fewer automatic links than the spec tables (section 7.2 and 8.3
 - **Event dates are read generously** for the date conflicts: a month-precision event counts until the end of its month for "too young" (ch-16).
 - **Form D:** a single-word issuer name links only when amounts were compared (fd-06, fd-07), and a year of incorporation more than 2 years from the news founded year conflicts (fd-11).
 
+## Search hints (D62)
+
+Hints (a GBP round, a UK-only source, a UK town or region) decide only which companies with no stated country are searched. The rules above decide them unchanged: a filing still links an exact name (ch-57), and a prefix match or an exact name with no signal still goes to review (ch-58, ch-59).
+
 ## Every case
 
 | Case | Tags | Labelled | Result | Reason |

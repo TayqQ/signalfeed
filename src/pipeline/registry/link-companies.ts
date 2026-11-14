@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { and, asc, eq, inArray, isNull, ne, not, or, sql } from "drizzle-orm";
 import type { RegistryStats } from "@/core/domain";
 import type { RegistrySearchOutcome } from "@/core/enums";
+import { upgradeExtraction } from "@/core/extraction-schema";
 import {
   normaliseCompanyNumber,
   type RegistryCompanyFacts,
@@ -16,7 +17,9 @@ import {
   companies,
   companyAliases,
   companyLocations,
+  eventSources,
   events,
+  extractions,
   fundingRounds,
   grantParticipants,
   registryLinks,
@@ -43,6 +46,16 @@ import {
   type ChLinkResult,
   type LinkLocation,
 } from "./link-rules";
+import {
+  chHints,
+  chSearchNote,
+  chSearchTier,
+  hintsApply,
+  isUkPlaceText,
+  searchedOnHintsOnly,
+  sourceSlugsFor,
+  type ChSearchReason,
+} from "./search-hints";
 import { freshAddressCount, isSharedAddress } from "./shared-address";
 import {
   fillFoundedYear,
@@ -376,32 +389,145 @@ export function filingsSince(
   return `${String(year).padStart(4, "0")}${earliest.slice(4)}`;
 }
 
+/** A company due for a Companies House search, and why. */
+export interface EligibleCompany {
+  id: number;
+  /** Evidence and hints that put the company in the queue (D62). */
+  reasons: ChSearchReason[];
+  tier: number;
+  latestEvent: string | null;
+}
+
 /**
- * Companies to search, in order (spec-phase3 section 7.2): not merged, not
- * linked yet, and GB, or with a grant participant, or with a UK location.
- * Grant companies with a company number come first, then newest events.
+ * Towns and regions that current extractions give for the companies' events,
+ * by company. Read only for companies with no country, to find UK places.
  */
-export async function eligibleCompanyIds(db: Db): Promise<number[]> {
-  const hasGrant = sql`exists (select 1 from ${grantParticipants} where ${grantParticipants.companyId} = ${companies.id})`;
-  const ukLocation = sql`exists (select 1 from ${companyLocations} where ${companyLocations.companyId} = ${companies.id} and ${companyLocations.countryCode} = 'GB')`;
-  const linked = sql`exists (select 1 from ${registryLinks} where ${registryLinks.companyId} = ${companies.id} and ${registryLinks.registry} = ${REGISTRY} and ${registryLinks.status} = 'linked')`;
-  const latestEvent = sql`(select max(${events.announcedOn}) from ${events} where ${events.companyId} = ${companies.id})`;
+async function extractedPlaces(
+  db: Db,
+  companyIds: readonly number[],
+): Promise<Map<number, { cities: string[]; regions: string[] }>> {
+  const out = new Map<number, { cities: string[]; regions: string[] }>();
+  for (const ids of chunks(companyIds, ID_CHUNK)) {
+    if (ids.length === 0) continue;
+    const rows = await db
+      .select({
+        companyId: events.companyId,
+        eventIndex: eventSources.eventIndex,
+        result: extractions.result,
+      })
+      .from(eventSources)
+      .innerJoin(events, eq(events.id, eventSources.eventId))
+      .innerJoin(extractions, eq(extractions.id, eventSources.extractionId))
+      .where(
+        and(eq(extractions.isCurrent, true), inArray(events.companyId, ids)),
+      );
+    for (const row of rows) {
+      const company = upgradeExtraction(row.result).events[row.eventIndex]
+        ?.company;
+      if (!company) continue;
+      const places = out.get(row.companyId) ?? { cities: [], regions: [] };
+      if (company.city) places.cities.push(company.city);
+      if (company.regionText) places.regions.push(company.regionText);
+      out.set(row.companyId, places);
+    }
+  }
+  return out;
+}
+
+/**
+ * Companies to search, in order (spec-phase3 section 7.2, D62): not merged,
+ * not linked yet, and either with evidence (GB, a grant participant, a UK
+ * location row) or, when the country is null or GB, with a hint: a GBP
+ * round, a report from a UK-only source, or a UK town or region in the
+ * extractions. A known country other than GB never takes a hint. The queue
+ * runs by tier (`chSearchTier`), then newest event first.
+ */
+export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
+  const ukSlugs = sourceSlugsFor("GB");
+  // Written with table names: in a single-table select Drizzle leaves column
+  // names unqualified, which the subqueries would read as their own columns.
+  const hasGrant = sql<boolean>`exists (select 1 from grant_participants gp where gp.company_id = companies.id)`;
+  const ukLocation = sql<boolean>`exists (select 1 from company_locations cl where cl.company_id = companies.id and cl.country_code = 'GB')`;
+  const gbpRound = sql<boolean>`exists (select 1 from funding_rounds fr inner join events e on e.id = fr.event_id where e.company_id = companies.id and fr.currency = 'GBP')`;
+  const ukSource =
+    ukSlugs.length === 0
+      ? sql<boolean>`false`
+      : sql<boolean>`exists (select 1 from event_sources es inner join events e on e.id = es.event_id inner join source_items si on si.id = es.source_item_id inner join sources s on s.id = si.source_id where e.company_id = companies.id and s.slug in (${sql.join(
+          ukSlugs.map((slug) => sql`${slug}`),
+          sql`, `,
+        )}))`;
+  const linked = sql`exists (select 1 from registry_links rl where rl.company_id = companies.id and rl.registry = ${REGISTRY} and rl.status = 'linked')`;
+  const latestEvent = sql<
+    string | null
+  >`(select max(e.announced_on)::text from events e where e.company_id = companies.id)`;
   const rows = await db
-    .select({ id: companies.id })
+    .select({
+      id: companies.id,
+      countryCode: companies.countryCode,
+      city: companies.city,
+      ukCompanyNumber: companies.ukCompanyNumber,
+      hasGrant,
+      ukLocation,
+      gbpRound,
+      ukSource,
+      latestEvent,
+    })
     .from(companies)
     .where(
       and(
         isNull(companies.mergedIntoId),
-        or(eq(companies.countryCode, "GB"), hasGrant, ukLocation),
+        or(
+          isNull(companies.countryCode),
+          eq(companies.countryCode, "GB"),
+          hasGrant,
+          ukLocation,
+        ),
         not(linked),
       ),
-    )
-    .orderBy(
-      sql`case when ${hasGrant} and ${companies.ukCompanyNumber} is not null then 0 else 1 end`,
-      sql`${latestEvent} desc nulls last`,
-      asc(companies.id),
     );
-  return rows.map((row) => row.id);
+
+  const unknownCountry = rows
+    .filter((row) => row.countryCode === null)
+    .map((row) => row.id);
+  const places = await extractedPlaces(db, unknownCountry);
+
+  const out: EligibleCompany[] = [];
+  for (const row of rows) {
+    const reasons: ChSearchReason[] = [];
+    if (row.hasGrant && row.ukCompanyNumber !== null) {
+      reasons.push("grant_number");
+    }
+    if (row.hasGrant) reasons.push("grant");
+    if (row.countryCode?.toUpperCase() === "GB") reasons.push("country_gb");
+    if (row.ukLocation) reasons.push("uk_location");
+    if (hintsApply(row.countryCode)) {
+      if (row.gbpRound) reasons.push("gbp");
+      if (row.ukSource) reasons.push("uk_source");
+      const extracted = places.get(row.id);
+      if (
+        row.countryCode === null &&
+        (isUkPlaceText(row.city, "city") ||
+          extracted?.cities.some((city) => isUkPlaceText(city, "city")) ||
+          extracted?.regions.some((text) => isUkPlaceText(text, "region")))
+      ) {
+        reasons.push("uk_place");
+      }
+    }
+    const tier = chSearchTier(reasons);
+    if (tier === null) continue;
+    out.push({ id: row.id, reasons, tier, latestEvent: row.latestEvent });
+  }
+  return out.sort(
+    (a, b) =>
+      a.tier - b.tier ||
+      (b.latestEvent ?? "").localeCompare(a.latestEvent ?? "") ||
+      a.id - b.id,
+  );
+}
+
+/** The ids of `eligibleCompanies`, in queue order. */
+export async function eligibleCompanyIds(db: Db): Promise<number[]> {
+  return (await eligibleCompanies(db)).map((company) => company.id);
 }
 
 /** Numbers `linked` in Companies House, with the company holding each. */
@@ -445,6 +571,8 @@ interface LinkContext {
   stats: RegistryStats;
   /** Numbers linked in Companies House, kept current through the run. */
   holders: Map<string, number>;
+  /** Why each company was searched, when only hints put it in the queue (D62). */
+  searchNotes: Map<number, string>;
 }
 
 async function fetchProfile(
@@ -540,6 +668,9 @@ async function applyResult(
     candidates.map((c) => [c.profile.companyNumber, c.profile]),
   );
   let outcome = result.outcome;
+  const note = ctx.searchNotes.get(facts.companyId);
+  const withNote = (reason: string) =>
+    note === undefined ? reason : `${reason}; ${note}`;
 
   for (const decision of result.decisions) {
     const profile = byNumber.get(decision.registryId);
@@ -551,7 +682,7 @@ async function applyResult(
         registryId: decision.registryId,
         registryName: profile.name,
         method: decision.method,
-        reason: decision.reason,
+        reason: withNote(decision.reason),
         decidedBy: "auto",
         now,
       });
@@ -573,7 +704,7 @@ async function applyResult(
         registry: REGISTRY,
         registryId: decision.registryId,
         registryName: profile.name,
-        reason: decision.reason,
+        reason: withNote(decision.reason),
         now,
       });
       if (inserted) stats.candidates += 1;
@@ -720,10 +851,19 @@ export async function linkCompanies(
     budget,
     stats,
     holders: await linkedHolders(db),
+    searchNotes: new Map(),
   };
+  const hintCounts = new Map<string, number>();
+  let hintOnly = 0;
 
   try {
-    const ids = await eligibleCompanyIds(db);
+    const queue = await eligibleCompanies(db);
+    const reasonsById = new Map(queue.map((c) => [c.id, c.reasons]));
+    for (const company of queue) {
+      const note = chSearchNote(company.reasons);
+      if (note !== null) ctx.searchNotes.set(company.id, note);
+    }
+    const ids = queue.map((company) => company.id);
     for (const batch of chunks(ids, ID_CHUNK)) {
       const factsById = await loadCompanyLinkFacts(db, batch);
       for (const id of batch) {
@@ -736,6 +876,13 @@ export async function linkCompanies(
         }
         try {
           await linkOne(ctx, facts, fingerprint);
+          const reasons = reasonsById.get(id) ?? [];
+          if (searchedOnHintsOnly(reasons)) {
+            hintOnly += 1;
+            for (const hint of chHints(reasons)) {
+              hintCounts.set(hint, (hintCounts.get(hint) ?? 0) + 1);
+            }
+          }
         } catch (error) {
           if (
             error instanceof RateLimitedError ||
@@ -751,6 +898,12 @@ export async function linkCompanies(
     }
   } catch (error) {
     if (!markStopped(stats, error)) throw error;
+  }
+  if (hintOnly > 0) {
+    const counts = [...hintCounts].map(([hint, n]) => `${hint} ${n}`);
+    log(
+      `registry: ${hintOnly} companies searched on hints only (${counts.join(", ")})`,
+    );
   }
   stats.requests += budget.used() - startUsed;
   return stats;

@@ -349,3 +349,44 @@ describe("linkFormDFilings", () => {
     expect(await links()).toEqual([]);
   });
 });
+
+describe("linkFormDFilings: country hints (D62)", () => {
+  it("links a company with no country and a USD round, and records the hint", async () => {
+    const orbital = await insertCompany("Orbital Forge", { countryCode: null });
+    await addRound(orbital.id, "2026-02-18", 450_000_000);
+    await storeFiling(orbitalForge());
+
+    const stats = await linkFormDFilings({ db, now: NOW });
+    expect(stats.linkedByName).toBe(1);
+    const [link] = await links();
+    expect(link).toMatchObject({
+      companyId: orbital.id,
+      status: "linked",
+      method: "form_d_round",
+    });
+    expect(link!.reason).toContain("searched on hint: usd; country not stated");
+    // The country stays as news gave it: a hint is not a stated country.
+    expect((await company(orbital.id)).countryCode).toBeNull();
+  });
+
+  it("adds no note for a company whose country is US", async () => {
+    const orbital = await insertCompany("Orbital Forge");
+    await addRound(orbital.id, "2026-02-18", 450_000_000);
+    await storeFiling(orbitalForge());
+    await linkFormDFilings({ db, now: NOW });
+    const [link] = await links();
+    expect(link!.reason).not.toContain("country not stated");
+  });
+
+  it("never links a company with no country on a prefix name", async () => {
+    const orbital = await insertCompany("Orbital", { countryCode: null });
+    await addRound(orbital.id, "2026-02-18", 450_000_000);
+    await storeFiling(orbitalForge({ issuerName: "Orbital Labs, Inc." }));
+
+    const stats = await linkFormDFilings({ db, now: NOW });
+    expect(stats.linkedByName).toBe(0);
+    const rows = await links();
+    expect(rows.every((row) => row.status !== "linked")).toBe(true);
+    expect((await company(orbital.id)).secCik).toBeNull();
+  });
+});

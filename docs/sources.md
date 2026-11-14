@@ -291,6 +291,8 @@ Copied into code by Task 006.
 
 **Phase 1 enabled count:** 5 feeds, including **3** with UK/Europe focus (Tech.eu, EU-Startups, UKTN).
 
+**Country hints (D62, 14 November 2026).** `SOURCE_COUNTRY_HINTS` in `src/pipeline/sources.ts` marks sources that report on one country only. Only UKTN (`uktech-news`) is marked, as GB. Tech.eu and EU-Startups cover the UK with the rest of Europe. TechCrunch Venture and Crunchbase News lean US but report worldwide, so no source is marked US. A hint chooses which companies are searched in Companies House; it is never stored as a company's country. Review the list when a source is added.
+
 ---
 
 ## References (quick links)

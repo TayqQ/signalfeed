@@ -9,18 +9,21 @@ import {
   chFilings,
   companies,
   companyLocations,
+  eventSources,
   events,
+  extractions,
   fundingRounds,
   grantParticipants,
   grantProjects,
   mergeCandidates,
   registryLinks,
   registrySearches,
+  sourceItems,
   sources,
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { RateLimitedError, type ChClient, type ChSearchHit } from "./ch-client";
-import { linkCompanies } from "./link-companies";
+import { eligibleCompanies, linkCompanies } from "./link-companies";
 import { recordLink } from "./link-store";
 import { fakeChClient, type FakeChClientOptions } from "./testing";
 
@@ -597,5 +600,277 @@ describe("linkCompanies: limits", () => {
     const stats = await run(client);
     expect(stats.rateLimited).toBe(true);
     expect(await searchOf(company.id)).toBeUndefined();
+  });
+});
+
+describe("linkCompanies: country hints (D62)", () => {
+  let itemCounter = 0;
+
+  async function addCurrencyRound(
+    companyId: number,
+    announcedOn: string,
+    currency: string,
+    amountMinor = 210_000_000,
+  ) {
+    const event = await addRound(companyId, announcedOn);
+    await db
+      .update(fundingRounds)
+      .set({ amountMinor, currency })
+      .where(eq(fundingRounds.eventId, event.id));
+    return event;
+  }
+
+  /** A report of the event from the source with this slug. */
+  async function addReport(
+    eventId: number,
+    sourceSlug: string,
+    company: { name: string; city?: string | null; regionText?: string | null },
+  ) {
+    itemCounter += 1;
+    const [existing] = await db
+      .select()
+      .from(sources)
+      .where(eq(sources.slug, sourceSlug));
+    const source =
+      existing ??
+      (
+        await db
+          .insert(sources)
+          .values({
+            slug: sourceSlug,
+            name: sourceSlug,
+            kind: "rss",
+            url: `https://${sourceSlug}.test/feed`,
+          })
+          .returning()
+      )[0]!;
+    const [item] = await db
+      .insert(sourceItems)
+      .values({
+        sourceId: source.id,
+        externalId: `item-${itemCounter}`,
+        url: `https://${sourceSlug}.test/${itemCounter}`,
+        canonicalUrl: `https://${sourceSlug}.test/${itemCounter}`,
+        title: "Invented headline",
+      })
+      .returning();
+    const [extraction] = await db
+      .insert(extractions)
+      .values({
+        sourceItemId: item!.id,
+        promptVersion: "v2",
+        model: "test",
+        isRelevant: true,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsdMicros: 0,
+        result: {
+          isRelevant: true,
+          events: [
+            {
+              type: "funding_round",
+              company: {
+                name: company.name,
+                websiteDomain: null,
+                description: null,
+                countryCode: null,
+                city: company.city ?? null,
+                regionText: company.regionText ?? null,
+                foundedYear: null,
+                tags: [],
+              },
+              announcedOn: null,
+              funding: null,
+              acquisition: null,
+              launch: null,
+            },
+          ],
+        },
+      })
+      .returning();
+    await db.insert(eventSources).values({
+      eventId,
+      extractionId: extraction!.id,
+      sourceItemId: item!.id,
+      eventIndex: 0,
+    });
+  }
+
+  function brightwellClient() {
+    return recordingClient({
+      companies: [BRIGHTWELL],
+      search: { "Brightwell Robotics": [hit(BRIGHTWELL)] },
+      filings: { "13579246": [sh01("2026-02-02")] },
+    });
+  }
+
+  it("searches a company with no country and a GBP round, and records why", async () => {
+    const company = await insertCompany("Brightwell Robotics", {
+      countryCode: null,
+    });
+    await addCurrencyRound(company.id, "2026-03-10", "GBP");
+    const { client, calls } = brightwellClient();
+    const messages: string[] = [];
+    await linkCompanies({
+      db,
+      client,
+      now: NOW,
+      maxRequests: 100,
+      log: (m) => messages.push(m),
+    });
+
+    expect(calls).toContain("search:Brightwell Robotics");
+    const [link] = await linksOf(company.id);
+    // The link rules are unchanged: an exact name with an SH01 36 days
+    // before the round links, as for a GB company.
+    expect(link).toMatchObject({ status: "linked", method: "name_filing" });
+    expect(link!.reason).toContain("searched on hint: gbp; country not stated");
+    expect(messages).toContain(
+      "registry: 1 companies searched on hints only (gbp 1)",
+    );
+    // A hint is never written as the company's country.
+    expect((await companyRow(company.id)).countryCode).toBeNull();
+  });
+
+  it("searches a company reported only by UKTN", async () => {
+    const company = await insertCompany("Brightwell Robotics", {
+      countryCode: null,
+    });
+    const event = await addRound(company.id, "2026-03-10");
+    await addReport(event.id, "uktech-news", { name: "Brightwell Robotics" });
+    const { client, calls } = brightwellClient();
+    await run(client);
+
+    expect(calls).toContain("search:Brightwell Robotics");
+    const [link] = await linksOf(company.id);
+    expect(link!.reason).toContain("searched on hint: uk_source");
+  });
+
+  it("does not search a company reported only by a source with no country hint", async () => {
+    const company = await insertCompany("Brightwell Robotics", {
+      countryCode: null,
+    });
+    const event = await addRound(company.id, "2026-03-10");
+    await addReport(event.id, "techcrunch-venture", {
+      name: "Brightwell Robotics",
+    });
+    const { client, calls } = brightwellClient();
+    await run(client);
+    expect(calls).toEqual([]);
+  });
+
+  it("does not search a company whose country is FR, even with a GBP round", async () => {
+    const company = await insertCompany("Brightwell Robotics", {
+      countryCode: "FR",
+    });
+    const event = await addCurrencyRound(company.id, "2026-03-10", "GBP");
+    await addReport(event.id, "uktech-news", { name: "Brightwell Robotics" });
+    const { client, calls } = brightwellClient();
+    await run(client);
+    expect(calls).toEqual([]);
+    expect(await eligibleCompanies(db)).toEqual([]);
+  });
+
+  it("takes a UK town or region from the extractions, but not a place abroad", async () => {
+    const leeds = await insertCompany("Leeds Hint", { countryCode: null });
+    const leedsEvent = await addRound(leeds.id, "2026-03-10");
+    await addReport(leedsEvent.id, "tech-eu", {
+      name: "Leeds Hint",
+      city: "Leeds",
+    });
+    const scotland = await insertCompany("Scotland Hint", {
+      countryCode: null,
+    });
+    const scotlandEvent = await addRound(scotland.id, "2026-03-11");
+    await addReport(scotlandEvent.id, "tech-eu", {
+      name: "Scotland Hint",
+      regionText: "Scotland",
+    });
+    const town = await insertCompany("Column Hint", {
+      countryCode: null,
+      city: "Manchester",
+    });
+    const paris = await insertCompany("Paris Hint", { countryCode: null });
+    const parisEvent = await addRound(paris.id, "2026-03-12");
+    await addReport(parisEvent.id, "tech-eu", {
+      name: "Paris Hint",
+      city: "Paris",
+      regionText: "Ile-de-France",
+    });
+
+    const queue = await eligibleCompanies(db);
+    expect(queue.map((c) => [c.id, c.reasons])).toEqual([
+      [scotland.id, ["uk_place"]],
+      [leeds.id, ["uk_place"]],
+      [town.id, ["uk_place"]],
+    ]);
+  });
+
+  it("orders the queue by strength of hint, then newest event", async () => {
+    const place = await insertCompany("Place Only", {
+      countryCode: null,
+      city: "Leeds",
+    });
+    await addRound(place.id, "2026-10-01");
+    const gbp = await insertCompany("Gbp Only", { countryCode: null });
+    await addCurrencyRound(gbp.id, "2026-01-01", "GBP");
+    const both = await insertCompany("Gbp And Uktn", { countryCode: null });
+    const bothEvent = await addCurrencyRound(both.id, "2025-06-01", "GBP");
+    await addReport(bothEvent.id, "uktech-news", { name: "Gbp And Uktn" });
+    const gb = await insertCompany("Stated GB");
+    await addRound(gb.id, "2024-01-01");
+    const newerGbp = await insertCompany("Newer Gbp", { countryCode: null });
+    await addCurrencyRound(newerGbp.id, "2026-05-01", "GBP");
+
+    const queue = await eligibleCompanies(db);
+    expect(queue.map((c) => [c.id, c.tier])).toEqual([
+      [gb.id, 1],
+      [both.id, 2],
+      [newerGbp.id, 3],
+      [gbp.id, 3],
+      [place.id, 4],
+    ]);
+  });
+
+  it("never links a hinted company on a prefix match, even with an SH01", async () => {
+    const company = await insertCompany("Tidewell", { countryCode: null });
+    const event = await addCurrencyRound(company.id, "2026-01-20", "GBP");
+    await addReport(event.id, "uktech-news", {
+      name: "Tidewell",
+      city: "London",
+    });
+    const platform = profile({
+      companyNumber: "15550001",
+      name: "TIDEWELL PLATFORM LTD",
+      officePostcode: "EC2A 4NE",
+      officeOutcode: "EC2A",
+    });
+    const client = fakeChClient({
+      companies: [platform],
+      search: { Tidewell: [hit(platform)] },
+      filings: { "15550001": [sh01("2025-12-15")] },
+    });
+    await run(client);
+
+    const links = await linksOf(company.id);
+    expect(links.map((l) => l.status)).toEqual(["candidate"]);
+    expect(links[0]!.reason).toContain("trading name: review");
+    expect(links[0]!.reason).toContain(
+      "searched on hint: gbp, uk_source, uk_place; country not stated",
+    );
+  });
+
+  it("keeps the request limit with hinted companies in the queue", async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const company = await insertCompany(`Hinted Company ${i}`, {
+        countryCode: null,
+      });
+      await addCurrencyRound(company.id, `2026-0${i + 1}-01`, "GBP");
+    }
+    const client = fakeChClient();
+    const stats = await run(client, 3);
+    expect(client.requestsMade()).toBe(3);
+    expect(stats.stoppedAtLimit).toBe(true);
+    expect(stats.companiesSearched).toBe(3);
   });
 });
