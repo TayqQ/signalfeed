@@ -3,6 +3,11 @@ import { ConfigError } from "./errors";
 
 export const webEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
+  /**
+   * Set to "true" to let search engines index the site. Anything else, or
+   * unset, keeps it out of search results until launch.
+   */
+  SITE_INDEXING: z.string().optional(),
 });
 export type WebEnv = z.infer<typeof webEnvSchema>;
 
@@ -30,6 +35,14 @@ export const pipelineEnvSchema = z.object({
   /** Companies House API key. The registry step is skipped without it. Never given to the web app. */
   COMPANIES_HOUSE_API_KEY: z.string().min(1).optional(),
   MAX_CH_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(2000),
+  /** Gateway to Research requests a second. UKRI documents up to 10 (A18). */
+  GTR_REQUESTS_PER_SECOND: z.coerce.number().positive().max(10).default(3),
+  /** Most organisation details fetched from Gateway to Research per grants run. */
+  MAX_GRANT_ORG_FETCHES_PER_RUN: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1500),
   MAX_EDGAR_DAYS_PER_RUN: z.coerce.number().int().positive().default(10),
   MAX_EDGAR_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(3000),
 });
@@ -70,6 +83,15 @@ function parseEnv<T extends z.ZodObject>(
     else invalid.add(key);
   }
   throw new ConfigError([...missing].sort(), [...invalid].sort());
+}
+
+/**
+ * Whether search engines may index the site. Only the exact value "true"
+ * turns it on. Reads the raw value, so it works at build time without a
+ * database URL.
+ */
+export function isSiteIndexingEnabled(env: EnvSource): boolean {
+  return env.SITE_INDEXING === "true";
 }
 
 export function parseWebEnv(env: EnvSource): WebEnv {

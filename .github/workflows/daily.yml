@@ -3,7 +3,7 @@
 #   1. new Innovate UK grants from UKRI Gateway to Research
 #   2. Companies House linking and profile refresh (needs COMPANIES_HOUSE_API_KEY)
 #   3. SEC Form D filings from EDGAR (needs an email address in HTTP_CONTACT)
-# None of them needs OPENAI_API_KEY. The hourly run tags and resolves what the
+# None of them needs OPENAI_API_KEY. Each step has its own timeout. The hourly run tags and resolves what the
 # grants step collects. A failing step does not skip the ones after it.
 #
 # It shares the "ingest" concurrency group with the hourly workflow, so the two
@@ -30,15 +30,19 @@ jobs:
     name: Daily jobs
     runs-on: ubuntu-latest
     if: vars.INGEST_ENABLED == 'true'
-    # At the default limits the registry step takes about 21 minutes
-    # (2,000 requests) and Form D about 10 (3,000 requests).
-    timeout-minutes: 60
+    # Each step has its own budget so a slow one cannot starve the rest:
+    # grants 25 minutes, Companies House 25, Form D 15, plus setup. At the
+    # default limits grants takes about 9 minutes (1,500 organisations at
+    # 3 requests a second), registry about 21 and Form D about 10.
+    timeout-minutes: 75
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EXTRACTION_MODEL: ${{ vars.EXTRACTION_MODEL }}
       LLM_MONTHLY_CAP_GBP: ${{ vars.LLM_MONTHLY_CAP_GBP }}
       HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
+      GTR_REQUESTS_PER_SECOND: ${{ vars.GTR_REQUESTS_PER_SECOND }}
+      MAX_GRANT_ORG_FETCHES_PER_RUN: ${{ vars.MAX_GRANT_ORG_FETCHES_PER_RUN }}
       MAX_CH_REQUESTS_PER_RUN: ${{ vars.MAX_CH_REQUESTS_PER_RUN }}
       MAX_EDGAR_DAYS_PER_RUN: ${{ vars.MAX_EDGAR_DAYS_PER_RUN }}
       MAX_EDGAR_REQUESTS_PER_RUN: ${{ vars.MAX_EDGAR_REQUESTS_PER_RUN }}
@@ -52,6 +56,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Collect grants
+        timeout-minutes: 25
         run: |
           set -o pipefail
           pnpm --silent ingest grants --trigger "$TRIGGER" | tee grants.json
@@ -106,6 +111,7 @@ jobs:
                   ["New projects", g.projectsInserted],
                   ["New participants", g.participantsInserted],
                   ["Participants skipped (not organisations)", g.participantsSkipped],
+                  ["Organisations skipped (name not a company form)", g.orgsSkipped ?? 0],
                   ["Organisations fetched", g.orgsFetched],
                   ["Organisations failed", g.orgsFailed],
                 ];

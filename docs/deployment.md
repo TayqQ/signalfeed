@@ -51,12 +51,12 @@ Variables:
 | `LLM_MONTHLY_CAP_GBP` | `3` |
 | `HTTP_CONTACT` | An email address where publishers and the SEC can reach you, sent in every User-Agent as `SignalFeed/<version> (+<HTTP_CONTACT>)`. SEC EDGAR needs an email address, so `pnpm ingest formd` refuses a URL |
 
-Optional variables, with their defaults: `EMBEDDING_MODEL` (`text-embedding-3-small`), `MAX_EXTRACTIONS_PER_RUN` (150), `MAX_EMBEDDINGS_PER_RUN` (2000), `MAX_THEME_NAMES_PER_RUN` (20) and `MAX_GRANT_TAGGINGS_PER_RUN` (200). The workflows do not pass them yet, so the defaults apply.
+Optional variables, with their defaults: `GTR_REQUESTS_PER_SECOND` (3), `MAX_GRANT_ORG_FETCHES_PER_RUN` (1500), `EMBEDDING_MODEL` (`text-embedding-3-small`), `MAX_EXTRACTIONS_PER_RUN` (150), `MAX_EMBEDDINGS_PER_RUN` (2000), `MAX_THEME_NAMES_PER_RUN` (20) and `MAX_GRANT_TAGGINGS_PER_RUN` (200). The hourly workflow does not pass the Phase 2 ones yet, so their defaults apply. The daily workflow passes the two grants settings when set.
 
 Two workflows use these settings:
 
 - **Ingest** (`.github/workflows/ingest.yml`), hourly at minute 17. It runs `pnpm ingest run`: collect, prefilter, extract, resolve and FX, then grant tagging and resolution, tag embedding, theme assignment and naming, locations and stats. Paid steps skip cleanly with no key, and a budget pause stops the paid steps that follow it.
-- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. It runs three steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). All three are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run tags and resolves the grants.
+- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. The job has 75 minutes, and each step has its own timeout (grants 25, Companies House 25, Form D 15), so a slow grants step cannot starve the later ones. It runs three steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). All three are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run tags and resolves the grants.
 
 Both share the `ingest` concurrency group, so they never overlap, and the database run lock is a second guard. `INGEST_ENABLED` stops both.
 
@@ -64,7 +64,18 @@ Run the **Ingest** and **Daily** workflows once by hand from the Actions tab and
 
 ## 6. Deploy the site
 
-Import the repository into Vercel with the Next.js preset. Set `DATABASE_URL` to the pooled URL with the `signalfeed_web` role, for Production and Preview. The site needs no other secrets, and must never be given an LLM key.
+Import the repository into Vercel with the Next.js preset. `vercel.json` pins functions to London (`lhr1`), next to the Neon London database.
+
+The web environment needs only:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | The pooled URL with the `signalfeed_web` role, for Production and Preview |
+| `SITE_INDEXING` | Optional. Leave it unset until launch. See below |
+
+The site needs no other secrets, and must never be given an LLM key or the Companies House key.
+
+**Indexing.** While `SITE_INDEXING` is unset, or anything other than `true`, every page carries `noindex, nofollow` and `/robots.txt` disallows everything. That is right for a `vercel.app` preview in the old design. At launch, set `SITE_INDEXING` to `true` and redeploy (the value is read at build time) to allow indexing.
 
 ## 7. Verify
 
@@ -88,7 +99,7 @@ The daily workflow only fetches recent projects. To load older grants, run the b
 pnpm ingest grants --since 2024-04-01 --max-pages 400
 ```
 
-That is about 6,000 projects. One run walks every page back to the `--since` date; this takes about a minute, at one request a second. The organisation details are the slow part: each run fetches at most 1,500 organisations (`--max-orgs`), about 25 minutes. Run the same command again until `orgsFetched` is 0. Later runs stop after 3 pages with no new project, so they go straight to the organisations.
+That is about 6,000 projects. One run walks every page back to the `--since` date; this takes about a minute, at 3 requests a second (`GTR_REQUESTS_PER_SECOND`). The organisation details are the slow part: each run fetches at most 1,500 organisations (`--max-orgs`, or `MAX_GRANT_ORG_FETCHES_PER_RUN`), about 9 minutes. The whole backfill is roughly 13 minutes, down from about 40. Run the same command again until `orgsFetched` is 0. Later runs stop after 3 pages with no new project, so they go straight to the organisations.
 
 Let the first walk finish. If it stops part way, later runs also stop after 3 pages with nothing new, so the older pages are not reached.
 
@@ -143,7 +154,7 @@ Each command is recorded as a run under the run lock, and its stats show on `/st
    pnpm ingest relink-grants
    ```
 
-Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 60-minute limit: the registry step has 25 minutes and Form D 15.
+Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 75-minute limit: grants has 25 minutes, the registry step 25 and Form D 15.
 
 In short, you must set:
 
@@ -189,7 +200,7 @@ Automatic links are strict, so some companies wait for review. Review them from 
 
 - **Neon Free:** 1 GB of storage and 100 CU-hours a month. Measured growth is about 10 MB a month, and hourly runs fit the allowance.
 - **GitHub Actions:** free for public repositories. Start times are best-effort, and schedules stop after 60 days without repository activity. Re-enable both workflows from the Actions tab.
-- **Gateway to Research:** SignalFeed stays at one request a second. Project data is updated monthly.
+- **Gateway to Research:** UKRI documents up to 10 requests a second ("to be confirmed"). SignalFeed asks for 3 by default. Project data is updated monthly.
 - **Companies House:** the limit is 600 requests in 5 minutes. SignalFeed stays at 500, and at most `MAX_CH_REQUESTS_PER_RUN` a run.
 - **SEC EDGAR:** the limit is 10 requests a second. SignalFeed stays at 5, with an email address in the User-Agent.
 - **Vercel Hobby:** non-commercial use only. A paid product needs another plan or host.

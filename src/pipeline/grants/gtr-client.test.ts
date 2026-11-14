@@ -68,7 +68,23 @@ describe("createGtrClient", () => {
     expect(fake.headers[0]).toEqual({ Accept: "application/json" });
   });
 
-  it("waits one second between requests but not before the first", async () => {
+  it("spaces requests by the configured rate, 3 a second by default", async () => {
+    const fake = fakeGtr(() => loadGtrFixture("projects-page.json"));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const client = createGtrClient({
+      http: fake.fetcher,
+      sleep,
+      requestsPerSecond: 10,
+    });
+    await client.listInnovateUkProjects(1);
+    await client.listInnovateUkProjects(2);
+    expect(sleep.mock.calls).toEqual([[100]]);
+    expect(() =>
+      createGtrClient({ http: fake.fetcher, requestsPerSecond: 0 }),
+    ).toThrow(/positive/);
+  });
+
+  it("waits a third of a second between requests but not before the first", async () => {
     const fake = fakeGtr(() => loadGtrFixture("projects-page.json"));
     const sleep = vi.fn().mockResolvedValue(undefined);
     const client = createGtrClient({ http: fake.fetcher, sleep });
@@ -76,7 +92,7 @@ describe("createGtrClient", () => {
     expect(sleep).not.toHaveBeenCalled();
     await client.getOrganisation("abc-123");
     await client.listInnovateUkProjects(2);
-    expect(sleep.mock.calls).toEqual([[1000], [1000]]);
+    expect(sleep.mock.calls).toEqual([[334], [334]]);
   });
 
   const page = () => jsonResponse(loadGtrFixture("projects-page.json"));

@@ -470,8 +470,8 @@ What was verified on 11 November 2026 (details and links in `docs/sources.md`, A
 
 ### 10.2 Collection (`pnpm ingest grants`, daily)
 
-- Walk Innovate UK projects newest first, 100 per page, at most 1 request a second. Stop after 3 consecutive pages with no unseen project, or at 30 pages. Upsert `grant_projects`, `grant_project_texts` (abstract cut to 1,500 characters) and `grant_participants`.
-- For each participant organisation not yet fetched, fetch `organisations/{id}` once and store `reg_number`, postcode, outcode and region text. At most 1,500 organisation fetches a run; the rest wait for the next run.
+- Walk Innovate UK projects newest first, 100 per page, at most `GTR_REQUESTS_PER_SECOND` requests a second (default 3; UKRI documents up to 10, to be confirmed, A18). Stop after 3 consecutive pages with no unseen project, or at 30 pages. Upsert `grant_projects`, `grant_project_texts` (abstract cut to 1,500 characters) and `grant_participants`.
+- For each participant organisation not yet fetched, fetch `organisations/{id}` once and store `reg_number`, postcode, outcode and region text. The organisation rule (section 10.3) is checked first: a stored participant whose name is not a company form is not fetched, and is counted as `orgsSkipped`. Storing already applies the same rule, so this is a guard that normally skips nothing. At most `MAX_GRANT_ORG_FETCHES_PER_RUN` (default 1,500) organisation fetches a run; the rest wait for the next run.
 - Backfill: `pnpm ingest grants --since 2024-04-01 --max-pages 400`, run by hand in chunks. About 6,000 projects.
 - Every response is validated with Zod. Unknown fields are ignored.
 

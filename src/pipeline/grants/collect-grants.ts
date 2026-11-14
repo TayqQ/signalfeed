@@ -9,6 +9,7 @@ import {
   projectFundDates,
   type GtrOrganisation,
 } from "./gtr-schemas";
+import { isOrganisation } from "./organisation-rule";
 import { ensureGtrSource, storeProjects } from "./store-grants";
 
 /** Decision D45: the backfill starts on 1 April 2024. Passed as `since` by the CLI. */
@@ -60,6 +61,7 @@ export async function collectGrantsStep(
     participantsSkipped: 0,
     orgsFetched: 0,
     orgsFailed: 0,
+    orgsSkipped: 0,
   };
 
   const sourceId = await ensureGtrSource(db);
@@ -143,12 +145,34 @@ async function fetchOrganisations(
   stats: GrantCollectStats,
 ): Promise<void> {
   if (maxOrgFetches <= 0) return;
-  const pending = await db
-    .selectDistinct({ gtrOrgId: grantParticipants.gtrOrgId })
+  const unfetched = await db
+    .selectDistinct({
+      gtrOrgId: grantParticipants.gtrOrgId,
+      organisationName: grantParticipants.organisationName,
+    })
     .from(grantParticipants)
     .where(isNull(grantParticipants.orgFetchedAt))
-    .orderBy(grantParticipants.gtrOrgId)
-    .limit(maxOrgFetches);
+    .orderBy(grantParticipants.gtrOrgId);
+
+  // Apply the organisation rule before the fetch (spec section 10.3). The
+  // registration number is only known after a fetch, so the check rests on
+  // the company form in the name, as it does when participants are stored.
+  // A name that fails is skipped without a request and left unfetched. It
+  // does not use up a place in this run's limit.
+  const eligible = new Set<string>();
+  const skipped = new Set<string>();
+  for (const row of unfetched) {
+    if (isOrganisation(row.organisationName, null)) {
+      eligible.add(row.gtrOrgId);
+    } else {
+      skipped.add(row.gtrOrgId);
+    }
+  }
+  for (const id of eligible) skipped.delete(id);
+  stats.orgsSkipped += skipped.size;
+  const pending = [...eligible].slice(0, maxOrgFetches).map((gtrOrgId) => ({
+    gtrOrgId,
+  }));
 
   let failuresInARow = 0;
   for (const { gtrOrgId } of pending) {

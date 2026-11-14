@@ -119,6 +119,8 @@ export interface PipelineConfig {
   maxEmbeddingsPerRun: number;
   maxThemeNamesPerRun: number;
   maxGrantTaggingsPerRun: number;
+  /** `MAX_GRANT_ORG_FETCHES_PER_RUN`. */
+  maxGrantOrgFetchesPerRun: number;
   /** `MAX_CH_REQUESTS_PER_RUN`. */
   maxChRequestsPerRun: number;
   /** `MAX_EDGAR_DAYS_PER_RUN`. */
@@ -1091,7 +1093,8 @@ export async function runGrants(
       gtr: scoped.gtr,
       since: options.since,
       maxPages: options.maxPages,
-      maxOrgFetches: options.maxOrgFetches,
+      maxOrgFetches:
+        options.maxOrgFetches ?? deps.config.maxGrantOrgFetchesPerRun,
       now: () => scoped.clock.now(),
     });
     return {

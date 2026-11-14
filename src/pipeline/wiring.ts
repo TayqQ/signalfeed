@@ -82,7 +82,10 @@ export function createPipelineDeps(env: EnvSource): Wired {
             model: parsed.EMBEDDING_MODEL,
           })
         : null,
-      gtr: createGtrClient({ http: fetcher }),
+      gtr: createGtrClient({
+        http: fetcher,
+        requestsPerSecond: parsed.GTR_REQUESTS_PER_SECOND,
+      }),
       companiesHouse: chKey
         ? createChClient({
             http: fetcher,
@@ -111,6 +114,7 @@ export function createPipelineDeps(env: EnvSource): Wired {
         maxEmbeddingsPerRun: parsed.MAX_EMBEDDINGS_PER_RUN,
         maxThemeNamesPerRun: parsed.MAX_THEME_NAMES_PER_RUN,
         maxGrantTaggingsPerRun: parsed.MAX_GRANT_TAGGINGS_PER_RUN,
+        maxGrantOrgFetchesPerRun: parsed.MAX_GRANT_ORG_FETCHES_PER_RUN,
         maxChRequestsPerRun: parsed.MAX_CH_REQUESTS_PER_RUN,
         maxEdgarDaysPerRun: parsed.MAX_EDGAR_DAYS_PER_RUN,
         maxEdgarRequestsPerRun: parsed.MAX_EDGAR_REQUESTS_PER_RUN,
