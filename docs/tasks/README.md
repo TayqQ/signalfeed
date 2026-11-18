@@ -210,3 +210,29 @@ Only the owner may change these files in a given wave. "Then" means a later wave
 | `docs/spec-phase3.md`, `docs/decisions.md`, `docs/roadmap.md` | The maintainer only |
 
 No Phase 3 task adds a dependency (`fast-xml-parser` is already installed). Task 067's OCR tools are installed on the runner with `apt`, not added to `package.json`. If a task turns out to need a dependency, or a shared file it does not own, it stops and reports, and the maintainer adds a small follow-up task.
+
+# UX overhaul tasks
+
+| Wave | Task | Tier | Depends on |
+|---|---|---|---|
+| 1 | [074 Apply the Raisory brand across the site](074-apply-raisory-brand.md) | 2 | the brand in `docs/design/brand/` |
+| 2 | [075 UI primitives and semantic tokens](075-ui-primitives.md) | 2 | 074 |
+| 2 | [076 Row fields, funding summary and company preview queries](076-row-fields-and-summary-queries.md) | 2 | 074 |
+| 3 | [077 Company page rebuild](077-company-page-rebuild.md) | 2 | 075, 076 |
+| 3 | [078 Filter bar](078-filter-bar.md) | 3 | 075 |
+| 4 | [079 Home page: summary, quick views, List and Cards, view switch](079-home-summary-and-list-views.md) | 2 | 076, 078 |
+| 5 | [080 Split view](080-split-view.md) | 3 | 079 |
+| 6 | [081 Move the other pages onto the system](081-sweep-other-pages.md) | 1-2 | 075 (best after 079) |
+
+The plan behind these tasks is `docs/design/design-system.md`: one site, with three list views (List, Cards, Split) that share their data and parts. Tasks in the same wave run in parallel in one worktree. Their file lists don't overlap:
+
+| Files | Owned by |
+|---|---|
+| `src/app/globals.css`, `src/app/globals.test.ts`, `src/components/ui/*`, `src/lib/stage.ts`, `src/app/ui/page.tsx`, `src/components/confirmed-marker.tsx` | 075, then 081 (deleting the old names) |
+| `src/core/read-models.ts`, `src/db/queries/funding.ts`, `src/db/queries/summary.ts`, `src/lib/main-sector.ts`, `src/lib/cached.ts` | 076 |
+| `src/db/queries/companies.ts` | 076, then 077 (similar companies) |
+| `src/app/companies/[slug]/page.tsx`, `src/components/company/*`, the company section components | 077 |
+| `src/components/filters/*`, `src/lib/funding-filters.ts`, `src/lib/filter-summary.ts`, `src/components/funding-filters-form.tsx`, `src/components/theme-select.tsx` | 078 |
+| `src/app/page.tsx` | 078 (form swap only), then 079, then 080 |
+| `src/components/home/*`, `src/components/rounds/*`, `src/lib/view-preference.ts`, `src/components/funding-table.tsx` | 079, then 080 |
+| `scripts/screenshots.ts` | one task at a time: 077, then 079, 080, 081, each adding its own pages (078 only runs it) |

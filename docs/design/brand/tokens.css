@@ -1,0 +1,90 @@
+/* Raisory brand tokens (17 November 2026). Source of truth for the rebuild: copy into src/app/globals.css.
+   Light is the default; dark follows the system unless the user picks a theme (data-theme on <html>). */
+
+:root {
+  /* Surfaces and text */
+  --paper: #F6F4EE;        /* page background */
+  --surface: #FFFFFF;      /* cards, tables, inputs */
+  --surface-sunk: #EFECE4; /* table header, hover, code */
+  --line: #E3DFD4;         /* borders, dividers */
+  --line-strong: #CFC9BA;
+  --ink: #10241D;          /* body text */
+  --muted: #5D6B64;        /* secondary text (5.1:1 on paper) */
+  --faint: #8A958F;        /* placeholders, disabled (decorative only) */
+
+  /* Brand */
+  --brand: #1D4A38;        /* Raisory green: links, primary buttons, the mark's ring */
+  --brand-hover: #163B2C;
+  --brand-deep: #0E2B21;   /* Forest: app icon, hero bands */
+  --brand-soft: #E3EEE7;   /* Mint wash: selected rows, chips */
+  --on-brand: #F6F4EE;     /* text on --brand / --brand-deep */
+  --accent: #A8834A;       /* Brass: the mark's dot, "new" and highlights. Never for body text */
+  --accent-soft: #F3EADB;
+  --accent-ink: #7A5C2C;   /* brass-coloured text (5.6:1 on paper) */
+  --focus: #2E7553;
+
+  /* Meaning (always paired with an icon or word) */
+  --up: #2E7553;           /* growth, up round, confirmed */
+  --up-soft: #E1EFE6;
+  --down: #B23A2E;         /* down round, errors */
+  --down-soft: #F7E3DF;
+  --warn: #8A5710;         /* unconfirmed, stale data */
+  --warn-soft: #F6EAD3;
+  --info: #3E6A8A;
+  --info-soft: #E2EBF2;
+
+  /* Charts: categorical series, in this order */
+  --data-1: #2E7553;
+  --data-2: #A8834A;
+  --data-3: #3E6A8A;
+  --data-4: #B4593C;
+  --data-5: #7A5C8E;
+  --data-6: #2F7F7A;
+  --data-7: #7A7F3A;
+  --data-8: #6B7570;
+
+  /* Type */
+  --font-display: "Inter Tight", Inter, system-ui, sans-serif; /* wordmark, headings, big numbers */
+  --font-ui: Inter, system-ui, sans-serif;                      /* everything else */
+  --tracking-display: -0.025em;
+  --text-xs: 12px;  --text-sm: 13px;  --text-base: 15px; --text-md: 17px;
+  --text-lg: 20px;  --text-xl: 24px;  --text-2xl: 30px;  --text-3xl: 38px; --text-4xl: 48px;
+
+  /* Shape and depth */
+  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px; --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(16 36 29 / 0.06);
+  --shadow-2: 0 1px 2px rgb(16 36 29 / 0.06), 0 8px 24px -12px rgb(16 36 29 / 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0B1411; --surface: #111D18; --surface-sunk: #0E1814;
+    --line: #22322B; --line-strong: #2F433A;
+    --ink: #E8EDE9; --muted: #94A39B; --faint: #64736B;
+    --brand: #7CC29A; --brand-hover: #95D1AE; --brand-deep: #0E2B21; --brand-soft: #18302A; --on-brand: #0B1411;
+    --accent: #CDAA6E; --accent-soft: #2A2416; --accent-ink: #DDBE86; --focus: #7CC29A;
+    --up: #7CC29A; --up-soft: #16301F; --down: #EE8A7C; --down-soft: #3A1C18;
+    --warn: #E2B05A; --warn-soft: #33260F; --info: #86AFCF; --info-soft: #172634;
+    --data-1: #7CC29A; --data-2: #CDAA6E; --data-3: #86AFCF; --data-4: #E08F72;
+    --data-5: #B59AC8; --data-6: #6FC1BA; --data-7: #B9BE6E; --data-8: #A3ADA8;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0B1411; --surface: #111D18; --surface-sunk: #0E1814;
+  --line: #22322B; --line-strong: #2F433A;
+  --ink: #E8EDE9; --muted: #94A39B; --faint: #64736B;
+  --brand: #7CC29A; --brand-hover: #95D1AE; --brand-deep: #0E2B21; --brand-soft: #18302A; --on-brand: #0B1411;
+  --accent: #CDAA6E; --accent-soft: #2A2416; --accent-ink: #DDBE86; --focus: #7CC29A;
+  --up: #7CC29A; --up-soft: #16301F; --down: #EE8A7C; --down-soft: #3A1C18;
+  --warn: #E2B05A; --warn-soft: #33260F; --info: #86AFCF; --info-soft: #172634;
+  --data-1: #7CC29A; --data-2: #CDAA6E; --data-3: #86AFCF; --data-4: #E08F72;
+  --data-5: #B59AC8; --data-6: #6FC1BA; --data-7: #B9BE6E; --data-8: #A3ADA8;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}

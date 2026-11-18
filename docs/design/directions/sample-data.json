@@ -1,0 +1,428 @@
+{
+ "_note": "Real rows from the live site on 17 November 2026 (funding page, newest first). Company-level data only. Every row has a real one-line description. 'sector' is the company's main sector from the site; null means not yet assigned (show 'Sector pending' muted, and keep it out of sector filtering).",
+ "summary": {
+  "rounds_shown": 57,
+  "window": "last 90 days"
+ },
+ "sectors": [
+  "Software, AI and data",
+  "Financial services",
+  "Health and life sciences",
+  "Climate and energy",
+  "Transport and mobility",
+  "Property and construction",
+  "Retail and consumer",
+  "Food and agriculture",
+  "Manufacturing and industrial",
+  "Media, creative and gaming",
+  "Education",
+  "Professional and business services",
+  "Security and defence",
+  "Space and deep tech",
+  "Public sector and social impact",
+  "Other"
+ ],
+ "stages": [
+  "Pre-seed",
+  "Seed",
+  "Series A",
+  "Series B",
+  "Series C",
+  "Series D+",
+  "Growth",
+  "Debt",
+  "Grant",
+  "Unknown"
+ ],
+ "rows": [
+  {
+   "slug": "valeria",
+   "name": "Valeria",
+   "city": "Barcelona",
+   "country": "ES",
+   "stage": "Seed",
+   "gbp": "£4.6m",
+   "original": "€5.5m",
+   "leads": [
+    "BlackFin"
+   ],
+   "date": "2026-11-16",
+   "sources": 2,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "AI-powered HR and payroll management platform for companies with high staff turnover."
+  },
+  {
+   "slug": "stoa",
+   "name": "Stoa",
+   "city": "Helsinki",
+   "country": "FI",
+   "stage": "Pre-seed",
+   "gbp": "£2.9m",
+   "original": "€3.5m",
+   "leads": [
+    "Lifeline Ventures"
+   ],
+   "date": "2026-11-16",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "AI-powered platform for managing complex construction projects."
+  },
+  {
+   "slug": "intergrid",
+   "name": "Intergrid",
+   "city": "Helsinki",
+   "country": "FI",
+   "stage": "Unknown",
+   "gbp": "£19.6m",
+   "original": "€23.5m",
+   "leads": [],
+   "date": "2026-11-16",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "Helsinki-based energy technology company developing autonomous industrial energy operations and expanding internationally across Europe."
+  },
+  {
+   "slug": "daisytuner",
+   "name": "Daisytuner",
+   "city": "Darmstadt",
+   "country": "DE",
+   "stage": "Seed",
+   "gbp": "£5.0m",
+   "original": "€6.0m",
+   "leads": [
+    "Elaia",
+    "LEA Ventures"
+   ],
+   "date": "2026-11-16",
+   "sources": 2,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "Darmstadt-based DeepTech startup automating AI model performance engineering across different chips."
+  },
+  {
+   "slug": "mirendil",
+   "name": "Mirendil",
+   "city": null,
+   "country": null,
+   "stage": "Series A",
+   "gbp": "£754.4m",
+   "original": "US$1.0bn",
+   "leads": [],
+   "date": "2026-11-13",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Software, AI and data",
+   "description": "Developer of agentic AI for research and development."
+  },
+  {
+   "slug": "mercor",
+   "name": "Mercor",
+   "city": null,
+   "country": null,
+   "stage": "Unknown",
+   "gbp": "£565.8m",
+   "original": "US$750m",
+   "leads": [],
+   "date": "2026-11-13",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Software, AI and data",
+   "description": "Connects AI developers with human experts."
+  },
+  {
+   "slug": "neuralsat",
+   "name": "NeuralSat",
+   "city": "Würzburg",
+   "country": "DE",
+   "stage": "Pre-seed",
+   "gbp": "£2.4m",
+   "original": "€2.9m",
+   "leads": [
+    "Bayern Kapital",
+    "Capnamic Ventures"
+   ],
+   "date": "2026-11-13",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "Würzburg-based SpaceTech startup developing a satellite network to improve data transmission and computing capabilities in orbit."
+  },
+  {
+   "slug": "valkaai",
+   "name": "ValkaAI",
+   "city": null,
+   "country": "CZ",
+   "stage": "Pre-seed",
+   "gbp": "£10.9m",
+   "original": "€13.0m",
+   "leads": [],
+   "date": "2026-11-13",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": null,
+   "sector": null,
+   "description": "Czech DeepTech company developing real-time generative AI that enables digital personas to react to live events."
+  },
+  {
+   "slug": "pro-climbing-league",
+   "name": "Pro Climbing League",
+   "city": "London",
+   "country": "GB",
+   "stage": "Seed",
+   "gbp": "£3.2m",
+   "original": "€3.8m",
+   "leads": [
+    "Redrice Ventures"
+   ],
+   "date": "2026-11-13",
+   "sources": 1,
+   "confirmed": true,
+   "momentum": null,
+   "sector": "Retail and consumer",
+   "description": "London-based professional climbing competition raising funds to professionalise climbing and launch its inaugural 2027 season."
+  },
+  {
+   "slug": "agile-robots",
+   "name": "Agile Robots",
+   "city": null,
+   "country": "DE",
+   "stage": "Series D+",
+   "stageLabel": "Series F",
+   "gbp": "£377.2m",
+   "original": "US$500m",
+   "leads": [
+    "SoftBank"
+   ],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Manufacturing and industrial",
+   "description": "German humanoid robotics startup that automates industrial work."
+  },
+  {
+   "slug": "opdo",
+   "name": "Opdo",
+   "city": null,
+   "country": null,
+   "stage": "Pre-seed",
+   "gbp": "£1.7m",
+   "original": "US$2.3m",
+   "leads": [],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Software, AI and data",
+   "description": "AI-native optical engineering company automating the process from initial design to finished components."
+  },
+  {
+   "slug": "mondrio",
+   "name": "Mondrio",
+   "city": null,
+   "country": null,
+   "stage": "Unknown",
+   "gbp": "£2.8m",
+   "original": "US$3.8m",
+   "leads": [
+    "Heartcore Capital"
+   ],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Software, AI and data",
+   "description": "AI-powered B2B pricing platform that uses AI agents."
+  },
+  {
+   "slug": "griffin",
+   "name": "Griffin",
+   "city": null,
+   "country": "GB",
+   "stage": "Series B",
+   "gbp": "£15.1m",
+   "original": "US$20m",
+   "leads": [
+    "Octagon Partners"
+   ],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Financial services",
+   "description": "UK banking infrastructure fintech that raised a $20m Series B round and is valued at over $100m."
+  },
+  {
+   "slug": "uforce",
+   "name": "UFORCE",
+   "city": "London",
+   "country": "GB",
+   "stage": "Series A",
+   "gbp": "£528.1m",
+   "original": "US$700m",
+   "leads": [],
+   "date": "2026-11-12",
+   "sources": 2,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Security and defence",
+   "description": "Ukrainian defencetech company headquartered in London with major hubs in Kyiv and Washington, DC."
+  },
+  {
+   "slug": "gama",
+   "name": "Gama",
+   "city": null,
+   "country": "FR",
+   "stage": "Seed",
+   "gbp": "£12.5m",
+   "original": "€15.0m",
+   "leads": [],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Climate and energy",
+   "description": "French company building ultra-light deployable solar arrays for satellites."
+  },
+  {
+   "slug": "biomatter",
+   "name": "Biomatter",
+   "city": null,
+   "country": null,
+   "stage": "Series A",
+   "gbp": "£13.6m",
+   "original": "US$18m",
+   "leads": [
+    "Astanor"
+   ],
+   "date": "2026-11-12",
+   "sources": 1,
+   "confirmed": false,
+   "momentum": "First recorded round",
+   "sector": "Software, AI and data",
+   "description": "Company specialising in custom enzyme design using AI."
+  }
+ ],
+ "today": "2026-11-17",
+ "companies": {
+  "pro-climbing-league": {
+   "name": "Pro Climbing League",
+   "place": "London, GB",
+   "founded": "2021 (about 5 years old)",
+   "website": null,
+   "description": "London-based professional climbing competition raising funds to professionalise climbing and launch its inaugural 2027 season.",
+   "sector": "Retail and consumer",
+   "themes": [
+    "Professional climbing",
+    "Sports competition"
+   ],
+   "registry": {
+    "source": "Companies House",
+    "companyNumber": "13263925",
+    "status": "Active",
+    "type": "Private limited company",
+    "incorporated": "12 Mar 2021",
+    "sic": [
+     {
+      "code": "93199",
+      "label": "Other sports activities"
+     }
+    ],
+    "size": "Dormant (accounts made up to 31 Mar 2025)",
+    "registeredOfficeArea": "RG24"
+   },
+   "rounds": [
+    {
+     "date": "2026-11-13",
+     "companyAge": "5 years",
+     "stage": "Seed",
+     "label": "Seed round",
+     "gbp": "£3.2m",
+     "original": "€3.8m",
+     "confirmed": "Shares allotted on 2 October 2026 (Companies House SH01)",
+     "investors": [
+      {
+       "name": "Redrice Ventures",
+       "role": "lead"
+      },
+      {
+       "name": "Accelerate Ventures",
+       "role": "participant"
+      },
+      {
+       "name": "Active Partners",
+       "role": "participant"
+      },
+      {
+       "name": "The International Bouldering Alliance",
+       "role": "participant"
+      }
+     ],
+     "sources": [
+      {
+       "title": "Pro Climbing League secures €3.8 million to “professionalise climbing”; gears up for inaugural 2027 season",
+       "outlet": "EU-Startups",
+       "date": "2026-11-13"
+      }
+     ]
+    }
+   ],
+   "totalRaised": "£3.2m",
+   "momentum": null
+  },
+  "griffin": {
+   "name": "Griffin",
+   "place": "United Kingdom (GB)",
+   "founded": null,
+   "website": null,
+   "description": "UK banking infrastructure fintech that raised a $20m Series B round and is valued at over $100m.",
+   "sector": "Financial services",
+   "themes": [
+    "Financial infrastructure",
+    "Financial technology"
+   ],
+   "registry": null,
+   "rounds": [
+    {
+     "date": "2026-11-12",
+     "stage": "Series B",
+     "label": "Series B",
+     "gbp": "£15.1m",
+     "original": "US$20m",
+     "confirmed": null,
+     "investors": [
+      {
+       "name": "Octagon Partners",
+       "role": "lead"
+      }
+     ],
+     "sources": [
+      {
+       "title": "UK banking infrastructure fintech Griffin raises $20M",
+       "outlet": "Tech.eu",
+       "date": "2026-11-12"
+      }
+     ]
+    }
+   ],
+   "totalRaised": "£15.1m",
+   "momentum": "1 round in the last 24 months. First round we have recorded; history starts in November 2026, so the company may have raised before."
+  }
+ },
+ "marketStrip": {
+  "_note": "For a 'what is happening' strip. Computed from the 16 rows above only. Label it 'from the 16 most recent rounds' so it is honest.",
+  "roundCount": 16,
+  "totalGbp": "£2.32bn",
+  "medianGbp": "£11.7m"
+ }
+}

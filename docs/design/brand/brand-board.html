@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raisory brand board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F6F4EE; --surface: #FFFFFF; --line: #E3DFD4;
+  --ink: #10241D; --muted: #5D6B64;
+  --brand: #1D4A38; --brand-deep: #0E2B21; --brand-soft: #E3EEE7; --on-brand: #F6F4EE;
+  --accent: #A8834A; --accent-soft: #F3EADB;
+  --up: #2E7553;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0B1411; --surface: #111D18; --line: #22322B;
+    --ink: #E8EDE9; --muted: #94A39B;
+    --brand: #7CC29A; --brand-deep: #0E2B21; --brand-soft: #18302A; --on-brand: #0B1411;
+    --accent: #CDAA6E; --accent-soft: #2A2416; --up: #7CC29A;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0B1411; --surface: #111D18; --line: #22322B;
+  --ink: #E8EDE9; --muted: #94A39B;
+  --brand: #7CC29A; --brand-deep: #0E2B21; --brand-soft: #18302A; --on-brand: #0B1411;
+  --accent: #CDAA6E; --accent-soft: #2A2416; --up: #7CC29A;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 40px 16px 80px; }
+header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+h1 { font: 600 28px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -0.02em; margin: 0; }
+h2 { font: 600 13px/1 Inter, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 56px 0 16px; }
+.lede { color: var(--muted); max-width: 680px; margin: 4px 0 0; }
+button.toggle { font: 500 13px Inter, sans-serif; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+
+.dir { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; margin-bottom: 20px; }
+.dir-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.dir-head h3 { margin: 0; font: 600 18px/1.3 "Inter Tight", sans-serif; letter-spacing: -0.01em; }
+.dir-head p { margin: 4px 0 0; color: var(--muted); max-width: 620px; font-size: 14px; }
+.tag { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; height: fit-content; white-space: nowrap; }
+
+.tiles { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
+.tile { border-radius: 10px; min-height: 150px; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.tile.paper { background: var(--paper); border: 1px solid var(--line); }
+.tile.green { background: #0E2B21; color: #F6F4EE; }
+.tile.ink { background: #0B1411; color: #E8EDE9; }
+.lockup { display: flex; align-items: center; gap: 12px; }
+.lockup svg { width: 40px; height: 40px; flex: none; }
+.tile .mark-only svg { width: 72px; height: 72px; }
+
+.wm-serif { font: 600 34px/1 Newsreader, Georgia, serif; letter-spacing: -0.01em; }
+.wm-sans { font: 600 32px/1 "Inter Tight", sans-serif; letter-spacing: -0.035em; }
+.wm-lower { font: 600 34px/1 "Inter Tight", sans-serif; letter-spacing: -0.04em; position: relative; }
+.wm-lower .i { position: relative; display: inline-block; }
+.lockup .wm-lower .i svg.chev, .wm-lower .i svg.chev { position: absolute; left: 50%; top: -0.02em; width: 0.42em; height: 0.3em; transform: translateX(-50%); }
+
+.small-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.fav { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.fav svg.f16 { width: 16px; height: 16px; } .fav svg.f32 { width: 32px; height: 32px; }
+
+.appbar { flex: 1; min-width: 300px; display: flex; align-items: center; gap: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.appbar .lockup svg { width: 24px; height: 24px; }
+.appbar .lockup span { font-size: 18px; }
+.appbar nav { display: flex; gap: 16px; font-size: 13px; color: var(--muted); }
+.appbar nav b { color: var(--ink); font-weight: 500; }
+
+.row { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+.mono { width: 36px; height: 36px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font: 600 14px "Inter Tight", sans-serif; }
+.row .name { font-weight: 600; }
+.row .meta { font-size: 13px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { font-size: 12px; border-radius: 999px; padding: 2px 8px; background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.amount { font: 600 18px/1 "Inter Tight", sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
+.amount small { display: block; font: 500 12px Inter; color: var(--up); margin-top: 4px; }
+
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.sw { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.sw div { height: 64px; }
+.sw p { margin: 0; padding: 8px 10px; font-size: 12px; color: var(--muted); }
+.sw p b { display: block; color: var(--ink); font-weight: 500; font-size: 13px; }
+
+.type { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .type { grid-template-columns: 1fr; } }
+.type .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.type .card p.label { margin: 0 0 10px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.serif-sample { font: 500 30px/1.15 Newsreader, serif; letter-spacing: -0.01em; margin: 0; }
+.sans-sample { font: 600 28px/1.15 "Inter Tight", sans-serif; letter-spacing: -0.025em; margin: 0; }
+.ui-sample { margin: 12px 0 0; color: var(--muted); }
+.nums { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Raisory: brand directions</h1>
+      <p class="lede">Three logo directions on one shared palette (deep green, warm off-white and a brass accent) and one type system. Use the toggle to see dark mode. These are working drafts: the chosen mark gets refined and drawn as final SVG paths.</p>
+    </div>
+    <button class="toggle" id="toggle">Switch to dark</button>
+  </header>
+
+  <!-- SVG symbols -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="steps" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#1D4A38"/>
+        <rect x="12" y="26" width="6" height="10" rx="1.5" fill="#F6F4EE"/>
+        <rect x="21" y="20" width="6" height="16" rx="1.5" fill="#F6F4EE"/>
+        <rect x="30" y="12" width="6" height="24" rx="1.5" fill="#C9A66B"/>
+      </symbol>
+      <symbol id="steps-rev" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#F6F4EE"/>
+        <rect x="12" y="26" width="6" height="10" rx="1.5" fill="#0E2B21"/>
+        <rect x="21" y="20" width="6" height="16" rx="1.5" fill="#0E2B21"/>
+        <rect x="30" y="12" width="6" height="24" rx="1.5" fill="#A8834A"/>
+      </symbol>
+      <symbol id="breakout" viewBox="0 0 48 48">
+        <path d="M34.22 21.55 A13 13 0 1 1 26.45 13.78" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="36" cy="12" r="4.6" fill="#B8935A"/>
+      </symbol>
+      <symbol id="tick-i" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#1D4A38"/>
+        <rect x="21" y="21" width="6" height="16" rx="3" fill="#F6F4EE"/>
+        <path d="M16.5 17 L24 10 L31.5 17" fill="none" stroke="#C9A66B" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="chev" viewBox="0 0 20 14">
+        <path d="M3 11 L10 4 L17 11" fill="none" stroke="#B8935A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <h2>1 · Institution</h2>
+  <section class="dir">
+    <div class="dir-head">
+      <div><h3>Serif wordmark, step mark</h3>
+      <p>Three rising bars stand for the funding rounds stepping up, and the newest round is picked out in brass. The serif wordmark reads like a fund house or the FT: established and trustworthy. The mark doubles as a small chart.</p></div>
+      <span class="tag">Feel: premium, institutional</span>
+    </div>
+    <div class="tiles">
+      <div class="tile paper"><div class="lockup"><svg><use href="#steps"/></svg><span class="wm-serif">Raisory</span></div></div>
+      <div class="tile green"><div class="lockup"><svg><use href="#steps-rev"/></svg><span class="wm-serif" style="color:#F6F4EE">Raisory</span></div></div>
+      <div class="tile ink"><div class="mark-only"><svg><use href="#steps"/></svg></div></div>
+    </div>
+    <div class="small-row">
+      <div class="fav"><svg class="f16"><use href="#steps"/></svg><svg class="f32"><use href="#steps"/></svg> favicon 16 / 32</div>
+      <div class="appbar"><div class="lockup"><svg><use href="#steps"/></svg><span class="wm-serif">Raisory</span></div><nav><b>Funding</b><span>Sectors</span><span>Companies</span></nav></div>
+    </div>
+    <div class="row"><div class="mono">FB</div><div><div class="name">Ferrum Bio</div><div class="meta"><span class="pill">Seed</span><span>Biotech</span><span>GB · London</span><span>2 days ago</span><span class="pill acc">Confirmed</span></div></div><div class="amount">£4.2m<small>Up round</small></div></div>
+  </section>
+
+  <h2>2 · Ledger</h2>
+  <section class="dir">
+    <div class="dir-head">
+      <div><h3>Modern sans wordmark, breakout mark</h3>
+      <p>A ring stands for a round, with a brass dot breaking out of it and rising. That's a company raising and growing. The tight sans wordmark sits with Stripe, Linear and Mixpanel: clean and product-first. The mark has no box, so it also works on its own.</p></div>
+      <span class="tag">Feel: clean, modern SaaS</span>
+    </div>
+    <div class="tiles">
+      <div class="tile paper"><div class="lockup" style="color:var(--brand)"><svg><use href="#breakout"/></svg><span class="wm-sans" style="color:var(--ink)">Raisory</span></div></div>
+      <div class="tile green"><div class="lockup" style="color:#F6F4EE"><svg><use href="#breakout"/></svg><span class="wm-sans">Raisory</span></div></div>
+      <div class="tile ink" style="color:#7CC29A"><div class="mark-only"><svg><use href="#breakout"/></svg></div></div>
+    </div>
+    <div class="small-row">
+      <div class="fav" style="color:var(--brand)"><svg class="f16"><use href="#breakout"/></svg><svg class="f32"><use href="#breakout"/></svg><span style="color:var(--muted)">favicon 16 / 32</span></div>
+      <div class="appbar"><div class="lockup" style="color:var(--brand)"><svg><use href="#breakout"/></svg><span class="wm-sans" style="color:var(--ink)">Raisory</span></div><nav><b>Funding</b><span>Sectors</span><span>Companies</span></nav></div>
+    </div>
+    <div class="row"><div class="mono">FB</div><div><div class="name">Ferrum Bio</div><div class="meta"><span class="pill">Seed</span><span>Biotech</span><span>GB · London</span><span>2 days ago</span><span class="pill acc">Confirmed</span></div></div><div class="amount">£4.2m<small>Up round</small></div></div>
+  </section>
+
+  <h2>3 · Signal i</h2>
+  <section class="dir">
+    <div class="dir-head">
+      <div><h3>Lowercase wordmark, rising "i"</h3>
+      <p>The dot on the "i" becomes an upward chevron: a raise inside the name itself. The lowercase wordmark is friendly but precise. The mark is the "i" alone, which makes a distinctive favicon.</p></div>
+      <span class="tag">Feel: distinctive, ownable</span>
+    </div>
+    <div class="tiles">
+      <div class="tile paper"><div class="lockup"><svg><use href="#tick-i"/></svg><span class="wm-lower">ra<span class="i">ı<svg class="chev" viewBox="0 0 20 14"><use href="#chev"/></svg></span>sory</span></div></div>
+      <div class="tile green"><div class="lockup"><span class="wm-lower" style="color:#F6F4EE">ra<span class="i">ı<svg class="chev" viewBox="0 0 20 14"><use href="#chev"/></svg></span>sory</span></div></div>
+      <div class="tile ink"><div class="mark-only"><svg><use href="#tick-i"/></svg></div></div>
+    </div>
+    <div class="small-row">
+      <div class="fav"><svg class="f16"><use href="#tick-i"/></svg><svg class="f32"><use href="#tick-i"/></svg> favicon 16 / 32</div>
+      <div class="appbar"><div class="lockup"><svg><use href="#tick-i"/></svg><span class="wm-lower" style="font-size:20px">ra<span class="i">ı<svg class="chev" viewBox="0 0 20 14"><use href="#chev"/></svg></span>sory</span></div><nav><b>Funding</b><span>Sectors</span><span>Companies</span></nav></div>
+    </div>
+    <div class="row"><div class="mono">FB</div><div><div class="name">Ferrum Bio</div><div class="meta"><span class="pill">Seed</span><span>Biotech</span><span>GB · London</span><span>2 days ago</span><span class="pill acc">Confirmed</span></div></div><div class="amount">£4.2m<small>Up round</small></div></div>
+  </section>
+
+  <h2>Palette (shared by all three)</h2>
+  <div class="swatches">
+    <div class="sw"><div style="background:#0E2B21"></div><p><b>Forest</b>#0E2B21 · headers, deep panels</p></div>
+    <div class="sw"><div style="background:#1D4A38"></div><p><b>Raisory green</b>#1D4A38 · brand, primary actions</p></div>
+    <div class="sw"><div style="background:#2E7553"></div><p><b>Growth</b>#2E7553 · positive data</p></div>
+    <div class="sw"><div style="background:#E3EEE7"></div><p><b>Mint wash</b>#E3EEE7 · chips, highlights</p></div>
+    <div class="sw"><div style="background:#A8834A"></div><p><b>Brass</b>#A8834A · accent, used sparingly</p></div>
+    <div class="sw"><div style="background:#F6F4EE"></div><p><b>Paper</b>#F6F4EE · page background</p></div>
+    <div class="sw"><div style="background:#10241D"></div><p><b>Ink</b>#10241D · text</p></div>
+    <div class="sw"><div style="background:#0B1411"></div><p><b>Night</b>#0B1411 · dark-mode page</p></div>
+  </div>
+
+  <h2>Type</h2>
+  <div class="type">
+    <div class="card"><p class="label">Headings, option A · Newsreader (serif)</p><p class="serif-sample">Who raised this week, and where the money is going.</p><p class="ui-sample">UI and data · Inter, with tabular figures: <span class="nums">£4.2m · £12.0m · £850k</span></p></div>
+    <div class="card"><p class="label">Headings, option B · Inter Tight (sans)</p><p class="sans-sample">Who raised this week, and where the money is going.</p><p class="ui-sample">UI and data · Inter, with tabular figures: <span class="nums">£4.2m · £12.0m · £850k</span></p></div>
+  </div>
+</div>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById('toggle');
+  function isDark() { var t = root.getAttribute('data-theme'); return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
+  function label() { btn.textContent = isDark() ? 'Switch to light' : 'Switch to dark'; }
+  btn.addEventListener('click', function () { root.setAttribute('data-theme', isDark() ? 'light' : 'dark'); label(); });
+  label();
+})();
+</script>
+</body>
+</html>
