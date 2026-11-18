@@ -75,28 +75,52 @@ const launch: LaunchEvent = {
 describe("EventTimeline", () => {
   it("shows the company's age at each event when the founded year is known", () => {
     render(<EventTimeline events={[launch]} foundedYear={2023} />);
-    expect(screen.getByText(/company age 3 years/)).toBeInTheDocument();
+    expect(screen.getByText("Company age 3 years")).toBeInTheDocument();
   });
 
   it("leaves the age out when the founded year is unknown", () => {
     render(<EventTimeline events={[launch]} />);
-    expect(screen.queryByText(/company age/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/company age/i)).not.toBeInTheDocument();
   });
 
-  it("marks the lead and lists it first, with every source linked", () => {
-    render(<EventTimeline events={[funding]} />);
-    expect(screen.getByText("(lead)")).toBeInTheDocument();
-    const investors = screen
-      .getAllByRole("link")
-      .filter((link) => link.getAttribute("href")?.startsWith("/investors/"));
-    expect(investors[0]).toHaveTextContent("Alpha");
+  it("shows the stage and amount with a bar scaled to the biggest round", () => {
+    render(
+      <EventTimeline
+        events={[
+          funding,
+          {
+            ...funding,
+            id: 9,
+            announcedOn: "2026-09-01",
+            roundType: "series_a",
+            amount: { amountMinor: 1_600_000_000, currency: "GBP" },
+            amountGbpMinor: 1_600_000_000,
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Seed")).toBeInTheDocument();
+    expect(screen.getByText("£4.0m")).toBeInTheDocument();
+    expect(screen.getByText("£16.0m")).toBeInTheDocument();
+    const bars = screen.getAllByTestId("amount-bar");
+    expect(bars[0]).toHaveStyle({ width: "100%" });
+    expect(bars[1]).toHaveStyle({ width: "25%" });
+  });
 
-    const source = screen.getByRole("link", { name: "Acme raises £4M" });
-    expect(source).toHaveAttribute("href", "https://a.test/1");
-    expect(source).toHaveAttribute("rel", "noopener");
-    expect(
-      screen.getByRole("link", { name: "Acme lands seed" }),
-    ).toBeInTheDocument();
+  it("leaves investors and sources to their own sections", () => {
+    render(<EventTimeline events={[funding]} />);
+    expect(screen.queryByRole("link", { name: "Alpha" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Acme raises £4M" })).toBeNull();
+  });
+
+  it("says Undisclosed and draws no bar without an amount", () => {
+    render(
+      <EventTimeline
+        events={[{ ...funding, amount: null, amountGbpMinor: null }]}
+      />,
+    );
+    expect(screen.getByText("Undisclosed")).toBeInTheDocument();
+    expect(screen.queryByTestId("amount-bar")).toBeNull();
   });
 
   it("links a resolved acquirer", () => {
@@ -192,7 +216,7 @@ describe("EventTimeline momentum and grants", () => {
     expect(screen.queryByText(/we have recorded/)).toBeNull();
   });
 
-  it("lists confirmations under the amount", () => {
+  it("marks a confirmed round with the record's wording", () => {
     const text =
       "Confirmed: shares allotted on 2 February 2026 (Companies House SH01)";
     render(
@@ -212,20 +236,28 @@ describe("EventTimeline momentum and grants", () => {
         ]}
       />,
     );
-    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.getByRole("note", { name: text })).toHaveTextContent(
+      "Confirmed",
+    );
   });
 
-  it("shows both the GtR source line and attached news headlines on a grant", () => {
+  it("marks a confirmed grant without a record as a UKRI grant", () => {
     render(
       <EventTimeline
-        events={[{ ...funding, roundType: "grant", momentum: null }]}
+        events={[
+          {
+            ...funding,
+            roundType: "grant",
+            momentum: null,
+            evidence: "confirmed",
+          },
+        ]}
       />,
     );
     expect(
-      screen.getByText("Source: UKRI Gateway to Research"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Acme raises £4M" }),
+      screen.getByRole("note", {
+        name: "Confirmed: UKRI grant record (Gateway to Research)",
+      }),
     ).toBeInTheDocument();
   });
 });

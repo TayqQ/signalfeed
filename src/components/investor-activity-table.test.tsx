@@ -20,7 +20,7 @@ function row(
 describe("InvestorActivityTable", () => {
   it("shows the median and its coverage", () => {
     render(<InvestorActivityTable rows={[row()]} filtered={false} />);
-    expect(screen.getByText("£2M")).toBeInTheDocument();
+    expect(screen.getByText("£2.0m")).toBeInTheDocument();
     expect(screen.getByText("3 of 4 with amounts")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Example VC" })).toHaveAttribute(
       "href",

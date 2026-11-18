@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import type { Money } from "@/core/domain";
 import type { LaunchKind, RoundType } from "@/core/enums";
 import type {
   CompanyDetail,
+  CompanyPreview,
   CompanyEvent,
   CompanyRegistryView,
   CompanyLocationView,
@@ -14,13 +16,22 @@ import type {
 import { companiesHouseUrl, edgarCompanyUrl } from "@/core/registry";
 import { isSector, SECTORS, type Sector } from "@/core/sectors";
 import { roundsInLastMonths } from "@/lib/company-momentum";
+import { chooseMainSector } from "@/lib/main-sector";
 import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { ukRegionByCode } from "@/lib/geo/uk-regions";
 import { companyStatusLabel, companyTypeLabel } from "@/lib/registry/ch-labels";
 import { sizeBandForAccounts } from "@/lib/registry/company-size";
 import { sicLabel } from "@/lib/registry/sic-codes";
+import { stageBucket } from "@/lib/stage";
 import type { Db } from "../client";
-import { loadConfirmations } from "./funding";
+import {
+  fundingColumns,
+  loadConfirmations,
+  mainSectorOf,
+  sicCodesSql,
+  themeStrengthsSql,
+  withConfirmations,
+} from "./funding";
 import {
   acquisitions,
   chCompanies,
@@ -653,4 +664,320 @@ function toCompanyEvent(
     url: launch.url,
     externalRef: launch.externalRef,
   };
+}
+
+const DAY_MS = 86_400_000;
+
+function utcDay(value: Date | string): number {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return Math.floor(date.getTime() / DAY_MS);
+}
+
+/**
+ * The light company view for the split preview: header and key facts, the
+ * latest round with its leads and confirmation, the registry summary and the
+ * inputs of the signals. No history and no source list; the company page has
+ * those. `now` is the date the days since the last round are counted to.
+ */
+export async function getCompanyPreview(
+  db: Db,
+  slug: string,
+  now: Date | string = new Date(),
+): Promise<CompanyPreview | null> {
+  const [company] = await db
+    .select({
+      id: companies.id,
+      slug: companies.slug,
+      name: companies.name,
+      description: companies.description,
+      websiteDomain: companies.websiteDomain,
+      countryCode: companies.countryCode,
+      city: companies.city,
+      foundedYear: companies.foundedYear,
+      foundedYearSource: companies.foundedYearSource,
+      status: companies.status,
+      mergedIntoId: companies.mergedIntoId,
+    })
+    .from(companies)
+    .where(eq(companies.slug, slug))
+    .limit(1);
+  if (!company) return null;
+
+  const [redirectToSlug, themeRows, roundDates, latestRows, registry] =
+    await Promise.all([
+      redirectSlug(db, company.mergedIntoId),
+      db
+        .select({
+          themeId: companyThemes.themeId,
+          tagCount: companyThemes.tagCount,
+          sector: themes.sector,
+        })
+        .from(companyThemes)
+        .innerJoin(themes, eq(themes.id, companyThemes.themeId))
+        .where(eq(companyThemes.companyId, company.id)),
+      db
+        .select({
+          announcedOn: events.announcedOn,
+          roundType: fundingRounds.roundType,
+        })
+        .from(events)
+        .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+        .where(eq(events.companyId, company.id)),
+      db
+        .select(fundingColumns())
+        .from(events)
+        .innerJoin(companies, eq(companies.id, events.companyId))
+        .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+        .where(eq(events.companyId, company.id))
+        .orderBy(desc(events.announcedOn), desc(events.id))
+        .limit(1),
+      loadRegistry(db, company.id),
+    ]);
+
+  const [latest] = await withConfirmations(db, latestRows);
+  const confirmation = latest?.confirmation ?? null;
+  const firstRoundOn =
+    roundDates.map((round) => calendarDate(round.announcedOn)).sort()[0] ??
+    null;
+  const ch = registry?.companiesHouse ?? null;
+
+  return {
+    slug: company.slug,
+    name: company.name,
+    description: trimOrNull(company.description),
+    websiteDomain: trimOrNull(company.websiteDomain),
+    countryCode: trimOrNull(company.countryCode),
+    city: company.city,
+    mainSector: chooseMainSector({
+      themes: themeRows,
+      sicCodes: ch?.sicCodes.map((sic) => sic.code) ?? [],
+    }),
+    foundedYear: company.foundedYear,
+    foundedYearSource: company.foundedYearSource,
+    status: company.status,
+    roundsInLast24Months: roundsInLastMonths(
+      roundDates.map((round) => ({
+        announcedOn: calendarDate(round.announcedOn),
+        roundType: round.roundType,
+      })),
+      now,
+    ),
+    redirectToSlug,
+    latestRound: latest
+      ? {
+          eventId: latest.eventId,
+          roundType: latest.roundType,
+          roundLabel: latest.roundLabel,
+          amount: latest.amount,
+          amountGbpMinor: latest.amountGbpMinor,
+          announcedOn: calendarDate(latest.announcedOn),
+          leadInvestors: latest.leadInvestors,
+          investorCount: latest.investorCount,
+          sourceCount: latest.sourceCount,
+          evidence: latest.evidence ?? "reported",
+          confirmation,
+        }
+      : null,
+    registry: ch
+      ? {
+          companyNumber: ch.companyNumber,
+          url: ch.url,
+          statusLabel: ch.statusLabel,
+          sizeBand: ch.sizeBand,
+          incorporatedOn: ch.incorporatedOn,
+        }
+      : null,
+    signals: {
+      confirmed: latest
+        ? latest.evidence === "confirmed" || confirmation !== null
+        : false,
+      daysSinceLastRound: latest
+        ? Math.max(
+            0,
+            utcDay(now) -
+              utcDay(`${calendarDate(latest.announcedOn)}T00:00:00Z`),
+          )
+        : null,
+      firstRoundOn,
+      sourceCount: latest?.sourceCount ?? 0,
+    },
+  };
+}
+
+/** One compact item in "Companies like this": the company and its latest round. */
+export interface SimilarCompany {
+  slug: string;
+  name: string;
+  countryCode: string | null;
+  city: string | null;
+  roundType: RoundType;
+  roundLabel: string | null;
+  amount: Money | null;
+  amountGbpMinor: number | null;
+  /** YYYY-MM-DD of the latest round. */
+  announcedOn: string;
+}
+
+export interface SimilarCompanies {
+  /** This company's main sector. Null means nothing is compared ("Sector pending"). */
+  mainSector: Sector | null;
+  /** The round type of this company's latest funding round, or null. */
+  roundType: RoundType | null;
+  /** At most `limit`: the same stage first, then the newest rounds. */
+  items: SimilarCompany[];
+}
+
+export const SIMILAR_COMPANIES_LIMIT = 5;
+/** How many of the newest candidate rounds are read before ranking. */
+const SIMILAR_POOL = 400;
+
+/**
+ * "Companies like this" (docs/design/design-system.md section 2): other
+ * companies with the same main sector, ranked by the same stage (the exact
+ * round type, then the same stage bucket), then by their latest round, newest
+ * first. Only companies with a funding round count; merged companies and this
+ * company never appear. The main sector is worked out as for list rows
+ * (`src/lib/main-sector.ts`), so the sector shown here and in lists agrees.
+ * Returns null for an unknown slug.
+ */
+export async function getSimilarCompanies(
+  db: Db,
+  slug: string,
+  limit: number = SIMILAR_COMPANIES_LIMIT,
+): Promise<SimilarCompanies | null> {
+  const [company] = await db
+    .select({ id: companies.id })
+    .from(companies)
+    .where(eq(companies.slug, slug))
+    .limit(1);
+  if (!company) return null;
+
+  const [themeRows, sicRows, latestRows] = await Promise.all([
+    db
+      .select({
+        themeId: companyThemes.themeId,
+        tagCount: companyThemes.tagCount,
+        sector: themes.sector,
+      })
+      .from(companyThemes)
+      .innerJoin(themes, eq(themes.id, companyThemes.themeId))
+      .where(eq(companyThemes.companyId, company.id)),
+    db
+      .select({ sicCodes: chCompanies.sicCodes })
+      .from(registryLinks)
+      .innerJoin(
+        chCompanies,
+        eq(chCompanies.companyNumber, registryLinks.registryId),
+      )
+      .where(
+        and(
+          eq(registryLinks.companyId, company.id),
+          eq(registryLinks.registry, "companies_house"),
+          eq(registryLinks.status, "linked"),
+        ),
+      )
+      .orderBy(asc(registryLinks.id))
+      .limit(1),
+    db
+      .select({ roundType: fundingRounds.roundType })
+      .from(events)
+      .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+      .where(eq(events.companyId, company.id))
+      .orderBy(desc(events.announcedOn), desc(events.id))
+      .limit(1),
+  ]);
+  const roundType = latestRows[0]?.roundType ?? null;
+  const mainSector = chooseMainSector({
+    themes: themeRows,
+    sicCodes: sicRows[0]?.sicCodes ?? [],
+  });
+  if (mainSector === null) return { mainSector, roundType, items: [] };
+
+  // Candidates: a theme in the sector, or no sector theme at all and a linked
+  // Companies House record (their main sector comes from SIC codes). The exact
+  // main sector is checked below, so this only narrows the read.
+  const sectorTheme = sql`exists (
+    select 1 from ${companyThemes}
+    inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
+    where ${companyThemes.companyId} = ${companies.id}
+      and ${themes.sector} = ${mainSector}
+  )`;
+  const sicOnly = sql`(not exists (
+    select 1 from ${companyThemes}
+    inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
+    where ${companyThemes.companyId} = ${companies.id}
+      and ${themes.sector} is not null
+      and ${themes.sector} <> 'other'
+  ) and exists (
+    select 1 from ${registryLinks}
+    where ${registryLinks.companyId} = ${companies.id}
+      and ${registryLinks.registry} = 'companies_house'
+      and ${registryLinks.status} = 'linked'
+  ))`;
+
+  const rows = await db
+    .select({
+      companyId: companies.id,
+      slug: companies.slug,
+      name: companies.name,
+      countryCode: companies.countryCode,
+      city: companies.city,
+      themeStrengths: themeStrengthsSql(),
+      sicCodes: sicCodesSql(),
+      roundType: fundingRounds.roundType,
+      roundLabel: fundingRounds.roundLabel,
+      amountMinor: fundingRounds.amountMinor,
+      currency: fundingRounds.currency,
+      amountGbpMinor: fundingRounds.amountGbpMinor,
+      announcedOn: events.announcedOn,
+    })
+    .from(events)
+    .innerJoin(companies, eq(companies.id, events.companyId))
+    .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+    .where(
+      and(
+        ne(companies.id, company.id),
+        isNull(companies.mergedIntoId),
+        or(sectorTheme, sicOnly),
+      ),
+    )
+    .orderBy(desc(events.announcedOn), desc(events.id))
+    .limit(SIMILAR_POOL);
+
+  // Newest first, so the first row seen per company is its latest round.
+  const seen = new Set<number>();
+  const ranked: Array<{ item: SimilarCompany; rank: number }> = [];
+  for (const row of rows) {
+    if (seen.has(row.companyId)) continue;
+    seen.add(row.companyId);
+    if (mainSectorOf(row) !== mainSector) continue;
+    ranked.push({
+      rank: stageRank(row.roundType, roundType),
+      item: {
+        slug: row.slug,
+        name: row.name,
+        countryCode: trimOrNull(row.countryCode),
+        city: trimOrNull(row.city),
+        roundType: row.roundType,
+        roundLabel: row.roundLabel,
+        amount: money(row.amountMinor, row.currency),
+        amountGbpMinor: row.amountGbpMinor,
+        announcedOn: calendarDate(row.announcedOn),
+      },
+    });
+  }
+  // A stable sort keeps the newest first within each rank.
+  ranked.sort((a, b) => a.rank - b.rank);
+  return {
+    mainSector,
+    roundType,
+    items: ranked.slice(0, limit).map((entry) => entry.item),
+  };
+}
+
+/** 0 for the same round type, 1 for the same stage bucket, 2 otherwise. */
+function stageRank(candidate: RoundType, own: RoundType | null): number {
+  if (own === null) return 2;
+  if (candidate === own) return 0;
+  return stageBucket(candidate) === stageBucket(own) ? 1 : 2;
 }

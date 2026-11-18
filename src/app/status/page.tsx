@@ -24,10 +24,17 @@ import {
 } from "@/db/queries/status";
 import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
-import { formatMoneyCompact } from "@/lib/format";
+import { formatMoneyShort } from "@/lib/format";
+
+/**
+ * Phones (under 768 px): each row stacks as a block, and each cell with a
+ * data-label shows "label ... value". The first cell (the name) has no label.
+ */
+const STACK_TABLE =
+  "max-md:block max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:block max-md:[&_tr]:py-3 max-md:[&_td]:block max-md:[&_th]:block max-md:[&_td]:p-0 max-md:[&_th]:p-0 max-md:[&_[data-label]]:flex max-md:[&_[data-label]]:justify-between max-md:[&_[data-label]]:gap-4 max-md:[&_[data-label]]:py-0.5 max-md:[&_[data-label]]:text-right max-md:[&_[data-label]]:before:text-left max-md:[&_[data-label]]:before:text-muted max-md:[&_[data-label]]:before:content-[attr(data-label)]";
 
 export const metadata: Metadata = {
-  title: "Status — SignalFeed",
+  title: "Status",
   description: "Pipeline health, ingest runs and LLM spend against the cap.",
 };
 
@@ -144,15 +151,15 @@ function formatEventType(type: EventType): string {
 function statusBadgeClass(status: IngestStatus): string {
   switch (status) {
     case "succeeded":
-      return "bg-emerald-100 text-emerald-900";
+      return "bg-up-soft text-up";
     case "running":
-      return "bg-blue-100 text-blue-900";
+      return "bg-brand-soft text-brand";
     case "failed":
-      return "bg-red-100 text-red-900";
+      return "bg-down-soft text-down";
     case "budget_paused":
-      return "bg-amber-100 text-amber-900";
+      return "bg-warn-soft text-warn";
     default:
-      return "bg-zinc-100 text-zinc-800";
+      return "bg-surface-sunk text-ink";
   }
 }
 
@@ -184,10 +191,10 @@ function SpendByPurpose({ summary }: { summary: StatusReport }) {
       {LLM_PURPOSES.map((purpose) => (
         <div
           key={purpose}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+          className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
         >
-          <dt className="text-xs text-zinc-600">{formatPurpose(purpose)}</dt>
-          <dd className="text-lg font-semibold tabular-nums text-zinc-900">
+          <dt className="text-xs text-muted">{formatPurpose(purpose)}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-ink">
             {formatUsdFromMicros(byPurpose[purpose])}
           </dd>
         </div>
@@ -206,10 +213,10 @@ function StatGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+          className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
         >
-          <dt className="text-xs text-zinc-600">{item.label}</dt>
-          <dd className="text-lg font-semibold tabular-nums text-zinc-900">
+          <dt className="text-xs text-muted">{item.label}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-ink">
             {item.value}
           </dd>
         </div>
@@ -228,7 +235,7 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
     <>
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Tags and themes</h2>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="mt-1 text-sm text-muted">
           Pending tags wait for the next embedding run. Unnamed themes still
           carry the label of their first tag. Unreviewed themes have not been
           checked by a person.
@@ -246,7 +253,7 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Grants</h2>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="mt-1 text-sm text-muted">
           Innovate UK projects from UKRI Gateway to Research. Skipped
           participants have no grant offer or start date. Organisations that may
           be individuals are never stored.
@@ -263,7 +270,7 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
           ]}
         />
         {run ? (
-          <p className="mt-3 text-sm text-zinc-700">
+          <p className="mt-3 text-sm text-ink">
             Latest grants run: {formatUtcDateTime(run.startedAt)} UTC (
             {formatIngestStatus(run.status).toLowerCase()})
             {run.collect
@@ -275,7 +282,7 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
             .
           </p>
         ) : (
-          <p className="mt-3 text-sm text-zinc-600">
+          <p className="mt-3 text-sm text-muted">
             The grants collector has not run yet.
           </p>
         )}
@@ -283,7 +290,7 @@ function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Derived data</h2>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="mt-1 text-sm text-muted">
           Trend figures and locations are rebuilt from stored events. A rebuild
           is skipped when nothing has changed, so an old time is not a fault.
         </p>
@@ -340,13 +347,13 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
   return (
     <section className="mt-10">
       <h2 className="text-xl font-semibold">Registry and filings</h2>
-      <p className="mt-1 text-sm text-zinc-600">
+      <p className="mt-1 text-sm text-muted">
         Open candidates wait for a person to review them. A &ldquo;confirmed
         news event&rdquo; is a news round that an official filing matches.
       </p>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-zinc-600">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+        <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+          <thead className="bg-surface-sunk text-muted">
             <tr>
               <th className="px-3 py-2 font-medium">Registry</th>
               <th className="px-3 py-2 font-medium text-right">Linked</th>
@@ -356,19 +363,28 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
               <th className="px-3 py-2 font-medium text-right">Rejected</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-line">
             {REGISTRY_KINDS.map((kind) => {
               const counts = registry.links[kind].byStatus;
               return (
-                <tr key={kind} className="text-zinc-800">
+                <tr key={kind} className="text-ink">
                   <td className="px-3 py-2">{REGISTRY_LABELS[kind]}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td
+                    data-label="Linked"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
                     {counts.linked}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td
+                    data-label="Open candidates"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
                     {counts.candidate}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td
+                    data-label="Rejected"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
                     {counts.rejected}
                   </td>
                 </tr>
@@ -378,12 +394,10 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
         </table>
       </div>
 
-      <h3 className="mt-6 text-sm font-medium text-zinc-700">
-        Links by method
-      </h3>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-zinc-200">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-zinc-600">
+      <h3 className="mt-6 text-sm font-medium text-ink">Links by method</h3>
+      <div className="mt-2 overflow-x-auto rounded-lg border border-line">
+        <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+          <thead className="bg-surface-sunk text-muted">
             <tr>
               <th className="px-3 py-2 font-medium">Method</th>
               {REGISTRY_KINDS.map((kind) => (
@@ -393,12 +407,16 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-line">
             {REGISTRY_LINK_METHODS.map((method) => (
-              <tr key={method} className="text-zinc-800">
+              <tr key={method} className="text-ink">
                 <td className="px-3 py-2">{METHOD_LABELS[method]}</td>
                 {REGISTRY_KINDS.map((kind) => (
-                  <td key={kind} className="px-3 py-2 text-right tabular-nums">
+                  <td
+                    key={kind}
+                    data-label={REGISTRY_LABELS[kind]}
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
                     {registry.links[kind].linkedByMethod[method]}
                   </td>
                 ))}
@@ -408,9 +426,7 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
         </table>
       </div>
 
-      <h3 className="mt-6 text-sm font-medium text-zinc-700">
-        Companies House
-      </h3>
+      <h3 className="mt-6 text-sm font-medium text-ink">Companies House</h3>
       <StatGrid
         items={[
           { label: "Searched, no match", value: registry.searchedNoMatch },
@@ -429,25 +445,25 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
         ]}
       />
       {run?.skipped ? (
-        <p className="mt-3 text-sm text-zinc-700">
+        <p className="mt-3 text-sm text-ink">
           The last registry run was skipped because no Companies House key is
           set.
         </p>
       ) : null}
       {run?.stoppedAtLimit ? (
-        <p className="mt-3 text-sm text-amber-900">
+        <p className="mt-3 text-sm text-warn">
           The last registry run stopped at its request limit. The rest waits for
           the next run.
         </p>
       ) : null}
       {run?.rateLimited ? (
-        <p className="mt-3 text-sm text-amber-900">
+        <p className="mt-3 text-sm text-warn">
           Companies House answered &ldquo;too many requests&rdquo; (429) in the
           last registry run, and the run stopped.
         </p>
       ) : null}
 
-      <h3 className="mt-6 text-sm font-medium text-zinc-700">SEC Form D</h3>
+      <h3 className="mt-6 text-sm font-medium text-ink">SEC Form D</h3>
       <StatGrid
         items={[
           {
@@ -460,7 +476,7 @@ function RegistrySections({ summary }: { summary: StatusReport }) {
         ]}
       />
 
-      <h3 className="mt-6 text-sm font-medium text-zinc-700">Confirmations</h3>
+      <h3 className="mt-6 text-sm font-medium text-ink">Confirmations</h3>
       <StatGrid
         items={[
           ...RECORD_KINDS.map((kind) => ({
@@ -486,7 +502,7 @@ function SpendSection({ summary }: { summary: StatusReport }) {
     return (
       <section className="mt-10">
         <h2 className="text-xl font-semibold">LLM spend this month</h2>
-        <p className="mt-3 text-zinc-600">
+        <p className="mt-3 text-muted">
           Spend tracking appears after the first ingest run completes.
         </p>
       </section>
@@ -500,14 +516,14 @@ function SpendSection({ summary }: { summary: StatusReport }) {
   return (
     <section className="mt-10">
       <h2 className="text-xl font-semibold">LLM spend this month</h2>
-      <p className="mt-3 text-zinc-700">
-        {formatMoneyCompact(gbpMinor, "GBP")} and{" "}
+      <p className="mt-3 text-ink">
+        {formatMoneyShort(gbpMinor, "GBP")} and{" "}
         {formatUsdFromMicros(monthToDateUsdMicros)} month-to-date, against a{" "}
-        {formatMoneyCompact(capGbp * 100, "GBP")} (
+        {formatMoneyShort(capGbp * 100, "GBP")} (
         {formatUsdFromMicros(capMicros)}) cap
       </p>
       <div
-        className="mt-4 h-3 w-full overflow-hidden rounded-full bg-zinc-200"
+        className="mt-4 h-3 w-full overflow-hidden rounded-full bg-line"
         role="progressbar"
         aria-valuenow={Math.round(pct)}
         aria-valuemin={0}
@@ -515,11 +531,11 @@ function SpendSection({ summary }: { summary: StatusReport }) {
         aria-label="Month-to-date LLM spend against cap"
       >
         <div
-          className="h-full rounded-full bg-blue-600 transition-[width]"
+          className="h-full rounded-full bg-brand transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <h3 className="mt-6 text-sm font-medium text-zinc-700">By purpose</h3>
+      <h3 className="mt-6 text-sm font-medium text-ink">By purpose</h3>
       <SpendByPurpose summary={summary} />
     </section>
   );
@@ -527,9 +543,9 @@ function SpendSection({ summary }: { summary: StatusReport }) {
 
 function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-200">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-zinc-50 text-zinc-600">
+    <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+      <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+        <thead className="bg-surface-sunk text-muted">
           <tr>
             <th className="px-3 py-2 font-medium">Started (UTC)</th>
             <th className="px-3 py-2 font-medium">Duration</th>
@@ -539,7 +555,7 @@ function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
             <th className="px-3 py-2 font-medium text-right">Run spend</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-200">
+        <tbody className="divide-y divide-line">
           {runs.map((run) => {
             const stats = run.stats;
             const collected = stats?.collect.itemsInserted ?? null;
@@ -548,25 +564,36 @@ function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
             const duration = runDuration(run);
 
             return (
-              <tr key={run.id} className="text-zinc-800">
+              <tr key={run.id} className="text-ink">
                 <td className="whitespace-nowrap px-3 py-2">
                   {formatUtcDateTime(run.startedAt)}
                 </td>
-                <td className="px-3 py-2">{duration ?? "—"}</td>
-                <td className="px-3 py-2">
+                <td data-label="Duration" className="px-3 py-2">
+                  {duration ?? "—"}
+                </td>
+                <td data-label="Status" className="px-3 py-2">
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(run.status)}`}
                   >
                     {formatIngestStatus(run.status)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td
+                  data-label="Collected"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
                   {collected ?? "—"}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td
+                  data-label="Extracted"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
                   {extracted ?? "—"}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td
+                  data-label="Run spend"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
                   {spend != null ? formatUsdFromMicros(spend) : "—"}
                 </td>
               </tr>
@@ -595,10 +622,10 @@ function CountGrid({
         {keys.map((key) => (
           <div
             key={key}
-            className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+            className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
           >
-            <dt className="text-xs text-zinc-600">{labels[key]}</dt>
-            <dd className="text-lg font-semibold tabular-nums text-zinc-900">
+            <dt className="text-xs text-muted">{labels[key]}</dt>
+            <dd className="text-lg font-semibold tabular-nums text-ink">
               {counts[key] ?? 0}
             </dd>
           </div>
@@ -623,16 +650,16 @@ export default async function StatusPage() {
   ) as Record<EventType, string>;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 text-zinc-900">
+    <main className="mx-auto max-w-4xl px-4 py-10 text-ink">
       <h1 className="text-3xl font-semibold tracking-tight">Pipeline status</h1>
-      <p className="mt-3 text-zinc-700">
+      <p className="mt-3 text-ink">
         Ingestion health, item and event counts, and language-model spend
         against the monthly cap. Cached for about 60 seconds.
       </p>
 
       {budgetPaused ? (
         <div
-          className="mt-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"
+          className="mt-6 rounded-lg border border-warn bg-warn-soft px-4 py-3 text-warn"
           role="status"
         >
           <p className="font-medium">Budget paused</p>
@@ -646,7 +673,7 @@ export default async function StatusPage() {
 
       {latest?.stats?.extract.skipped ? (
         <div
-          className="mt-6 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3"
+          className="mt-6 rounded-lg border border-line-strong bg-surface-sunk px-4 py-3"
           role="status"
         >
           <p className="font-medium">Extraction is off</p>
@@ -659,7 +686,7 @@ export default async function StatusPage() {
 
       {latest?.stats?.extract.providerError ? (
         <div
-          className="mt-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3"
+          className="mt-6 rounded-lg border border-down bg-down-soft px-4 py-3"
           role="status"
         >
           <p className="font-medium">The language model provider refused</p>
@@ -670,11 +697,9 @@ export default async function StatusPage() {
       ) : null}
 
       {empty ? (
-        <div className="mt-10 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center">
-          <p className="text-lg font-medium text-zinc-800">
-            No ingest runs yet
-          </p>
-          <p className="mt-2 text-zinc-600">
+        <div className="mt-10 rounded-lg border border-dashed border-line-strong bg-surface-sunk px-6 py-10 text-center">
+          <p className="text-lg font-medium text-ink">No ingest runs yet</p>
+          <p className="mt-2 text-muted">
             Scheduled collection has not recorded a run. After the first
             pipeline run, recent activity and spend will appear here.
           </p>
@@ -683,7 +708,7 @@ export default async function StatusPage() {
         <>
           <section className="mt-10">
             <h2 className="text-xl font-semibold">Recent ingest runs</h2>
-            <p className="mt-1 text-sm text-zinc-600">
+            <p className="mt-1 text-sm text-muted">
               Last {summary.recentRuns.length} runs, newest first.
             </p>
             <RunsTable runs={summary.recentRuns} />

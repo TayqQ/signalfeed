@@ -1,42 +1,238 @@
 @import "tailwindcss";
 
 /*
- * SignalFeed's palette. The utility names stay Tailwind's so every page shares
- * one set of tokens: zinc is the cool ink-and-paper scale, blue is the cobalt.
+ * Raisory brand tokens (docs/design/brand/tokens.css). Light is the default;
+ * dark follows the system unless the visitor picks a theme (data-theme on <html>).
  */
-@theme {
-  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
 
-  --color-paper: #f3f5f8;
-  --color-ink: #0e1b33;
-  --color-quiet: #55627a;
-  --color-rule: #d4dae5;
-  --color-signal: #1f3fd1;
+:root {
+  /* Surfaces and text */
+  --paper: #f6f4ee; /* page background */
+  --surface: #ffffff; /* cards, tables, inputs */
+  --surface-sunk: #efece4; /* table header, hover, code */
+  --line: #e3dfd4; /* borders, dividers */
+  --line-strong: #cfc9ba;
+  --ink: #10241d; /* body text */
+  --muted: #5d6b64; /* secondary text (5.1:1 on paper) */
+  --faint: #8a958f; /* placeholders, disabled (decorative only) */
 
-  --color-zinc-50: #eef1f6;
-  --color-zinc-100: #e3e8f0;
-  --color-zinc-200: #d4dae5;
-  --color-zinc-300: #b8c1d1;
-  --color-zinc-400: #8d98ac;
-  --color-zinc-500: #6a768c;
-  --color-zinc-600: #55627a;
-  --color-zinc-700: #3a4760;
-  --color-zinc-800: #1f2c46;
-  --color-zinc-900: #0e1b33;
-  --color-blue-600: #1f3fd1;
-  --color-blue-700: #1a35b0;
+  /* Brand */
+  --brand: #1d4a38; /* Raisory green: links, primary buttons, the mark's ring */
+  --brand-hover: #163b2c;
+  --brand-deep: #0e2b21; /* Forest: app icon, hero bands */
+  --brand-soft: #e3eee7; /* Mint wash: selected rows, chips */
+  --on-brand: #f6f4ee; /* text on --brand / --brand-deep */
+  --accent: #a8834a; /* Brass: the mark's dot, "new" and highlights. Never for body text */
+  --accent-soft: #f3eadb;
+  --accent-ink: #7a5c2c; /* brass-coloured text (5.6:1 on paper) */
+  --focus: #2e7553;
 
-  /* Later funding stages read darker, so a column of bars shows a stage at a glance. */
-  --color-stage-early: #86a8f2;
-  --color-stage-seed: #5a82ea;
-  --color-stage-venture: #1f3fd1;
-  --color-stage-late: #142a8f;
-  --color-stage-other: #8d98ac;
+  /* Meaning (always paired with an icon or word) */
+  --up: #2e7553; /* growth, up round, confirmed */
+  --up-soft: #e1efe6;
+  --down: #b23a2e; /* down round, errors */
+  --down-soft: #f7e3df;
+  --warn: #8a5710; /* unconfirmed, stale data */
+  --warn-soft: #f6ead3;
+  --info: #3e6a8a;
+  --info-soft: #e2ebf2;
+
+  /* Charts: categorical series, in this order */
+  --data-1: #2e7553;
+  --data-2: #a8834a;
+  --data-3: #3e6a8a;
+  --data-4: #b4593c;
+  --data-5: #7a5c8e;
+  --data-6: #2f7f7a;
+  --data-7: #7a7f3a;
+  --data-8: #6b7570;
+
+  /* Type */
+  --tracking-display: -0.025em;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 30px;
+  --text-3xl: 38px;
+  --text-4xl: 48px;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(16 36 29 / 0.06);
+  --shadow-2:
+    0 1px 2px rgb(16 36 29 / 0.06), 0 8px 24px -12px rgb(16 36 29 / 0.18);
+  --chart-axis: #6e7a74;
+  --stage-early: #4e8a69;
+  --stage-seed: #2e7553;
+  --stage-venture: #1d4a38;
+  --stage-late: #0e2b21;
+  --stage-other: #7f8a84;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0b1411;
+    --surface: #111d18;
+    --surface-sunk: #0e1814;
+    --line: #22322b;
+    --line-strong: #2f433a;
+    --ink: #e8ede9;
+    --muted: #94a39b;
+    --faint: #64736b;
+    --brand: #7cc29a;
+    --brand-hover: #95d1ae;
+    --brand-deep: #0e2b21;
+    --brand-soft: #18302a;
+    --on-brand: #0b1411;
+    --accent: #cdaa6e;
+    --accent-soft: #2a2416;
+    --accent-ink: #ddbe86;
+    --focus: #7cc29a;
+    --up: #7cc29a;
+    --up-soft: #16301f;
+    --down: #ee8a7c;
+    --down-soft: #3a1c18;
+    --warn: #e2b05a;
+    --warn-soft: #33260f;
+    --info: #86afcf;
+    --info-soft: #172634;
+    --data-1: #7cc29a;
+    --data-2: #cdaa6e;
+    --data-3: #86afcf;
+    --data-4: #e08f72;
+    --data-5: #b59ac8;
+    --data-6: #6fc1ba;
+    --data-7: #b9be6e;
+    --data-8: #a3ada8;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --chart-axis: #7f8d86;
+    --stage-early: #3f8560;
+    --stage-seed: #5fa67f;
+    --stage-venture: #7cc29a;
+    --stage-late: #b5e0c6;
+    --stage-other: #7f8d86;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0b1411;
+  --surface: #111d18;
+  --surface-sunk: #0e1814;
+  --line: #22322b;
+  --line-strong: #2f433a;
+  --ink: #e8ede9;
+  --muted: #94a39b;
+  --faint: #64736b;
+  --brand: #7cc29a;
+  --brand-hover: #95d1ae;
+  --brand-deep: #0e2b21;
+  --brand-soft: #18302a;
+  --on-brand: #0b1411;
+  --accent: #cdaa6e;
+  --accent-soft: #2a2416;
+  --accent-ink: #ddbe86;
+  --focus: #7cc29a;
+  --up: #7cc29a;
+  --up-soft: #16301f;
+  --down: #ee8a7c;
+  --down-soft: #3a1c18;
+  --warn: #e2b05a;
+  --warn-soft: #33260f;
+  --info: #86afcf;
+  --info-soft: #172634;
+  --data-1: #7cc29a;
+  --data-2: #cdaa6e;
+  --data-3: #86afcf;
+  --data-4: #e08f72;
+  --data-5: #b59ac8;
+  --data-6: #6fc1ba;
+  --data-7: #b9be6e;
+  --data-8: #a3ada8;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --chart-axis: #7f8d86;
+  --stage-early: #3f8560;
+  --stage-seed: #5fa67f;
+  --stage-venture: #7cc29a;
+  --stage-late: #b5e0c6;
+  --stage-other: #7f8d86;
+  color-scheme: dark;
+}
+
+/*
+ * @theme inline points every utility at a variable that flips with the theme.
+ * Pages use the semantic names (design system section 3); the old Tailwind
+ * zinc, blue, amber, red and emerald names are gone.
+ */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    var(--font-inter-tight), var(--font-inter), ui-sans-serif, system-ui,
+    sans-serif;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-on-brand: var(--on-brand);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-brand-soft: var(--brand-soft);
+
+  /* Semantic utilities (design system section 3) */
+  --color-surface-sunk: var(--surface-sunk);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-data-1: var(--data-1);
+  --color-data-2: var(--data-2);
+  --color-data-3: var(--data-3);
+  --color-data-4: var(--data-4);
+  --color-data-5: var(--data-5);
+  --color-data-6: var(--data-6);
+  --color-data-7: var(--data-7);
+  --color-data-8: var(--data-8);
+
+  /* Later funding stages read stronger, so a column of bars shows a stage at a glance. */
+  --color-stage-early: var(--stage-early);
+  --color-stage-seed: var(--stage-seed);
+  --color-stage-venture: var(--stage-venture);
+  --color-stage-late: var(--stage-late);
+  --color-stage-other: var(--stage-other);
 }
 
 html {
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: light dark;
+}
+
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
 }
 
 a:focus-visible,
@@ -44,26 +240,45 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--color-signal);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 /*
  * Chart colours. Every fill and stroke is at least 3:1 against the paper
- * (WCAG 1.4.11); text uses the ink and quiet colours above. The site has one
- * light theme, so there are no dark overrides. Stacked series also differ by
- * pattern (solid, stripes, dots, cross-hatch), so colour is never the only cue.
+ * (WCAG 1.4.11) in both themes; text uses the ink and muted colours above.
+ * The series tokens and --chart-axis flip with the theme (see the dark blocks
+ * above). Stacked series also differ by pattern (solid, stripes, dots,
+ * cross-hatch), so colour is never the only cue.
  */
 :root {
-  --chart-1: #5a82ea;
-  --chart-2: #142a8f;
-  --chart-3: #6a768c;
-  --chart-4: #0f766e;
-  --chart-bar: #1f3fd1;
-  --chart-line: #1f3fd1;
-  --chart-axis: #6a768c;
-  --chart-grid: #d4dae5;
-  --chart-mark: #ffffff;
-  --chart-gap: #f3f5f8;
-  --chart-text: #55627a;
+  --chart-1: var(--data-1);
+  --chart-2: var(--data-3);
+  --chart-3: var(--data-8);
+  --chart-4: var(--data-6);
+  --chart-bar: var(--brand);
+  --chart-line: var(--brand);
+  --chart-grid: var(--line);
+  --chart-mark: var(--surface);
+  --chart-gap: var(--paper);
+  --chart-text: var(--muted);
+}
+
+/* Entrance motion for popovers and sheets (200 ms, ease-out; off under reduced motion). */
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes ui-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes ui-fade {
+  from {
+    opacity: 0;
+  }
 }

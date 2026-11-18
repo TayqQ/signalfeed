@@ -2,8 +2,8 @@ const REPO_URL = "https://github.com/TayqQ/signalfeed";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-rule">
-      <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-x-8 gap-y-2 px-4 py-6 text-sm text-quiet">
+    <footer className="mt-16 border-t border-line">
+      <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-x-8 gap-y-2 px-4 py-6 text-sm text-muted">
         <p>
           Data from public news feeds. Headlines link to the original articles.
         </p>

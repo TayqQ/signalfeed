@@ -17,7 +17,7 @@ import { cached } from "@/lib/cached";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Acquisitions | SignalFeed",
+  title: "Acquisitions",
   description:
     "Who buys young startups, in which themes, and how old the targets were.",
 };
@@ -100,7 +100,7 @@ async function loadAll(filters: Filters): Promise<AcquisitionRow[]> {
 }
 
 const inputClass =
-  "mt-1 w-full border border-zinc-300 bg-white px-2 py-2 text-sm text-ink";
+  "mt-1 w-full border border-line-strong bg-surface px-2 py-2 text-sm text-ink";
 
 export default async function AcquisitionsPage({
   searchParams,
@@ -121,10 +121,10 @@ export default async function AcquisitionsPage({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+      <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
         Who buys young startups, and how old were they
       </h1>
-      <p className="mt-3 max-w-2xl text-quiet">
+      <p className="mt-3 max-w-2xl text-muted">
         Acquisitions of startups, with the buyer and the age of the company when
         it was bought. Many founded years are unknown, so each figure shows how
         many deals it rests on.
@@ -167,7 +167,7 @@ export default async function AcquisitionsPage({
       <div className="mt-8 space-y-8">
         <AcquisitionsSummary summary={summary} />
         <section aria-label="Acquisitions">
-          <p className="mb-3 text-sm tabular-nums text-quiet" role="status">
+          <p className="mb-3 text-sm tabular-nums text-muted" role="status">
             {all.length === 1 ? "1 acquisition" : `${all.length} acquisitions`}
           </p>
           <AcquisitionsTable rows={rows} filtered={filtered} />

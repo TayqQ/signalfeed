@@ -23,13 +23,14 @@ import {
 } from "@/core/registry";
 import type { CompanySizeBand } from "@/core/registry";
 import type { RoundType } from "@/core/enums";
-import { isSector, SECTORS } from "@/core/sectors";
+import { isSector, SECTOR_LABELS, SECTORS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
 import { findPlaceBySlug, matchUkCity } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
+import { formatDate, formatMoneyShort, formatRoundType } from "@/lib/format";
 import { fromMinorUnits, toMinorUnits } from "@/lib/money";
 import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
-import { SIZE_BANDS, type SizeBand } from "@/lib/size-bands";
+import { SIZE_BAND_RANGES, SIZE_BANDS, type SizeBand } from "@/lib/size-bands";
 import type { Region } from "@/lib/regions";
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -506,4 +507,362 @@ export function effectiveRoundTypes(criteria: FundingCriteria): RoundType[] {
   const selected = criteria.roundTypes;
   if (selected && selected.length > 0) return [...selected];
   return ROUND_TYPES.filter((type) => type !== "grant");
+}
+
+// ---------------------------------------------------------------------------
+// Filter bar helpers (task 078). Everything below is additive: it reads
+// criteria, it never changes how a parameter parses.
+
+/** A Stage preset in the filter bar, and the round types it selects. */
+export interface StagePreset {
+  value: string;
+  label: string;
+  roundTypes: readonly RoundType[];
+}
+
+/** The Stage segmented control (research section 2). Grants live in "More". */
+export const STAGE_PRESETS: readonly StagePreset[] = [
+  { value: "seed", label: "Pre-seed/Seed", roundTypes: ["pre_seed", "seed"] },
+  { value: "series-a", label: "Series A", roundTypes: ["series_a"] },
+  {
+    value: "series-b-plus",
+    label: "Series B+",
+    roundTypes: ["series_b", "series_c", "series_d_plus", "growth"],
+  },
+  { value: "debt", label: "Debt", roundTypes: ["debt"] },
+];
+
+/** Every round type the default view shows (D44: all but grants). */
+export const NON_GRANT_ROUND_TYPES: readonly RoundType[] = ROUND_TYPES.filter(
+  (type) => type !== "grant",
+);
+
+export const DATE_PRESETS = ["7d", "30d", "90d", "year"] as const;
+export type DatePreset = (typeof DATE_PRESETS)[number];
+
+export const DATE_PRESET_LABELS: Readonly<Record<DatePreset, string>> = {
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  "90d": "Last 90 days",
+  year: "This year",
+};
+
+const PRESET_DAYS: Readonly<Record<Exclude<DatePreset, "year">, number>> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
+/** The `from` date a preset sets, for `today` as YYYY-MM-DD (UTC). */
+export function datePresetFrom(preset: DatePreset, today: string): string {
+  if (preset === "year") return `${today.slice(0, 4)}-01-01`;
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - PRESET_DAYS[preset]);
+  return date.toISOString().slice(0, 10);
+}
+
+/** The preset the criteria's dates match today, if any. */
+export function matchDatePreset(
+  criteria: FundingCriteria,
+  today: string,
+): DatePreset | undefined {
+  if (!criteria.from || criteria.to) return undefined;
+  return DATE_PRESETS.find(
+    (preset) => datePresetFrom(preset, today) === criteria.from,
+  );
+}
+
+/** Plain-word company size labels (research section 2). */
+export const COMPANY_SIZE_FILTER_LABELS: Readonly<
+  Record<CompanySizeBand, string>
+> = {
+  micro: "Tiny",
+  small: "Small",
+  medium: "Mid-size",
+  full_accounts: "Large",
+  dormant: "Dormant",
+  no_accounts_yet: "Not yet filed",
+};
+
+/** Company sizes the bar offers. Dormant shows only when a link sets it. */
+export const COMPANY_SIZE_FILTER_OPTIONS: readonly CompanySizeBand[] =
+  COMPANY_SIZE_BANDS.filter((band) => band !== "dormant");
+
+/** The renamed momentum filter (research section 2). */
+export const MOMENTUM_FILTER_LABELS: Readonly<Record<MomentumFilter, string>> =
+  {
+    first: "First round",
+    repeat: "Repeat raiser",
+  };
+
+const COUNTRY_DISPLAY = new Intl.DisplayNames(["en-GB"], { type: "region" });
+
+/** "United States" for "US"; the code itself when the name is not known. */
+export function countryName(code: string): string {
+  try {
+    return COUNTRY_DISPLAY.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Every country `country=` accepts, by name, for the place box. */
+export function countryOptions(): Array<{ code: string; name: string }> {
+  return Object.keys(COUNTRY_REGIONS)
+    .map((code) => ({ code, name: countryName(code) }))
+    .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
+}
+
+function titleWords(text: string): string {
+  return text
+    .split(/([\s-]+)/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
+/** A display name for a `city` value: the UK place name, else title case. */
+export function cityLabel(city: string): string {
+  const match = matchUkCity(city);
+  if (match && "place" in match) return match.place.name;
+  return titleWords(city);
+}
+
+/** A display name for a UK place slug (used by `near`). */
+export function placeLabel(slug: string): string {
+  return findPlaceBySlug(slug)?.name ?? titleWords(slug.replace(/-/g, " "));
+}
+
+/** One applied value, and the criteria once it is removed. */
+export interface AppliedFilter {
+  /** Stable and unique within one list, e.g. `sector:education`. */
+  id: string;
+  label: string;
+  without: FundingCriteria;
+}
+
+export interface AppliedFilterNames {
+  /** Theme slug to display name. */
+  themes?: Readonly<Record<string, string>>;
+  /** YYYY-MM-DD, so date presets show by name ("Last 30 days"). */
+  today?: string;
+}
+
+function omit<K extends keyof FundingCriteria>(
+  criteria: FundingCriteria,
+  key: K,
+): FundingCriteria {
+  const next = { ...criteria };
+  delete next[key];
+  return next;
+}
+
+function withoutValue<K extends keyof FundingCriteria>(
+  criteria: FundingCriteria,
+  key: K,
+  remove: readonly string[],
+): FundingCriteria {
+  const values = (criteria[key] as readonly string[] | undefined) ?? [];
+  const kept = values.filter((value) => !remove.includes(value));
+  if (kept.length === 0) return omit(criteria, key);
+  return { ...criteria, [key]: kept };
+}
+
+/** Round type chips: whole Stage presets as one chip, the rest one each. */
+function roundChips(criteria: FundingCriteria): AppliedFilter[] {
+  const types = criteria.roundTypes ?? [];
+  if (types.length === 0) return [];
+  if (types.length === ROUND_TYPES.length) {
+    return [
+      {
+        id: "round:all",
+        label: "All rounds, including grants",
+        without: omit(criteria, "roundTypes"),
+      },
+    ];
+  }
+  const chips: AppliedFilter[] = [];
+  const covered = new Set<RoundType>();
+  for (const preset of STAGE_PRESETS) {
+    if (preset.roundTypes.length < 2) continue;
+    if (!preset.roundTypes.every((type) => types.includes(type))) continue;
+    preset.roundTypes.forEach((type) => covered.add(type));
+    chips.push({
+      id: `round:${preset.value}`,
+      label: preset.label,
+      without: withoutValue(criteria, "roundTypes", preset.roundTypes),
+    });
+  }
+  for (const type of types) {
+    if (covered.has(type)) continue;
+    chips.push({
+      id: `round:${type}`,
+      label: type === "grant" ? "Grants" : formatRoundType(type),
+      without: withoutValue(criteria, "roundTypes", [type]),
+    });
+  }
+  return chips;
+}
+
+function dateChips(
+  criteria: FundingCriteria,
+  today: string | undefined,
+): AppliedFilter[] {
+  const preset = today ? matchDatePreset(criteria, today) : undefined;
+  if (preset) {
+    return [
+      {
+        id: `date:${preset}`,
+        label: DATE_PRESET_LABELS[preset],
+        without: omit(criteria, "from"),
+      },
+    ];
+  }
+  const chips: AppliedFilter[] = [];
+  if (criteria.from) {
+    chips.push({
+      id: "from",
+      label: `From ${formatDate(criteria.from)}`,
+      without: omit(criteria, "from"),
+    });
+  }
+  if (criteria.to) {
+    chips.push({
+      id: "to",
+      label: `Until ${formatDate(criteria.to)}`,
+      without: omit(criteria, "to"),
+    });
+  }
+  return chips;
+}
+
+/**
+ * Every applied value as a removable chip, in filter-bar order. Values with no
+ * control of their own (`region`, `tag`) are included, so nothing filters the
+ * list without showing. `q` is included too.
+ */
+export function describeAppliedFilters(
+  criteria: FundingCriteria,
+  names: AppliedFilterNames = {},
+): AppliedFilter[] {
+  const chips: AppliedFilter[] = [];
+  const many = <K extends keyof FundingCriteria>(
+    key: K,
+    idPrefix: string,
+    label: (value: string) => string,
+  ) => {
+    for (const value of (criteria[key] as readonly string[] | undefined) ??
+      []) {
+      chips.push({
+        id: `${idPrefix}:${value}`,
+        label: label(value),
+        without: withoutValue(criteria, key, [value]),
+      });
+    }
+  };
+
+  if (criteria.q) {
+    chips.push({
+      id: "q",
+      label: `Name: ${criteria.q}`,
+      without: omit(criteria, "q"),
+    });
+  }
+  many("sectors", "sector", (value) => SECTOR_LABELS[value as Sector]);
+  many(
+    "themes",
+    "theme",
+    (value) => names.themes?.[value] ?? titleWords(value.replace(/-/g, " ")),
+  );
+  chips.push(...roundChips(criteria));
+  many(
+    "sizeBands",
+    "size",
+    (value) => SIZE_BAND_RANGES[value as SizeBand].label,
+  );
+  if (criteria.minGbpMinor != null) {
+    chips.push({
+      id: "min",
+      label: `At least ${formatMoneyShort(criteria.minGbpMinor, "GBP")}`,
+      without: omit(criteria, "minGbpMinor"),
+    });
+  }
+  if (criteria.maxGbpMinor != null) {
+    chips.push({
+      id: "max",
+      label: `Up to ${formatMoneyShort(criteria.maxGbpMinor, "GBP")}`,
+      without: omit(criteria, "maxGbpMinor"),
+    });
+  }
+  chips.push(...dateChips(criteria, names.today));
+  many(
+    "ukRegions",
+    "ukregion",
+    (value) => ukRegionBySlug(value)?.name ?? value,
+  );
+  many("cities", "city", cityLabel);
+  many("countryCodes", "country", countryName);
+  many("regions", "region", (value) =>
+    value === "Unknown" ? "Region not known" : value,
+  );
+  if (criteria.near) {
+    chips.push({
+      id: "near",
+      label: `Within ${criteria.near.km} km of ${placeLabel(criteria.near.placeSlug)}`,
+      without: omit(criteria, "near"),
+    });
+  }
+  if (criteria.evidence === "confirmed") {
+    chips.push({
+      id: "evidence",
+      label: "Confirmed only",
+      without: omit(criteria, "evidence"),
+    });
+  }
+  many(
+    "companySizes",
+    "cosize",
+    (value) =>
+      `Company size: ${COMPANY_SIZE_FILTER_LABELS[value as CompanySizeBand]}`,
+  );
+  if (criteria.momentum) {
+    chips.push({
+      id: "momentum",
+      label: MOMENTUM_FILTER_LABELS[criteria.momentum],
+      without: omit(criteria, "momentum"),
+    });
+  }
+  if (criteria.investorSlug) {
+    chips.push({
+      id: "investor",
+      label: `Investor: ${titleWords(criteria.investorSlug.replace(/-/g, " "))}`,
+      without: omit(criteria, "investorSlug"),
+    });
+  }
+  if (criteria.tag) {
+    chips.push({
+      id: "tag",
+      label: `Tag: ${titleWords(criteria.tag.replace(/-/g, " "))}`,
+      without: omit(criteria, "tag"),
+    });
+  }
+  return chips;
+}
+
+/**
+ * A link to `path` with these criteria and the sort, direction and page size
+ * of `view`. Paging always restarts at page 1.
+ */
+export function fundingFiltersHref(
+  criteria: FundingCriteria,
+  view: Partial<FundingView> = {},
+  path = "/",
+): string {
+  const query = serialiseFundingFilters({
+    ...criteria,
+    sort: view.sort,
+    direction: view.direction,
+    page: 1,
+    pageSize: view.pageSize ?? DEFAULT_PAGE_SIZE,
+  });
+  return query ? `${path}?${query}` : path;
 }

@@ -1,19 +1,29 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { describeCompanyLocation } from "@/components/company-location";
-import { CompanyMomentum } from "@/components/company-momentum";
+import { ActionRow } from "@/components/company/action-row";
+import { CompanyHeader } from "@/components/company/company-header";
+import { CompanyInvestors } from "@/components/company/company-investors";
+import { KeyFacts, keyFacts } from "@/components/company/key-facts";
+import { LatestRound } from "@/components/company/latest-round";
 import {
-  CompanyRegistry,
+  OfficialRecords,
   registryStatusFact,
-} from "@/components/company-registry";
-import { EventTimeline } from "@/components/event-timeline";
-import { TagList } from "@/components/tag-list";
-import { SECTOR_LABELS } from "@/core/sectors";
-import { getCompanyDetail } from "@/db/queries/companies";
+} from "@/components/company/official-records";
+import { CompanyPanel } from "@/components/company/panel";
+import { CompanySignals } from "@/components/company/signals";
+import { SimilarCompanies } from "@/components/company/similar-companies";
+import { describeCompanyLocation } from "@/components/company-location";
+import {
+  CompanyMomentum,
+  HISTORY_STARTS,
+  latestIsFirstRecorded,
+} from "@/components/company-momentum";
+import { EventTimeline, fundingRoundsOf } from "@/components/event-timeline";
+import { companySources, SourceList } from "@/components/source-list";
+import type { CompanyDetail } from "@/core/read-models";
+import { getCompanyDetail, getSimilarCompanies } from "@/db/queries/companies";
 import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
-import { formatCompanyAge } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -23,115 +33,135 @@ function load(slug: string) {
   return cached(() => getCompanyDetail(getWebDb(), slug), ["company", slug]);
 }
 
+function loadSimilar(slug: string) {
+  return cached(
+    () => getSimilarCompanies(getWebDb(), slug),
+    ["company-similar", slug],
+  );
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const company = await load((await params).slug);
-  if (!company) return { title: "Company not found | SignalFeed" };
+  if (!company) return { title: "Company not found" };
   return {
-    title: `${company.name} funding history | SignalFeed`,
+    title: `${company.name} funding history`,
     description:
       company.description ??
       `Funding rounds, acquisitions and launches reported for ${company.name}.`,
   };
 }
 
-function foundedFact(foundedYear: number | null): string | null {
-  if (!foundedYear) return null;
-  const age = formatCompanyAge(foundedYear, new Date().toISOString());
-  if (!age) return `Founded ${foundedYear}`;
-  const prefix = age === "under 1 year" ? "" : "about ";
-  return `Founded ${foundedYear} (${prefix}${age} old)`;
+/** Town and region for the place badge; the country code sits beside it. */
+function placeText(company: CompanyDetail): string | null {
+  return describeCompanyLocation(company.location, {
+    city: company.city,
+    countryCode: null,
+  });
+}
+
+function statuses(company: CompanyDetail): string[] {
+  return [
+    company.status === "acquired" ? "Acquired" : null,
+    company.status === "closed" ? "Closed" : null,
+    registryStatusFact(company.registry),
+  ].filter((fact): fact is string => Boolean(fact));
 }
 
 export default async function CompanyPage({ params }: Params) {
-  const company = await load((await params).slug);
+  const { slug } = await params;
+  const [company, similar] = await Promise.all([load(slug), loadSimilar(slug)]);
   if (!company) notFound();
   if (company.redirectToSlug) {
     permanentRedirect(`/companies/${company.redirectToSlug}`);
   }
 
-  const location = describeCompanyLocation(company.location, {
-    city: company.city,
-    countryCode: company.countryCode,
-  });
-  const facts = [
-    location,
-    foundedFact(company.foundedYear),
-    company.status === "acquired" ? "Acquired" : null,
-    company.status === "closed" ? "Closed" : null,
-    registryStatusFact(company.registry),
-  ].filter((fact): fact is string => Boolean(fact));
+  const now = new Date();
+  const ch = company.registry?.companiesHouse ?? null;
+  const countryCode = company.location?.countryCode ?? company.countryCode;
+  const latest = fundingRoundsOf(company.events)[0] ?? null;
+  const signals = (headingId: string) => (
+    <CompanySignals events={company.events} now={now} headingId={headingId} />
+  );
+  const records = (headingId: string) => (
+    <OfficialRecords
+      registry={company.registry}
+      companyName={company.name}
+      countryCode={countryCode}
+      headingId={headingId}
+    />
+  );
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-        {company.name}
-      </h1>
-      {facts.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-x-4 text-sm text-quiet">
-          {facts.map((fact) => (
-            <li key={fact}>{fact}</li>
-          ))}
-        </ul>
-      ) : null}
-      {company.description ? (
-        <p className="mt-4 max-w-2xl text-lg">{company.description}</p>
-      ) : null}
-      {company.websiteDomain ? (
-        <p className="mt-2 text-sm">
-          <a
-            href={`https://${company.websiteDomain}`}
-            rel="noopener"
-            className="text-signal underline underline-offset-4"
-          >
-            {company.websiteDomain}
-          </a>
-        </p>
-      ) : null}
-      {company.themes && company.themes.length > 0 ? (
-        <ul className="mt-4 flex flex-wrap gap-2 text-sm" aria-label="Themes">
-          {company.themes.map((theme) => (
-            <li key={theme.slug}>
-              <Link
-                href={`/themes/${encodeURIComponent(theme.slug)}`}
-                className="border border-zinc-300 px-2 py-0.5 hover:border-signal hover:text-signal"
-              >
-                {theme.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {company.sectors && company.sectors.length > 0 ? (
-        <p className="mt-2 text-sm text-quiet">
-          Sector:{" "}
-          {company.sectors.map((sector, index) => (
-            <span key={sector}>
-              {index > 0 ? ", " : null}
-              <Link
-                href={`/?sector=${encodeURIComponent(sector)}`}
-                className="underline underline-offset-4 hover:text-signal"
-              >
-                {SECTOR_LABELS[sector]}
-              </Link>
-            </span>
-          ))}
-        </p>
-      ) : null}
-      <TagList tags={company.tags} />
-      <CompanyMomentum
-        events={company.events}
-        roundsInLast24Months={company.roundsInLast24Months}
+    <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 sm:px-8 sm:pt-8">
+      <CompanyHeader
+        name={company.name}
+        description={company.description}
+        countryCode={countryCode}
+        place={placeText(company)}
+        mainSector={similar?.mainSector ?? null}
+        statuses={statuses(company)}
+        themes={company.themes ?? []}
+      />
+      <ActionRow
+        companyName={company.name}
+        websiteDomain={company.websiteDomain}
+        companiesHouse={
+          ch ? { companyNumber: ch.companyNumber, url: ch.url } : null
+        }
+      />
+      <KeyFacts
+        facts={keyFacts({
+          events: company.events,
+          foundedYear: company.foundedYear,
+          companiesHouse: ch,
+          now,
+        })}
       />
 
-      <CompanyRegistry registry={company.registry} />
+      {/*
+        One column below lg, in the phone order: latest round, signals,
+        history, investors, records, sources. From lg the signals and records
+        move to a sticky side column; the inline copies are hidden there, so
+        each appears once at any width.
+      */}
+      <div className="mt-3 flex flex-col gap-3 sm:mt-6 sm:gap-6 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
+          <LatestRound round={latest} companyName={company.name} />
+          <div className="lg:hidden">{signals("signals-heading-inline")}</div>
+          <CompanyPanel title="History" headingId="history-heading">
+            <EventTimeline
+              events={company.events}
+              foundedYear={company.foundedYear}
+            />
+            <div className="mt-4 border-t border-line pt-3">
+              <CompanyMomentum
+                events={company.events}
+                roundsInLast24Months={company.roundsInLast24Months}
+              />
+              {latestIsFirstRecorded(company.events) ? null : (
+                <p className="mt-1 text-[13px] text-muted">
+                  History starts in {HISTORY_STARTS}, so earlier rounds may be
+                  missing.
+                </p>
+              )}
+            </div>
+          </CompanyPanel>
+          <CompanyInvestors events={company.events} />
+          <div className="lg:hidden">{records("records-heading-inline")}</div>
+          <CompanyPanel title="Sources" headingId="sources-heading">
+            <SourceList sources={companySources(company.events)} />
+          </CompanyPanel>
+        </div>
+        <aside
+          aria-label="Signals and official records"
+          className="hidden min-w-0 lg:sticky lg:top-6 lg:flex lg:flex-col lg:gap-6"
+        >
+          {signals("signals-heading")}
+          {records("records-heading")}
+        </aside>
+      </div>
 
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold">History</h2>
-        <EventTimeline
-          events={company.events}
-          foundedYear={company.foundedYear}
-        />
-      </section>
+      <SimilarCompanies similar={similar} now={now} />
     </main>
   );
 }

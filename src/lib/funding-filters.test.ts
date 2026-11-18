@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { ROUND_TYPES } from "@/core/enums";
 import type { FundingCriteria } from "@/core/read-models";
 import {
+  countryOptions,
+  datePresetFrom,
+  describeAppliedFilters,
   effectiveRoundTypes,
+  fundingFiltersHref,
+  matchDatePreset,
+  NON_GRANT_ROUND_TYPES,
+  STAGE_PRESETS,
   FUNDING_CRITERIA_VERSION,
   parseFundingCriteria,
   unresolvedNearName,
@@ -480,5 +488,327 @@ describe("effectiveRoundTypes", () => {
       "seed",
       "grant",
     ]);
+  });
+});
+
+/**
+ * Links people may have saved before the filter bar (task 078). Each one must
+ * keep parsing to exactly these criteria. The parser did not change, so these
+ * expectations are what the old sidebar form and hidden fields produced.
+ */
+const OLD_URLS: ReadonlyArray<{ url: string; criteria: FundingCriteria }> = [
+  { url: "", criteria: {} },
+  { url: "q=Northwind", criteria: { q: "Northwind" } },
+  {
+    url: "q=+Acme+%26+Sons+&round=seed&round=series_a",
+    criteria: { q: "Acme & Sons", roundTypes: ["seed", "series_a"] },
+  },
+  { url: "round=grant", criteria: { roundTypes: ["grant"] } },
+  {
+    url: "round=series_b&round=series_c&round=series_d_plus&round=growth",
+    criteria: {
+      roundTypes: ["series_b", "series_c", "series_d_plus", "growth"],
+    },
+  },
+  {
+    url: "round=seed,pre_seed&round=debt&round=unknown",
+    criteria: { roundTypes: ["pre_seed", "seed", "debt", "unknown"] },
+  },
+  {
+    url: "size=1m-5m&size=100M-plus&min=250000&max=2000000",
+    criteria: {
+      sizeBands: ["1m-5m", "100m-plus"],
+      minGbpMinor: 25_000_000,
+      maxGbpMinor: 200_000_000,
+    },
+  },
+  {
+    url: "from=2026-06-01&to=2026-06-30",
+    criteria: { from: "2026-06-01", to: "2026-06-30" },
+  },
+  {
+    url: "region=Europe&region=uk&country=us&country=UK",
+    criteria: { regions: ["UK", "Europe"], countryCodes: ["GB", "US"] },
+  },
+  {
+    url: "ukregion=london&ukregion=scotland&city=Leeds&city=San+Francisco",
+    criteria: {
+      ukRegions: ["london", "scotland"],
+      cities: ["leeds", "san francisco"],
+    },
+  },
+  {
+    url: "near=Leeds&km=50",
+    criteria: { near: { placeSlug: "leeds", km: 50 } },
+  },
+  {
+    url: "near=newcastle-upon-tyne&km=30",
+    criteria: { near: { placeSlug: "newcastle-upon-tyne", km: 25 } },
+  },
+  { url: "near=Atlantis&km=50", criteria: {} },
+  {
+    url: "sector=software-ai&sector=Health-Life-Sciences&theme=ai-drug-discovery",
+    criteria: {
+      sectors: ["software-ai", "health-life-sciences"],
+      themes: ["ai-drug-discovery"],
+    },
+  },
+  { url: "theme=&sector=&q=", criteria: {} },
+  { url: "tag=Robotics", criteria: { tag: "robotics" } },
+  {
+    url: "investor=Northstar-Capital",
+    criteria: { investorSlug: "northstar-capital" },
+  },
+  { url: "momentum=first", criteria: { momentum: "first" } },
+  { url: "momentum=&evidence=", criteria: {} },
+  {
+    url: "momentum=repeat&evidence=confirmed",
+    criteria: { momentum: "repeat", evidence: "confirmed" },
+  },
+  {
+    url: "cosize=micro&cosize=no-accounts-yet&cosize=dormant",
+    criteria: { companySizes: ["micro", "dormant", "no_accounts_yet"] },
+  },
+  {
+    // Everything the old sidebar submitted, with empty text boxes and the
+    // default radius, as it arrived from a real form submit.
+    url: "q=&ukregion=north-west&city=&near=&km=25&sector=climate-energy&theme=&round=seed&size=under-1m&cosize=small&min=&max=&from=2026-01-01&to=&momentum=",
+    criteria: {
+      roundTypes: ["seed"],
+      from: "2026-01-01",
+      sizeBands: ["under-1m"],
+      sectors: ["climate-energy"],
+      ukRegions: ["north-west"],
+      companySizes: ["small"],
+    },
+  },
+  {
+    url: "q=Bio&round=pre_seed&round=seed&round=grant&size=under-1m&min=100.5&from=2026-06-01&region=UK&country=GB&ukregion=north-west&city=leeds&near=leeds&km=100&sector=health-life-sciences&theme=ai-drug-discovery&tag=biotech&investor=x&momentum=first&evidence=confirmed&cosize=small&cosize=no-accounts-yet&sort=amount&dir=asc&page=3",
+    criteria: {
+      q: "Bio",
+      roundTypes: ["pre_seed", "seed", "grant"],
+      sizeBands: ["under-1m"],
+      minGbpMinor: 10_050,
+      from: "2026-06-01",
+      regions: ["UK"],
+      countryCodes: ["GB"],
+      ukRegions: ["north-west"],
+      cities: ["leeds"],
+      near: { placeSlug: "leeds", km: 100 },
+      sectors: ["health-life-sciences"],
+      themes: ["ai-drug-discovery"],
+      tag: "biotech",
+      investorSlug: "x",
+      momentum: "first",
+      evidence: "confirmed",
+      companySizes: ["small", "no_accounts_yet"],
+    },
+  },
+];
+
+describe("old links (task 078)", () => {
+  it("covers at least 15 links and every parameter", () => {
+    expect(OLD_URLS.length).toBeGreaterThanOrEqual(15);
+    const keys = new Set(
+      OLD_URLS.flatMap(({ url }) => [...new URLSearchParams(url).keys()]),
+    );
+    for (const key of [
+      "q",
+      "round",
+      "size",
+      "min",
+      "max",
+      "from",
+      "to",
+      "region",
+      "country",
+      "ukregion",
+      "city",
+      "near",
+      "km",
+      "sector",
+      "theme",
+      "tag",
+      "investor",
+      "momentum",
+      "evidence",
+      "cosize",
+    ]) {
+      expect(keys).toContain(key);
+    }
+  });
+
+  it.each(OLD_URLS.map((entry) => [entry.url || "(empty)", entry] as const))(
+    "%s parses to the same criteria",
+    (_label, { url, criteria }) => {
+      expect(parseFundingCriteria(new URLSearchParams(url))).toEqual(criteria);
+    },
+  );
+});
+
+/** The chips each old link shows, in the same order as `OLD_URLS`. */
+const OLD_URL_CHIPS: readonly (readonly string[])[] = [
+  [],
+  ["Name: Northwind"],
+  ["Name: Acme & Sons", "Seed", "Series A"],
+  ["Grants"],
+  ["Series B+"],
+  ["Pre-seed/Seed", "Debt", "Unknown"],
+  ["£1m–£5m", "£100m+", "At least £250k", "Up to £2.0m"],
+  ["From 1 Jun 2026", "Until 30 Jun 2026"],
+  ["United Kingdom", "United States", "UK", "Europe"],
+  ["London", "Scotland", "Leeds", "San Francisco"],
+  ["Within 50 km of Leeds"],
+  ["Within 25 km of Newcastle upon Tyne"],
+  [],
+  ["Software, AI and data", "Health and life sciences", "AI drug discovery"],
+  [],
+  ["Tag: Robotics"],
+  ["Investor: Northstar Capital"],
+  ["First round"],
+  [],
+  ["Confirmed only", "Repeat raiser"],
+  [
+    "Company size: Tiny",
+    "Company size: Dormant",
+    "Company size: Not yet filed",
+  ],
+  [
+    "Climate and energy",
+    "Seed",
+    "Under £1m",
+    "This year",
+    "North West",
+    "Company size: Small",
+  ],
+  [
+    "Name: Bio",
+    "Health and life sciences",
+    "AI drug discovery",
+    "Pre-seed/Seed",
+    "Grants",
+    "Under £1m",
+    "At least £101",
+    "From 1 Jun 2026",
+    "North West",
+    "Leeds",
+    "United Kingdom",
+    "UK",
+    "Within 100 km of Leeds",
+    "Confirmed only",
+    "Company size: Small",
+    "Company size: Not yet filed",
+    "First round",
+    "Investor: X",
+    "Tag: Biotech",
+  ],
+];
+
+const CHIP_NAMES = {
+  themes: { "ai-drug-discovery": "AI drug discovery" },
+  today: "2026-11-18",
+};
+
+describe("applied filter chips for old links (task 078)", () => {
+  it("has one chip list per old link", () => {
+    expect(OLD_URL_CHIPS).toHaveLength(OLD_URLS.length);
+  });
+
+  it.each(
+    OLD_URLS.map(
+      (entry, index) =>
+        [entry.url || "(empty)", entry, OLD_URL_CHIPS[index] ?? []] as const,
+    ),
+  )("%s shows the right chips", (_label, { criteria }, labels) => {
+    const chips = describeAppliedFilters(criteria, CHIP_NAMES);
+    expect(chips.map((chip) => chip.label)).toEqual(labels);
+    expect(new Set(chips.map((chip) => chip.id)).size).toBe(chips.length);
+  });
+
+  it.each(OLD_URLS.map((entry) => [entry.url || "(empty)", entry] as const))(
+    "%s: each chip's link removes only its own value",
+    (_label, { criteria }) => {
+      const chips = describeAppliedFilters(criteria, CHIP_NAMES);
+      for (const chip of chips) {
+        const href = fundingFiltersHref(chip.without);
+        const query = href.split("?")[1] ?? "";
+        const after = parseFundingCriteria(new URLSearchParams(query));
+        expect(after).toEqual(chip.without);
+        const left = describeAppliedFilters(after, CHIP_NAMES).map((c) => c.id);
+        expect(left).not.toContain(chip.id);
+        for (const other of chips) {
+          if (other.id !== chip.id) expect(left).toContain(other.id);
+        }
+      }
+    },
+  );
+});
+
+describe("filter bar helpers", () => {
+  it("builds removal links that keep sort, direction and page size", () => {
+    const filters = parseFundingFilters(
+      new URLSearchParams(
+        "sector=software-ai&sector=education&round=seed&sort=amount&dir=asc&page=4&pageSize=50",
+      ),
+    );
+    const chips = describeAppliedFilters(filters);
+    const education = chips.find((chip) => chip.id === "sector:education");
+    expect(education).toBeDefined();
+    expect(fundingFiltersHref(education?.without ?? {}, filters)).toBe(
+      "/?round=seed&sector=software-ai&sort=amount&dir=asc&pageSize=50",
+    );
+    expect(fundingFiltersHref({}, filters)).toBe(
+      "/?sort=amount&dir=asc&pageSize=50",
+    );
+    expect(fundingFiltersHref({})).toBe("/");
+  });
+
+  it("removes a whole Stage preset with one chip", () => {
+    const chips = describeAppliedFilters({
+      roundTypes: ["pre_seed", "seed", "series_a"],
+    });
+    expect(chips.map((chip) => chip.label)).toEqual([
+      "Pre-seed/Seed",
+      "Series A",
+    ]);
+    expect(chips[0]?.without).toEqual({ roundTypes: ["series_a"] });
+    expect(
+      describeAppliedFilters({ roundTypes: [...ROUND_TYPES] }).map(
+        (chip) => chip.label,
+      ),
+    ).toEqual(["All rounds, including grants"]);
+  });
+
+  it("works out date presets in UTC", () => {
+    expect(datePresetFrom("7d", "2026-11-18")).toBe("2026-11-11");
+    expect(datePresetFrom("30d", "2026-03-01")).toBe("2026-01-30");
+    expect(datePresetFrom("90d", "2026-11-18")).toBe("2026-08-20");
+    expect(datePresetFrom("year", "2026-11-18")).toBe("2026-01-01");
+    expect(matchDatePreset({ from: "2026-10-19" }, "2026-11-18")).toBe("30d");
+    expect(
+      matchDatePreset({ from: "2026-10-19", to: "2026-11-01" }, "2026-11-18"),
+    ).toBeUndefined();
+    expect(matchDatePreset({ from: "2026-10-18" }, "2026-11-18")).toBe(
+      undefined,
+    );
+  });
+
+  it("lists every country the parser accepts, by name", () => {
+    const countries = countryOptions();
+    expect(countries.find((c) => c.code === "US")?.name).toBe("United States");
+    for (const { code } of countries) {
+      expect(parseFundingCriteria({ country: code }).countryCodes).toEqual([
+        code,
+      ]);
+    }
+  });
+
+  it("keeps the Stage presets inside the round types", () => {
+    for (const preset of STAGE_PRESETS) {
+      for (const type of preset.roundTypes) {
+        expect(NON_GRANT_ROUND_TYPES).toContain(type);
+      }
+    }
+    expect(NON_GRANT_ROUND_TYPES).not.toContain("grant");
   });
 });

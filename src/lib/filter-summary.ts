@@ -2,7 +2,7 @@ import type { FundingCriteria } from "@/core/read-models";
 import type { CompanySizeBand } from "@/core/registry";
 import { SECTOR_LABELS } from "@/core/sectors";
 import type { Sector } from "@/core/sectors";
-import { formatMoneyCompact, formatRoundType } from "@/lib/format";
+import { formatMoneyShort, formatRoundType } from "@/lib/format";
 import { findPlaceBySlug } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
 import { SIZE_BAND_RANGES } from "@/lib/size-bands";
@@ -55,7 +55,7 @@ function sizePhrases(criteria: FundingCriteria): string[] {
   if (bands.length > 0) phrases.push(joinWords(bands, "or"));
   const min = criteria.minGbpMinor;
   const max = criteria.maxGbpMinor;
-  const money = (amount: number) => formatMoneyCompact(amount, "GBP");
+  const money = (amount: number) => formatMoneyShort(amount, "GBP");
   if (min != null && max != null) {
     phrases.push(`of ${money(min)} to ${money(max)}`);
   } else if (min != null) {

@@ -140,6 +140,12 @@ export interface FundingRow {
   companyName: string;
   countryCode: string | null;
   city: string | null;
+  /** One line from `companies.description`. Null when none is stored. */
+  companyDescription: string | null;
+  /** The company's main sector (`src/lib/main-sector.ts`). Null shows as "Sector pending". */
+  mainSector: Sector | null;
+  /** From `companies.website_domain`; null until the domains are filled (Phase 3.5). */
+  websiteDomain: string | null;
   roundType: RoundType;
   roundLabel: string | null;
   /** Original amount and currency as reported. */
@@ -157,6 +163,32 @@ export interface FundingRow {
   evidence?: EvidenceLevel;
   /** The closest confirming record. Null or unset when not confirmed. */
   confirmation?: EventConfirmation | null;
+}
+
+/** Figures for a set of rounds. Money ignores rounds with no GBP amount. */
+export interface FundingTotals {
+  totalGbpMinor: number;
+  /** All rounds in the set, with or without an amount. */
+  count: number;
+  /** Null when no round has a GBP amount. */
+  medianGbpMinor: number | null;
+}
+
+export interface SectorTotal {
+  /** Null for companies with no main sector yet. */
+  sector: Sector | null;
+  gbpMinor: number;
+  count: number;
+}
+
+/** The "What's happening" summary of the filtered rounds, paging ignored. */
+export interface FundingSummary extends FundingTotals {
+  /** The window of equal length just before the filter's own. Null when the filter has no date window. */
+  previous: FundingTotals | null;
+  /** Most GBP first. */
+  sectors: SectorTotal[];
+  /** The three biggest rounds by GBP. */
+  biggest: FundingRow[];
 }
 
 export interface Page<T> {
@@ -309,6 +341,64 @@ export interface CompanyDetail {
   roundsInLast24Months?: number;
   /** Null when the company has no linked registry record. */
   registry?: CompanyRegistryView | null;
+}
+
+/** The light company view for the split preview (docs/design/design-system.md section 5). */
+export interface CompanyPreview {
+  slug: string;
+  name: string;
+  description: string | null;
+  websiteDomain: string | null;
+  countryCode: string | null;
+  city: string | null;
+  mainSector: Sector | null;
+  foundedYear: number | null;
+  foundedYearSource: FoundedYearSource | null;
+  status: CompanyStatus;
+  /** Equity rounds in the 24 months to today. */
+  roundsInLast24Months: number;
+  /** Slug of the surviving company when this one was merged. */
+  redirectToSlug: string | null;
+  /** Null when the company has no funding round. */
+  latestRound: CompanyPreviewRound | null;
+  /** Null when the company has no linked Companies House record. */
+  registry: CompanyPreviewRegistry | null;
+  /** The facts the signals are worked out from. */
+  signals: CompanyPreviewSignals;
+}
+
+export interface CompanyPreviewRound {
+  eventId: number;
+  roundType: RoundType;
+  roundLabel: string | null;
+  amount: Money | null;
+  amountGbpMinor: number | null;
+  announcedOn: string;
+  leadInvestors: InvestorRef[];
+  investorCount: number;
+  sourceCount: number;
+  evidence: EvidenceLevel;
+  confirmation: EventConfirmation | null;
+}
+
+export interface CompanyPreviewRegistry {
+  companyNumber: string;
+  url: string;
+  statusLabel: string;
+  sizeBand: CompanySizeBand;
+  /** YYYY-MM-DD. */
+  incorporatedOn: string;
+}
+
+export interface CompanyPreviewSignals {
+  /** The latest round is confirmed by an official record. */
+  confirmed: boolean;
+  /** Whole days from the latest round to today. Null when there is no round. */
+  daysSinceLastRound: number | null;
+  /** YYYY-MM-DD of the earliest recorded funding round. */
+  firstRoundOn: string | null;
+  /** Sources behind the latest round. */
+  sourceCount: number;
 }
 
 export interface InvestorRoundRow extends FundingRow {

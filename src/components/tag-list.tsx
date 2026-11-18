@@ -9,7 +9,7 @@ export function TagList({ tags }: { tags: TagRef[] }) {
         <li key={tag.slug}>
           <Link
             href={`/?tag=${encodeURIComponent(tag.slug)}`}
-            className="border border-zinc-300 px-2 py-0.5 hover:border-signal hover:text-signal"
+            className="border border-line-strong px-2 py-0.5 hover:border-brand hover:text-brand"
           >
             {tag.label}
           </Link>

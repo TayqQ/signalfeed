@@ -26,7 +26,7 @@ describe("describeFundingCriteria", () => {
         names,
       ),
     ).toBe(
-      "Seed and grant rounds under £1M, within 25 km of Leeds, in health and life sciences, since 1 June 2026",
+      "Seed and grant rounds under £1m, within 25 km of Leeds, in health and life sciences, since 1 June 2026",
     );
   });
 
@@ -56,7 +56,7 @@ describe("describeFundingCriteria", () => {
         names,
       ),
     ).toBe(
-      "Pre-seed rounds of £50K to £2M, in London, Leeds or San Francisco, in the AI drug discovery theme, first recorded equity round, from 1 January 2026 to 30 June 2026",
+      "Pre-seed rounds of £50k to £2.0m, in London, Leeds or San Francisco, in the AI drug discovery theme, first recorded equity round, from 1 January 2026 to 30 June 2026",
     );
   });
 
@@ -83,7 +83,7 @@ describe("describeFundingCriteria", () => {
         names,
       ),
     ).toBe(
-      "Confirmed seed and Series A rounds under £1M at micro companies, companies filing full accounts or companies with no accounts filed yet, within 25 km of Leeds",
+      "Confirmed seed and Series A rounds under £1m at micro companies, companies filing full accounts or companies with no accounts filed yet, within 25 km of Leeds",
     );
   });
 

@@ -1,8 +1,15 @@
 import Link from "next/link";
 import type { AcquisitionRow } from "@/core/read-models";
-import { formatDate, formatMoneyCompact } from "@/lib/format";
+import { formatDate, formatMoneyShort } from "@/lib/format";
 import { median } from "@/lib/trend-stats";
-import { BarChart } from "./charts/bar-chart";
+import { RankedBars } from "./ui/ranked-bars";
+
+/**
+ * Phones (under 768 px): each row stacks as a block, and each cell with a
+ * data-label shows "label ... value". The first cell (the name) has no label.
+ */
+const STACK_TABLE =
+  "max-md:block max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:block max-md:[&_tr]:py-3 max-md:[&_td]:block max-md:[&_th]:block max-md:[&_td]:p-0 max-md:[&_th]:p-0 max-md:[&_[data-label]]:flex max-md:[&_[data-label]]:justify-between max-md:[&_[data-label]]:gap-4 max-md:[&_[data-label]]:py-0.5 max-md:[&_[data-label]]:text-right max-md:[&_[data-label]]:before:text-left max-md:[&_[data-label]]:before:text-muted max-md:[&_[data-label]]:before:content-[attr(data-label)]";
 
 /** Fewest known ages before a median is shown (spec section 8.4). */
 const MIN_AGES_FOR_MEDIAN = 3;
@@ -82,13 +89,12 @@ export function AcquisitionsSummary({
   summary: AcquisitionSummary;
 }) {
   if (summary.total === 0) return null;
-  const top = summary.topAcquirers[0];
   return (
     <section aria-label="Summary" className="space-y-3">
       <p className="text-lg font-semibold leading-snug">
         {describeTargetAge(summary)}
       </p>
-      <p className="text-sm text-quiet">
+      <p className="text-sm text-muted">
         Price known for {summary.pricesKnown} of {summary.total}. Target age
         needs a founded year, which many companies do not have yet.
       </p>
@@ -96,18 +102,12 @@ export function AcquisitionsSummary({
         <h2 className="mb-2 text-sm font-semibold">
           Top acquirers by number of deals
         </h2>
-        <BarChart
-          title="Top acquirers by number of deals"
-          summary={
-            top
-              ? `${top.name} made the most acquisitions, with ${top.count}.`
-              : "No acquirers."
-          }
+        <RankedBars
           items={summary.topAcquirers.map((item) => ({
             label: item.name,
             value: item.count,
+            valueLabel: String(item.count),
           }))}
-          valueLabel="Acquisitions"
         />
       </div>
     </section>
@@ -118,10 +118,10 @@ function Price({ row }: { row: AcquisitionRow }) {
   if (row.priceGbpMinor !== null) {
     return (
       <>
-        {formatMoneyCompact(row.priceGbpMinor, "GBP")}
+        {formatMoneyShort(row.priceGbpMinor, "GBP")}
         {row.price && row.price.currency !== "GBP" ? (
-          <div className="text-xs text-quiet">
-            {formatMoneyCompact(row.price.amountMinor, row.price.currency)}
+          <div className="text-xs text-muted">
+            {formatMoneyShort(row.price.amountMinor, row.price.currency)}
           </div>
         ) : null}
       </>
@@ -130,12 +130,12 @@ function Price({ row }: { row: AcquisitionRow }) {
   if (row.price) {
     return (
       <>
-        {formatMoneyCompact(row.price.amountMinor, row.price.currency)}
-        <div className="text-xs text-quiet">Not converted to GBP</div>
+        {formatMoneyShort(row.price.amountMinor, row.price.currency)}
+        <div className="text-xs text-muted">Not converted to GBP</div>
       </>
     );
   }
-  return <span className="text-quiet">Not disclosed</span>;
+  return <span className="text-muted">Not disclosed</span>;
 }
 
 export function AcquisitionsTable({
@@ -148,19 +148,19 @@ export function AcquisitionsTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="border-y border-rule py-12">
+      <div className="border-y border-line py-12">
         <p className="text-lg font-medium">
           {filtered
             ? "No acquisitions match these filters"
             : "No acquisitions yet"}
         </p>
-        <p className="mt-2 max-w-xl text-quiet">
+        <p className="mt-2 max-w-xl text-muted">
           {filtered ? (
             <>
               Try fewer filters, or{" "}
               <Link
                 href="/acquisitions"
-                className="text-signal underline underline-offset-4"
+                className="text-brand underline underline-offset-4"
               >
                 reset them
               </Link>
@@ -175,9 +175,11 @@ export function AcquisitionsTable({
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+      <table
+        className={`w-full border-collapse text-left text-sm ${STACK_TABLE}`}
+      >
         <caption className="sr-only">Acquisitions, newest first</caption>
-        <thead className="border-b-2 border-ink text-quiet">
+        <thead className="border-b-2 border-ink text-muted">
           <tr>
             <th scope="col" className="py-2 pr-3 font-medium">
               Target
@@ -198,20 +200,20 @@ export function AcquisitionsTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.eventId} className="border-b border-rule align-top">
+            <tr key={row.eventId} className="border-b border-line align-top">
               <td className="py-3 pr-3">
                 <Link
                   href={`/companies/${row.target.slug}`}
-                  className="font-semibold text-ink underline-offset-4 hover:text-signal hover:underline"
+                  className="font-semibold text-ink underline-offset-4 hover:text-brand hover:underline"
                 >
                   {row.target.name}
                 </Link>
               </td>
-              <td className="px-3 py-3">
+              <td data-label="Acquirer" className="px-3 py-3">
                 {row.acquirer ? (
                   <Link
                     href={`/companies/${row.acquirer.slug}`}
-                    className="underline-offset-4 hover:text-signal hover:underline"
+                    className="underline-offset-4 hover:text-brand hover:underline"
                   >
                     {row.acquirer.name}
                   </Link>
@@ -219,17 +221,26 @@ export function AcquisitionsTable({
                   row.acquirerName
                 )}
               </td>
-              <td className="whitespace-nowrap px-3 py-3 tabular-nums">
+              <td
+                data-label="Price"
+                className="whitespace-nowrap px-3 py-3 tabular-nums"
+              >
                 <Price row={row} />
               </td>
-              <td className="whitespace-nowrap px-3 py-3 tabular-nums">
+              <td
+                data-label="Target age"
+                className="whitespace-nowrap px-3 py-3 tabular-nums"
+              >
                 {row.targetAgeYears === null ? (
-                  <span className="text-quiet">Unknown</span>
+                  <span className="text-muted">Unknown</span>
                 ) : (
                   formatYears(row.targetAgeYears)
                 )}
               </td>
-              <td className="whitespace-nowrap py-3 pl-3 tabular-nums">
+              <td
+                data-label="Date"
+                className="whitespace-nowrap py-3 pl-3 tabular-nums"
+              >
                 {formatAnnounced(row)}
               </td>
             </tr>
@@ -254,11 +265,11 @@ export function AcquisitionsPager({
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   if (pages <= 1) return null;
-  const linkClass = "underline underline-offset-4 hover:text-signal";
+  const linkClass = "underline underline-offset-4 hover:text-brand";
   return (
     <nav
       aria-label="Pages"
-      className="mt-4 flex items-center justify-between text-sm text-quiet"
+      className="mt-4 flex items-center justify-between text-sm text-muted"
     >
       {page > 1 ? (
         <Link rel="prev" href={hrefFor(page - 1)} className={linkClass}>

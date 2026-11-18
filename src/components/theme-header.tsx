@@ -11,12 +11,12 @@ export function ThemeHeader({
 }) {
   return (
     <header>
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {summary.name}
       </h1>
-      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-quiet">
+      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
         {summary.nameIsReviewed ? null : (
-          <span className="border border-rule px-2 py-0.5 font-medium text-ink">
+          <span className="border border-line px-2 py-0.5 font-medium text-ink">
             Suggested name
           </span>
         )}

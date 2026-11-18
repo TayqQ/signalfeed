@@ -3,22 +3,9 @@ import { ROUND_TYPES } from "@/core/enums";
 import {
   formatCompanyAge,
   formatDate,
-  formatMoneyCompact,
+  formatMoneyShort,
   formatRoundType,
 } from "./format";
-
-describe("formatMoneyCompact", () => {
-  it("formats en-GB compact amounts", () => {
-    expect(formatMoneyCompact(820_000_000, "GBP")).toBe("£8.2M");
-    expect(formatMoneyCompact(1_000_000_000, "USD")).toBe("US$10M");
-    expect(formatMoneyCompact(95_000_000, "EUR")).toBe("€950K");
-    expect(formatMoneyCompact(120_000_000_000, "GBP")).toBe("£1.2B");
-    expect(formatMoneyCompact(1_250, "GBP")).toBe("£12.5");
-    expect(formatMoneyCompact(0, "GBP")).toBe("£0");
-    expect(formatMoneyCompact(-820_000_000, "GBP")).toBe("-£8.2M");
-    expect(formatMoneyCompact(120_000_000, "CAD")).toBe("CAD 1.2M");
-  });
-});
 
 describe("formatDate", () => {
   it("formats a UTC calendar date", () => {
@@ -58,5 +45,25 @@ describe("formatCompanyAge", () => {
     expect(formatCompanyAge(null, "2026-10-08")).toBeNull();
     expect(formatCompanyAge(2027, "2026-10-08")).toBeNull();
     expect(formatCompanyAge(2020, "not a date")).toBeNull();
+  });
+});
+
+describe("formatMoneyShort", () => {
+  it("uses the house style: lower-case units, one decimal for m and bn", () => {
+    expect(formatMoneyShort(420_000_000, "GBP")).toBe("£4.2m");
+    expect(formatMoneyShort(1_200_000_000, "GBP")).toBe("£12.0m");
+    expect(formatMoneyShort(85_000_000, "GBP")).toBe("£850k");
+    expect(formatMoneyShort(232_000_000_000, "GBP")).toBe("£2.3bn");
+    expect(formatMoneyShort(95_000, "GBP")).toBe("£950");
+    expect(formatMoneyShort(0, "GBP")).toBe("£0");
+    expect(formatMoneyShort(75_000_000_000, "USD")).toBe("US$750.0m");
+    expect(formatMoneyShort(-420_000_000, "GBP")).toBe("-£4.2m");
+  });
+
+  it("promotes at the unit boundaries", () => {
+    expect(formatMoneyShort(99_960_000, "GBP")).toBe("£1.0m");
+    expect(formatMoneyShort(99_996_000_000, "GBP")).toBe("£1.0bn");
+    expect(formatMoneyShort(99_940, "GBP")).toBe("£999");
+    expect(formatMoneyShort(99_960, "GBP")).toBe("£1k");
   });
 });

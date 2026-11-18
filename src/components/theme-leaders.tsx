@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { AcquisitionRow, InvestorActivityRow } from "@/core/read-models";
-import { formatDate, formatMoneyCompact } from "@/lib/format";
+import { formatDate, formatMoneyShort } from "@/lib/format";
 
 export function ThemeLeaders({
   leaders,
@@ -14,29 +14,29 @@ export function ThemeLeaders({
       <h2 id="leaders-heading" className="text-xl font-semibold">
         First-cheque leaders
       </h2>
-      <p className="mt-1 text-sm text-quiet">
+      <p className="mt-1 text-sm text-muted">
         Investors with the most early rounds led in the last 12 months. We show
         round size, not cheque size, because cheques are rarely reported.
       </p>
       {leaders.length === 0 ? (
-        <p className="mt-3 text-quiet">
+        <p className="mt-3 text-muted">
           No investor has 2 or more early rounds here in the last 12 months.
         </p>
       ) : (
-        <ol className="mt-3 divide-y divide-rule border-y border-rule">
+        <ol className="mt-3 divide-y divide-line border-y border-line">
           {leaders.map((row) => (
             <li key={row.investor.slug} className="py-2 text-sm">
               <Link
                 href={`/investors/${row.investor.slug}`}
-                className="font-medium text-signal underline underline-offset-4"
+                className="font-medium text-brand underline underline-offset-4"
               >
                 {row.investor.name}
               </Link>
-              <span className="block text-quiet">
+              <span className="block text-muted">
                 Led {row.led}, joined {row.joined}.{" "}
                 {row.medianRoundGbpMinor === null
                   ? "No round sizes known."
-                  : `Median round ${formatMoneyCompact(row.medianRoundGbpMinor, "GBP")} (${row.roundsWithAmount} of ${row.rounds} with amounts).`}
+                  : `Median round ${formatMoneyShort(row.medianRoundGbpMinor, "GBP")} (${row.roundsWithAmount} of ${row.rounds} with amounts).`}
               </span>
             </li>
           ))}
@@ -45,7 +45,7 @@ export function ThemeLeaders({
       <p className="mt-3 text-sm">
         <Link
           href={`/investors?theme=${encodeURIComponent(themeSlug)}`}
-          className="text-signal underline underline-offset-4"
+          className="text-brand underline underline-offset-4"
         >
           All investors in this theme
         </Link>
@@ -67,16 +67,16 @@ export function ThemeAcquisitions({
         Latest acquisitions
       </h2>
       {acquisitions.length === 0 ? (
-        <p className="mt-3 text-quiet">
+        <p className="mt-3 text-muted">
           No acquisitions of companies in this theme have been recorded.
         </p>
       ) : (
-        <ul className="mt-3 divide-y divide-rule border-y border-rule">
+        <ul className="mt-3 divide-y divide-line border-y border-line">
           {acquisitions.map((row) => (
             <li key={row.eventId} className="py-2 text-sm">
               <Link
                 href={`/companies/${row.target.slug}`}
-                className="font-medium text-signal underline underline-offset-4"
+                className="font-medium text-brand underline underline-offset-4"
               >
                 {row.target.name}
               </Link>{" "}
@@ -91,10 +91,10 @@ export function ThemeAcquisitions({
               ) : (
                 row.acquirerName
               )}
-              <span className="block text-quiet">
+              <span className="block text-muted">
                 {formatDate(row.announcedOn)}
                 {row.priceGbpMinor !== null
-                  ? `, ${formatMoneyCompact(row.priceGbpMinor, "GBP")}`
+                  ? `, ${formatMoneyShort(row.priceGbpMinor, "GBP")}`
                   : ", price not known"}
               </span>
             </li>
@@ -104,7 +104,7 @@ export function ThemeAcquisitions({
       <p className="mt-3 text-sm">
         <Link
           href={`/acquisitions?theme=${encodeURIComponent(themeSlug)}`}
-          className="text-signal underline underline-offset-4"
+          className="text-brand underline underline-offset-4"
         >
           All acquisitions in this theme
         </Link>

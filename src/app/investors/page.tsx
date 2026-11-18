@@ -11,7 +11,7 @@ import { cached } from "@/lib/cached";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Investors | SignalFeed",
+  title: "Investors",
   description:
     "Investors leading pre-seed and seed rounds, by theme, with round sizes.",
 };
@@ -56,16 +56,16 @@ export default async function InvestorsPage({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+      <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
         Who leads first cheques
       </h1>
-      <p className="mt-3 max-w-2xl text-quiet">
+      <p className="mt-3 max-w-2xl text-muted">
         Investors in pre-seed and seed rounds over the last {WINDOW_MONTHS}{" "}
         months. Led counts rounds where they led. Joined counts rounds where
         they took part or their role is not reported. Investors need at least 2
         rounds to be listed.
       </p>
-      <p className="mt-3 max-w-2xl text-sm text-quiet">
+      <p className="mt-3 max-w-2xl text-sm text-muted">
         Individual cheque sizes are rarely reported, so these pages show the
         size of the whole round instead. The median uses only rounds with a
         known amount, and each row says how many that is.
@@ -81,7 +81,7 @@ export default async function InvestorsPage({
       </div>
 
       <section aria-label="Investor activity" className="mt-8">
-        <p className="mb-3 text-sm tabular-nums text-quiet" role="status">
+        <p className="mb-3 text-sm tabular-nums text-muted" role="status">
           {rows.length === 1 ? "1 investor" : `${rows.length} investors`}
         </p>
         <InvestorActivityTable

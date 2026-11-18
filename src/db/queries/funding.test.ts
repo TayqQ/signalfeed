@@ -776,7 +776,7 @@ describe("Phase 3 filters and confirmations", () => {
         .where(eq(eventConfirmations.recordKind, "ch_allotment"));
       const only = (await listFundingRounds(db, filters())).items[0];
       expect(only?.confirmation?.text).toBe(
-        "Confirmed: Form D, $4.4M sold, first sale 1 March 2026 (SEC)",
+        "Confirmed: Form D, $4.4m sold, first sale 1 March 2026 (SEC)",
       );
     });
 
@@ -801,5 +801,86 @@ describe("Phase 3 filters and confirmations", () => {
       const page = await listFundingRounds(db, filters());
       expect(page.items[0]?.confirmation).toBeNull();
     });
+  });
+});
+
+describe("row fields", () => {
+  let test: TestDb;
+  let db: Db;
+
+  beforeEach(async () => {
+    test = await createTestDb();
+    db = test.db;
+  });
+
+  afterEach(async () => {
+    await test.close();
+  });
+
+  async function rowFor(name: string) {
+    const page = await listFundingRounds(db, filters());
+    const row = page.items.find((item) => item.companyName === name);
+    if (!row) throw new Error(`No row for ${name}`);
+    return row;
+  }
+
+  it("returns the description and website domain", async () => {
+    const id = await addCompany(db, "Described Co");
+    await addRounds(db, id, [{ date: "2026-05-01", type: "seed" }]);
+    await db
+      .update(companies)
+      .set({ description: "Builds grid batteries", websiteDomain: "desc.test" })
+      .where(eq(companies.id, id));
+    const bare = await addCompany(db, "Bare Co");
+    await addRounds(db, bare, [{ date: "2026-05-02", type: "seed" }]);
+
+    const row = await rowFor("Described Co");
+    expect(row.companyDescription).toBe("Builds grid batteries");
+    expect(row.websiteDomain).toBe("desc.test");
+    const none = await rowFor("Bare Co");
+    expect(none.companyDescription).toBeNull();
+    expect(none.websiteDomain).toBeNull();
+  });
+
+  it("picks the main sector from the strongest theme, then SIC, else null", async () => {
+    const health = await addTheme(db, "health-ai", {
+      sector: "health-life-sciences",
+    });
+    const fin = await addTheme(db, "fintech", { sector: "financial-services" });
+
+    const themed = await addCompany(db, "Themed Co");
+    await addRounds(db, themed, [{ date: "2026-05-01", type: "seed" }]);
+    await db.insert(companyThemes).values([
+      { companyId: themed, themeId: fin, tagCount: 1 },
+      { companyId: themed, themeId: health, tagCount: 3 },
+    ]);
+
+    const sic = await addCompany(db, "Sic Co");
+    await addRounds(db, sic, [{ date: "2026-05-02", type: "seed" }]);
+    await addChCompany(db, "09000301", "micro-entity");
+    await db
+      .update(chCompanies)
+      .set({ sicCodes: ["62012"] })
+      .where(eq(chCompanies.companyNumber, "09000301"));
+    await link(db, sic, "09000301");
+
+    const neither = await addCompany(db, "Neither Co");
+    await addRounds(db, neither, [{ date: "2026-05-03", type: "seed" }]);
+
+    expect((await rowFor("Themed Co")).mainSector).toBe("health-life-sciences");
+    expect((await rowFor("Sic Co")).mainSector).toBe("software-ai");
+    expect((await rowFor("Neither Co")).mainSector).toBeNull();
+  });
+
+  it("does not use an unlinked Companies House record for the sector", async () => {
+    const id = await addCompany(db, "Candidate Sic Co");
+    await addRounds(db, id, [{ date: "2026-05-01", type: "seed" }]);
+    await addChCompany(db, "09000302", "micro-entity");
+    await db
+      .update(chCompanies)
+      .set({ sicCodes: ["62012"] })
+      .where(eq(chCompanies.companyNumber, "09000302"));
+    await link(db, id, "09000302", "candidate");
+    expect((await rowFor("Candidate Sic Co")).mainSector).toBeNull();
   });
 });
