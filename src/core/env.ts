@@ -35,6 +35,8 @@ export const pipelineEnvSchema = z.object({
   /** Companies House API key. The registry step is skipped without it. Never given to the web app. */
   COMPANIES_HOUSE_API_KEY: z.string().min(1).optional(),
   MAX_CH_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(2000),
+  /** Time limit for the registry step, checked between companies (D63). */
+  MAX_CH_MINUTES_PER_RUN: z.coerce.number().int().min(1).max(60).default(17),
   /** Gateway to Research requests a second. UKRI documents up to 10 (A18). */
   GTR_REQUESTS_PER_SECOND: z.coerce.number().positive().max(10).default(3),
   /** Most organisation details fetched from Gateway to Research per grants run. */

@@ -43,6 +43,7 @@ function fixtureClient(respond = route) {
       sleep,
     }),
     sleep,
+    clock,
   });
   return { client, fake };
 }
@@ -219,5 +220,70 @@ describe("registryStep", () => {
     });
     expect(stats.rateLimited).toBe(true);
     expect(stats.requests).toBe(2);
+  });
+
+  it("stops at the time limit, skips refreshing, and still returns a normal result", async () => {
+    for (const name of ["Alpha Works", "Beta Works"]) {
+      await db.insert(companies).values({
+        slug: name.toLowerCase().replace(" ", "-"),
+        name,
+        normalisedName: name.toLowerCase(),
+        countryCode: "GB",
+      });
+    }
+    // A linked company whose profile would be refreshed if the pass ran.
+    const [linked] = await db
+      .insert(companies)
+      .values({
+        slug: "kestrel-lantern",
+        name: "Kestrel Lantern Labs",
+        normalisedName: "kestrel lantern labs",
+        countryCode: "US",
+      })
+      .returning();
+    await db.insert(registryLinks).values({
+      companyId: linked!.id,
+      registry: "companies_house",
+      registryId: "09100417",
+      registryName: "KESTREL LANTERN LABS LIMITED",
+      status: "linked",
+      method: "manual",
+      reason: "test",
+      decidedBy: "manual",
+    });
+
+    const state = { ms: NOW.getTime() };
+    const movingClock = { now: () => new Date(state.ms) };
+    const { client: inner, fake } = fixtureClient();
+    const deadlines: (Date | null)[] = [];
+    const client: ChClient = {
+      ...inner,
+      searchCompanies: (name) => {
+        state.ms += 90_000;
+        return inner.searchCompanies(name);
+      },
+      setDeadline: (at) => {
+        deadlines.push(at);
+      },
+    };
+    const lines: string[] = [];
+    const stats = await registryStep({
+      db,
+      client,
+      clock: movingClock,
+      maxRequests: 100,
+      maxMinutes: 1,
+      log: (line) => lines.push(line),
+    });
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(stats.stoppedAtLimit).toBe(false);
+    expect(stats.companiesSearched).toBe(1);
+    expect(stats.profilesRefreshed).toBe(0);
+    expect(fake.paths.some((p) => p.startsWith("/company/09100417"))).toBe(
+      false,
+    );
+    expect(lines.at(-1)).toContain("stopped: time limit");
+    expect(deadlines[0]).toEqual(new Date(NOW.getTime() + 60_000));
+    expect(deadlines.at(-1)).toBeNull();
   });
 });

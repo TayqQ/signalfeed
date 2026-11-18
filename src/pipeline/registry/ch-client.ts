@@ -1,4 +1,4 @@
-import type { HttpFetcher, HttpResponse } from "@/core/ports";
+import type { Clock, HttpFetcher, HttpResponse } from "@/core/ports";
 import {
   normaliseCompanyNumber,
   type CapitalFiling,
@@ -26,6 +26,14 @@ export class RateLimitedError extends Error {
   constructor() {
     super("Companies House rate limit reached");
     this.name = "RateLimitedError";
+  }
+}
+
+/** Thrown when the run's time limit is reached (D63). */
+export class TimeLimitReached extends Error {
+  constructor() {
+    super("Companies House time limit for this run reached");
+    this.name = "TimeLimitReached";
   }
 }
 
@@ -62,6 +70,12 @@ export interface ChClient {
   /** Active companies registered at a postcode, or null if it cannot be counted. */
   countActiveAtPostcode(postcode: string): Promise<number | null>;
   requestsMade(): number;
+  /**
+   * Sets when the run must stop, or null for no limit. A rate-limit wait that
+   * would not end before this time is not started: `TimeLimitReached` is
+   * thrown instead. Optional so test doubles need not implement it.
+   */
+  setDeadline?(at: Date | null): void;
 }
 
 export interface ChClientOptions {
@@ -69,6 +83,8 @@ export interface ChClientOptions {
   apiKey: string;
   limiter: WindowLimiter;
   sleep?: (ms: number) => Promise<void>;
+  /** Used to compare the deadline with now. Defaults to the system clock. */
+  clock?: Clock;
 }
 
 function realSleep(ms: number): Promise<void> {
@@ -113,7 +129,9 @@ export function createChClient(options: ChClientOptions): ChClient {
   const { http, limiter } = options;
   const sleep = options.sleep ?? realSleep;
   const authorization = `Basic ${Buffer.from(`${options.apiKey}:`).toString("base64")}`;
+  const clock = options.clock ?? { now: () => new Date() };
   let made = 0;
+  let deadline: Date | null = null;
 
   /** Removes the key, in plain and encoded forms, from any text. */
   function scrub(text: string): string {
@@ -145,7 +163,14 @@ export function createChClient(options: ChClientOptions): ChClient {
     let response = await send(path);
     if (response.status === 429) {
       // `HttpFetcher` does not expose headers, so the reset time is not
-      // known. Wait out a whole window, which always ends the block.
+      // known. Wait out a whole window, which always ends the block, unless
+      // the time limit would pass first.
+      if (
+        deadline !== null &&
+        deadline.getTime() - clock.now().getTime() < RATE_WINDOW_MS
+      ) {
+        throw new TimeLimitReached();
+      }
       await sleep(RATE_WINDOW_MS);
       response = await send(path);
       if (response.status === 429) throw new RateLimitedError();
@@ -271,10 +296,16 @@ export function createChClient(options: ChClientOptions): ChClient {
         `/advanced-search/companies?location=${encodeURIComponent(`${parsed.outcode} ${parsed.incode}`)}&company_status=active&size=1`,
         chAdvancedSearchSchema,
         "advanced search",
+        true,
       );
-      return result?.hits ?? null;
+      // The endpoint answers 404 when nothing matches: zero hits, not an error.
+      return result === null ? 0 : result.hits;
     },
 
     requestsMade: () => made,
+
+    setDeadline(at) {
+      deadline = at;
+    },
   };
 }
