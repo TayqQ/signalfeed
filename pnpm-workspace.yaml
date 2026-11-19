@@ -4,3 +4,7 @@ minimumReleaseAgeExclude:
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+# Security: pin transitive zod past GHSA-mrhx-c7xc-m3w5 (fixed in 4.6.6).
+overrides:
+  "zod@<4.6.6": "4.6.7"
