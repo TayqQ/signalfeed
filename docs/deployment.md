@@ -130,7 +130,7 @@ Phase 3 links companies to Companies House and SEC filings and marks news rounds
 
 - **Hourly** (`pnpm ingest run`): after the Phase 2 steps, it rebuilds confirmations (`event_confirmations` and `events.evidence`) and then sectors (`company_sectors`). Both use the database only, and skip when nothing changed. The locations step also uses registered offices. `run` never calls Companies House or EDGAR.
 - **Daily**, after grants:
-  - `pnpm ingest registry`: links companies to Companies House, refreshes linked profiles and fetches SH01 filings, at most `MAX_CH_REQUESTS_PER_RUN` (2,000) requests. Then it rebuilds confirmations, locations and sectors, so new links show at once. About 21 minutes at 2,000 requests. Without `COMPANIES_HOUSE_API_KEY` the run is recorded as skipped and the step succeeds.
+  - `pnpm ingest registry`: links companies to Companies House, refreshes linked profiles and fetches SH01 filings, at most `MAX_CH_REQUESTS_PER_RUN` (2,000) requests, and it stops at `MAX_CH_MINUTES_PER_RUN` (17) minutes, checked between companies, whichever comes first. What is left stays due for the next run. Then it rebuilds confirmations, locations and sectors, so new links show at once. The summary shows "Stopped early: time limit" when the time limit ended it. Without `COMPANIES_HOUSE_API_KEY` the run is recorded as skipped and the step succeeds.
   - `pnpm ingest formd`: fetches the EDGAR daily indexes for days not yet done (up to yesterday, US Eastern time), stores each non-fund Form D and D/A, links issuers to companies, then rebuilds confirmations. At most `MAX_EDGAR_DAYS_PER_RUN` (10) days and `MAX_EDGAR_REQUESTS_PER_RUN` (3,000) requests, about 10 minutes. If `HTTP_CONTACT` has no email address it refuses, fetches nothing and the step fails.
 
 Each command is recorded as a run under the run lock, and its stats show on `/status`. A failing step is recorded in the run's error and never loses what earlier steps stored.
@@ -154,7 +154,7 @@ Each command is recorded as a run under the run lock, and its stats show on `/st
    pnpm ingest relink-grants
    ```
 
-Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 75-minute limit: grants has 25 minutes, the registry step 25 and Form D 15.
+Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_CH_MINUTES_PER_RUN` (17, whole minutes from 1 to 60), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 75-minute limit: grants has 25 minutes, the registry step 25 (it stops itself at 17) and Form D 15.
 
 In short, you must set:
 

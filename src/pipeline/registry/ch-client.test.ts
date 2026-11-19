@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { RateLimitedError, createChClient } from "./ch-client";
+import {
+  ChApiError,
+  RateLimitedError,
+  TimeLimitReached,
+  createChClient,
+} from "./ch-client";
 import { createWindowLimiter } from "./rate-limit";
 import {
   fakeChClient,
@@ -156,6 +161,53 @@ describe("createChClient", () => {
     expect(sleep).toHaveBeenCalledWith(300_000);
     expect(fake.paths).toHaveLength(2);
     expect(client.requestsMade()).toBe(2);
+  });
+
+  it("does not start the 5 minute wait when less than 5 minutes remain", async () => {
+    const sleep = vi.fn(() => Promise.resolve());
+    const fake = fakeChFetcher(() => jsonResponse("slow down", 429));
+    const client = createChClient({
+      http: fake.fetcher,
+      apiKey: KEY,
+      limiter: createWindowLimiter({
+        max: 500,
+        windowMs: 300_000,
+        clock: { now: () => new Date(0) },
+        sleep,
+      }),
+      sleep,
+      clock: { now: () => new Date(0) },
+    });
+    client.setDeadline?.(new Date(299_999));
+    await expect(client.getCompany("09100417")).rejects.toBeInstanceOf(
+      TimeLimitReached,
+    );
+    expect(sleep).not.toHaveBeenCalled();
+    expect(fake.paths).toHaveLength(1);
+
+    // With exactly a window left the wait still happens.
+    client.setDeadline?.(new Date(300_000));
+    await expect(client.getCompany("09100417")).rejects.toBeInstanceOf(
+      RateLimitedError,
+    );
+    expect(sleep).toHaveBeenCalledWith(300_000);
+  });
+
+  it("treats a 404 from advanced search as zero hits", async () => {
+    const { client } = setup((p) =>
+      p.startsWith("/advanced-search/")
+        ? jsonResponse("not found", 404)
+        : route(p),
+    );
+    expect(await client.countActiveAtPostcode("EX2 4AB")).toBe(0);
+  });
+
+  it("still fails on a 404 from basic search and keeps null for a profile", async () => {
+    const { client } = setup(() => jsonResponse("not found", 404));
+    await expect(client.searchCompanies("Acme")).rejects.toBeInstanceOf(
+      ChApiError,
+    );
+    expect(await client.getCompany("09100417")).toBeNull();
   });
 
   it("throws RateLimitedError on two 429s in a row", async () => {

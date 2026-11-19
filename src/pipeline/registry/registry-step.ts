@@ -2,14 +2,15 @@
 // House, then refresh linked profiles, sharing one request limit. Skipped
 // without a key. Log lines never carry the key or a full postcode.
 
-import type { RegistryStats } from "@/core/domain";
 import type { Clock } from "@/core/ports";
 import type { Db } from "@/db/client";
 import type { ChClient } from "./ch-client";
 import {
   RequestBudget,
+  RunDeadline,
   emptyRegistryStats,
   linkCompanies,
+  type RegistryRunStats,
 } from "./link-companies";
 import { refreshProfiles } from "./refresh-profiles";
 
@@ -20,10 +21,12 @@ export interface RegistryStepOptions {
   clock: Clock;
   /** `MAX_CH_REQUESTS_PER_RUN`. */
   maxRequests: number;
+  /** `MAX_CH_MINUTES_PER_RUN`. The default is 17. */
+  maxMinutes?: number;
   log: (message: string) => void;
 }
 
-function summary(stats: RegistryStats): string {
+function summary(stats: RegistryRunStats): string {
   const linked = Object.values(stats.linkedByMethod).reduce(
     (sum, n) => sum + (n ?? 0),
     0,
@@ -32,7 +35,9 @@ function summary(stats: RegistryStats): string {
     ? "; stopped: rate limited"
     : stats.stoppedAtLimit
       ? "; stopped: request limit"
-      : "";
+      : stats.stoppedAtTime
+        ? "; stopped: time limit"
+        : "";
   return (
     `registry: searched ${stats.companiesSearched}, linked ${linked}, ` +
     `candidates ${stats.candidates}, none ${stats.none}, skipped ${stats.companiesSkipped}, ` +
@@ -42,13 +47,17 @@ function summary(stats: RegistryStats): string {
   );
 }
 
+/** The default for `MAX_CH_MINUTES_PER_RUN` (D63). */
+export const DEFAULT_CH_MINUTES = 17;
+
 /**
- * Runs linking, then refreshing. A rate limit or the request limit ends the
- * step early with a normal result; whatever is left stays due for next run.
+ * Runs linking, then refreshing, sharing one request limit and one deadline.
+ * A rate limit, the request limit or the time limit ends the step early with
+ * a normal result; whatever is left stays due for next run.
  */
 export async function registryStep(
   options: RegistryStepOptions,
-): Promise<RegistryStats> {
+): Promise<RegistryRunStats> {
   const { db, client, clock, maxRequests, log } = options;
   if (client === null) {
     log("registry: skipped, no Companies House key");
@@ -56,11 +65,29 @@ export async function registryStep(
   }
 
   const stats = emptyRegistryStats();
-  const budget = new RequestBudget(client, maxRequests);
+  const deadline = new RunDeadline(
+    clock,
+    options.maxMinutes ?? DEFAULT_CH_MINUTES,
+  );
+  const budget = new RequestBudget(client, maxRequests, deadline);
   const now = clock.now();
-  await linkCompanies({ db, client, now, maxRequests, budget, stats, log });
-  if (!stats.rateLimited && !stats.stoppedAtLimit) {
-    await refreshProfiles({ db, client, now, maxRequests, budget, stats, log });
+  // Lets the client skip a rate-limit wait that would pass the deadline.
+  client.setDeadline?.(deadline.endsAt);
+  try {
+    await linkCompanies({ db, client, now, maxRequests, budget, stats, log });
+    if (!stats.rateLimited && !stats.stoppedAtLimit && !stats.stoppedAtTime) {
+      await refreshProfiles({
+        db,
+        client,
+        now,
+        maxRequests,
+        budget,
+        stats,
+        log,
+      });
+    }
+  } finally {
+    client.setDeadline?.(null);
   }
   log(summary(stats));
   return stats;

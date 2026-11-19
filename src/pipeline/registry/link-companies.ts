@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, eq, inArray, isNull, ne, not, or, sql } from "drizzle-orm";
 import type { RegistryStats } from "@/core/domain";
+import type { Clock } from "@/core/ports";
 import type { RegistrySearchOutcome } from "@/core/enums";
 import { upgradeExtraction } from "@/core/extraction-schema";
 import {
@@ -25,7 +26,12 @@ import {
   registryLinks,
 } from "@/db/schema";
 import { addMergeCandidate } from "@/pipeline/resolve/merge-candidates";
-import { ChApiError, RateLimitedError, type ChClient } from "./ch-client";
+import {
+  ChApiError,
+  RateLimitedError,
+  TimeLimitReached,
+  type ChClient,
+} from "./ch-client";
 import type { ConfirmableEvent } from "./confirm-rules";
 import {
   TAKEN_MERGE_REASONS,
@@ -83,15 +89,43 @@ export class RequestLimitReached extends Error {
   }
 }
 
-/** Counts requests through the client, shared by linking and refreshing. */
+/** The run's time limit (D63), shared by linking and refreshing. */
+export class RunDeadline {
+  readonly endsAt: Date;
+
+  constructor(
+    private readonly clock: Clock,
+    minutes: number,
+  ) {
+    this.endsAt = new Date(clock.now().getTime() + minutes * 60_000);
+  }
+
+  expired(): boolean {
+    return this.clock.now().getTime() >= this.endsAt.getTime();
+  }
+}
+
+/**
+ * Counts requests through the client, shared by linking and refreshing. It
+ * also carries the run's deadline, so both passes stop at the same time.
+ */
 export class RequestBudget {
   private readonly start: number;
 
   constructor(
     private readonly client: Pick<ChClient, "requestsMade">,
     readonly max: number,
+    readonly deadline?: RunDeadline,
   ) {
     this.start = client.requestsMade();
+  }
+
+  /**
+   * Throws `TimeLimitReached` once the deadline has passed. Called only
+   * between companies, so a company is never stopped part way.
+   */
+  checkTime(): void {
+    if (this.deadline?.expired()) throw new TimeLimitReached();
   }
 
   used(): number {
@@ -108,7 +142,13 @@ export class RequestBudget {
   }
 }
 
-export function emptyRegistryStats(): RegistryStats {
+/** `RegistryStats` plus the time-limit flag (D63). */
+export type RegistryRunStats = RegistryStats & {
+  /** True when the step stopped at `MAX_CH_MINUTES_PER_RUN`. */
+  stoppedAtTime: boolean;
+};
+
+export function emptyRegistryStats(): RegistryRunStats {
   return {
     companiesSearched: 0,
     linkedByMethod: {},
@@ -122,6 +162,7 @@ export function emptyRegistryStats(): RegistryStats {
     requests: 0,
     rateLimited: false,
     stoppedAtLimit: false,
+    stoppedAtTime: false,
   };
 }
 
@@ -129,7 +170,10 @@ export function emptyRegistryStats(): RegistryStats {
  * Sets the stop flags for the two errors that end the step. Returns false for
  * any other error, which the caller rethrows.
  */
-export function markStopped(stats: RegistryStats, error: unknown): boolean {
+export function markStopped(
+  stats: RegistryStats & { stoppedAtTime?: boolean },
+  error: unknown,
+): boolean {
   if (error instanceof RateLimitedError) {
     stats.rateLimited = true;
     return true;
@@ -138,13 +182,47 @@ export function markStopped(stats: RegistryStats, error: unknown): boolean {
     stats.stoppedAtLimit = true;
     return true;
   }
+  if (error instanceof TimeLimitReached) {
+    stats.stoppedAtTime = true;
+    return true;
+  }
   return false;
 }
 
-/** A log-safe description: never the key, a URL or a postcode. */
+const MAX_ERROR_TEXT = 300;
+
+/** Text after `params:` (Drizzle appends the query values), and any Basic token. */
+function cleanErrorText(text: string): string {
+  const cut = text.indexOf("params:");
+  return (cut === -1 ? text : text.slice(0, cut))
+    .replace(/Basic\s+[A-Za-z0-9+/=_-]+/g, "Basic [redacted]")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * A log-safe description: never the key, a URL or a postcode. A `ChApiError`
+ * is kept as it is. Any other error gives `name: message`, plus the code and
+ * message of its `cause` (Drizzle wraps the driver error), without query
+ * values, in at most 300 characters. Errors from `ch-client` are already
+ * scrubbed of the key; the Basic token pattern is a second guard.
+ */
 export function describeError(error: unknown): string {
   if (error instanceof ChApiError) return error.message;
-  return error instanceof Error ? error.name : "unknown error";
+  if (!(error instanceof Error)) return "unknown error";
+  let text = `${error.name}: ${cleanErrorText(error.message)}`;
+  const cause: unknown = error.cause;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: unknown }).code;
+    const parts = [
+      typeof code === "string" || typeof code === "number" ? String(code) : "",
+      cleanErrorText(cause.message),
+    ].filter((part) => part !== "");
+    if (parts.length > 0) text += ` (cause: ${parts.join(" ")})`;
+  }
+  return text.length > MAX_ERROR_TEXT
+    ? `${text.slice(0, MAX_ERROR_TEXT - 3)}...`
+    : text;
 }
 
 /** Errors that would repeat for every company, so the step must stop. */
@@ -396,6 +474,8 @@ export interface EligibleCompany {
   reasons: ChSearchReason[];
   tier: number;
   latestEvent: string | null;
+  /** True when an event has a news report (an `event_sources` row). */
+  hasNews: boolean;
 }
 
 /**
@@ -440,7 +520,8 @@ async function extractedPlaces(
  * location row) or, when the country is null or GB, with a hint: a GBP
  * round, a report from a UK-only source, or a UK town or region in the
  * extractions. A known country other than GB never takes a hint. The queue
- * runs by tier (`chSearchTier`), then newest event first.
+ * runs by tier (`chSearchTier`), then companies with a news report before
+ * those whose events all come from grants (D63), then newest event first.
  */
 export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
   const ukSlugs = sourceSlugsFor("GB");
@@ -460,6 +541,7 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
   const latestEvent = sql<
     string | null
   >`(select max(e.announced_on)::text from events e where e.company_id = companies.id)`;
+  const hasNews = sql<boolean>`exists (select 1 from event_sources es inner join events e on e.id = es.event_id where e.company_id = companies.id)`;
   const rows = await db
     .select({
       id: companies.id,
@@ -471,6 +553,7 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
       gbpRound,
       ukSource,
       latestEvent,
+      hasNews,
     })
     .from(companies)
     .where(
@@ -515,11 +598,18 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
     }
     const tier = chSearchTier(reasons);
     if (tier === null) continue;
-    out.push({ id: row.id, reasons, tier, latestEvent: row.latestEvent });
+    out.push({
+      id: row.id,
+      reasons,
+      tier,
+      latestEvent: row.latestEvent,
+      hasNews: row.hasNews,
+    });
   }
   return out.sort(
     (a, b) =>
       a.tier - b.tier ||
+      Number(b.hasNews) - Number(a.hasNews) ||
       (b.latestEvent ?? "").localeCompare(a.latestEvent ?? "") ||
       a.id - b.id,
   );
@@ -826,7 +916,7 @@ export interface LinkCompaniesOptions {
   /** Shared with the refresh pass. Made from `maxRequests` when missing. */
   budget?: RequestBudget;
   /** Added to in place. A new one when missing. */
-  stats?: RegistryStats;
+  stats?: RegistryRunStats;
   log?: (message: string) => void;
 }
 
@@ -837,7 +927,7 @@ export interface LinkCompaniesOptions {
  */
 export async function linkCompanies(
   options: LinkCompaniesOptions,
-): Promise<RegistryStats> {
+): Promise<RegistryRunStats> {
   const { db, client, now } = options;
   const stats = options.stats ?? emptyRegistryStats();
   const budget =
@@ -867,6 +957,7 @@ export async function linkCompanies(
     for (const batch of chunks(ids, ID_CHUNK)) {
       const factsById = await loadCompanyLinkFacts(db, batch);
       for (const id of batch) {
+        budget.checkTime();
         const facts = factsById.get(id);
         if (!facts) continue;
         const fingerprint = chLinkFingerprint(facts.company);
@@ -887,6 +978,7 @@ export async function linkCompanies(
           if (
             error instanceof RateLimitedError ||
             error instanceof RequestLimitReached ||
+            error instanceof TimeLimitReached ||
             isFatal(error)
           ) {
             throw error;
