@@ -223,6 +223,9 @@ No Phase 3 task adds a dependency (`fast-xml-parser` is already installed). Task
 | 4 | [079 Home page: summary, quick views, List and Cards, view switch](079-home-summary-and-list-views.md) | 2 | 076, 078 |
 | 5 | [080 Split view](080-split-view.md) | 3 | 079 |
 | 6 | [081 Move the other pages onto the system](081-sweep-other-pages.md) | 1-2 | 075 (best after 079) |
+| v2-1 | [082 Harbour+ palette and recoloured logo](082-harbour-plus-palette.md) | 2 | 081 |
+| v2-2 | [083 App shell: sidebar, top bar, full-width content](083-app-shell.md) | 3 | 082 |
+| v2-2 | [084 Remove page headers and fill the width](084-remove-page-headers.md) | 2 | 082 |
 
 The plan behind these tasks is `docs/design/design-system.md`: one site, with three list views (List, Cards, Split) that share their data and parts. Tasks in the same wave run in parallel in one worktree. Their file lists don't overlap:
 
@@ -236,3 +239,5 @@ The plan behind these tasks is `docs/design/design-system.md`: one site, with th
 | `src/app/page.tsx` | 078 (form swap only), then 079, then 080 |
 | `src/components/home/*`, `src/components/rounds/*`, `src/lib/view-preference.ts`, `src/components/funding-table.tsx` | 079, then 080 |
 | `scripts/screenshots.ts` | one task at a time: 077, then 079, 080, 081, each adding its own pages (078 only runs it) |
+
+**UX v2 file ownership** (083 and 084 run in parallel): 083 owns `src/app/layout.tsx`, `src/components/shell/*`, `site-header.tsx`, `site-footer.tsx` and `theme-toggle.tsx`. 084 owns `src/app/**/page.tsx`, `not-found.tsx`, `error.tsx`, `src/components/home/*`, `src/components/rounds/*` and `src/lib/view-preference.ts`. 082 runs first, on its own.

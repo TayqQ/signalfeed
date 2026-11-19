@@ -144,3 +144,24 @@ The split preview needs `getCompanyPreview(slug)`: header facts, key facts, late
 | 5 | 081 sweep the other pages onto the system, then delete the old remapped names | After 075, best after 079 |
 
 Split ships last on purpose. If Cards turns out to be little used (measured with privacy-friendly page analytics, not per-person tracking), it can be dropped cheaply, because it is only an arrangement.
+
+## 8. v2: the app shell and the Harbour+ palette (19 November 2026)
+After seeing v1 live, Taylor asked for three changes. This section overrides anything above that conflicts with it.
+
+1. **Palette.** Navy and orange "Harbour+" replaces green and brass (`brand/brand.md`, `brand/tokens.css`). Dark mode uses layered surfaces (paper < surface < raised < overlay), so it is no longer one flat dark plane. In light mode, orange marks what to act on or notice.
+2. **The site is an app that uses the whole window,** like Linear, Discord or Netflix, not a page centred in 1280 px:
+   - **Sidebar** (240 px, `--nav-bg`):
+     - the logo;
+     - primary nav: Funding, Companies, Investors, Sectors, Trends, Acquisitions;
+     - a lower group: Status, About;
+     - the theme toggle at the foot.
+
+     At 1024-1279 px it collapses to a 64 px icon rail, with tooltips and the same order. Under 768 px it becomes a bottom tab bar with Funding, Companies, Investors, Trends and More (More opens a sheet with the rest).
+   - **Top bar,** across the content area: global search (`/` and ⌘K focus it; it searches companies and investors and lands on the funding list with `q`), then on the right the primary orange action ("Get the weekly brief", a placeholder link to `/about#brief` until Phase 4).
+   - **Content area:** no `max-width` container. Panels and lists fill the width, with sensible minimums. Long prose (About) keeps a readable measure inside its panel.
+   - **Split view** becomes the natural desktop default once there is room (at least 1280 px of content); List remains the default below that. The visitor's choice still wins.
+3. **No page title and description blocks.** Remove the large H1 and standfirst at the top of every page ("Who just raised, how much, and from whom" and the others):
+   - The sidebar's active item says where you are. Each page still has one H1 for accessibility, either visually hidden or the entity's own name on detail pages (the company, investor or theme name stays visible as the page header).
+   - Context such as "From the 16 most recent rounds" lives in small captions beside the data it describes.
+
+The prototype is `brand/palette-v2.html` (palette D, "Home" and "Company" pages). Tasks: 082 (tokens and logo), 083 (app shell), 084 (remove page headers, full-width pages).

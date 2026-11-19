@@ -31,11 +31,11 @@ button.toggle { font: 500 var(--text-sm) var(--font-ui); color: var(--ink); back
 .tile { border-radius: var(--radius-lg); min-height: 180px; display: grid; place-items: center; padding: 28px; position: relative; }
 .tile img.lock { width: min(220px, 100%); }
 .tile .cap { position: absolute; left: 14px; bottom: 10px; font-size: var(--text-xs); }
-.t-paper { background: #F6F4EE; border: 1px solid #E3DFD4; } .t-paper .cap { color: #5D6B64; }
-.t-white { background: #FFFFFF; border: 1px solid #E3DFD4; } .t-white .cap { color: #5D6B64; }
-.t-forest { background: #0E2B21; } .t-forest .cap { color: #94A39B; }
-.t-green { background: #1D4A38; } .t-green .cap { color: #C9D6CE; }
-.t-night { background: #0B1411; border: 1px solid #22322B; } .t-night .cap { color: #94A39B; }
+.t-paper { background: #F3F5FA; border: 1px solid #D8DEEB; } .t-paper .cap { color: #465474; }
+.t-white { background: #FFFFFF; border: 1px solid #D8DEEB; } .t-white .cap { color: #465474; }
+.t-forest { background: #0E1C3B; } .t-forest .cap { color: #9DAAC2; }
+.t-green { background: #1D49A9; } .t-green .cap { color: #E1E9FC; }
+.t-night { background: #0A1222; border: 1px solid #233250; } .t-night .cap { color: #9DAAC2; }
 .t-mono { background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
 .t-mono .cap { color: var(--muted); }
 .mono-lock { width: 220px; max-width: 100%; aspect-ratio: 425.43 / 99.71; background: currentColor; -webkit-mask: url(logo/raisory-lockup-mono.svg) center / contain no-repeat; mask: url(logo/raisory-lockup-mono.svg) center / contain no-repeat; }
@@ -57,7 +57,7 @@ ul.rules li { margin: 4px 0; } ul.rules b { color: var(--ink); font-weight: 500;
 /* browser tab mock */
 .tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
 .tabbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px 8px 0 0; font: 400 12px var(--font-ui); min-width: 200px; }
-.tabbar.l { background: #FFFFFF; color: #10241D; border: 1px solid #E3DFD4; border-bottom: 0; }
+.tabbar.l { background: #FFFFFF; color: #10241D; border: 1px solid #D8DEEB; border-bottom: 0; }
 .tabbar.d { background: #2A2D2E; color: #E8EDE9; }
 .tabbar img { width: 16px; height: 16px; }
 
@@ -118,21 +118,21 @@ ul.rules li { margin: 4px 0; } ul.rules b { color: var(--ink); font-weight: 500;
     <img class="on-dark" src="logo/raisory-lockup-dark.svg" alt="Raisory">
     <button class="toggle" id="toggle" type="button">Switch to dark</button>
   </header>
-  <p class="lede">Final brand, chosen 17 November 2026. The breakout mark is an open ring, a funding round, with a brass dot breaking out of it. The wordmark is Inter Tight SemiBold, outlined. Every logo here is the real file in <code>logo/</code>, and every colour comes from <code>tokens.css</code>.</p>
+  <p class="lede">Final brand: logo chosen 17 November 2026, colours v2 "Harbour+" 19 November 2026. The breakout mark is an open ring, a funding round, with an orange dot breaking out of it. The wordmark is Inter Tight SemiBold, outlined. Every logo here is the real file in <code>logo/</code>, and every colour comes from <code>tokens.css</code>.</p>
 
   <h2>Logo</h2>
   <div class="grid">
     <div class="tile t-paper"><img class="lock" src="logo/raisory-lockup.svg" alt="Raisory on paper"><span class="cap">Paper · raisory-lockup</span></div>
     <div class="tile t-night"><img class="lock" src="logo/raisory-lockup-dark.svg" alt="Raisory on night"><span class="cap">Night · -dark</span></div>
-    <div class="tile t-forest"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on forest"><span class="cap">Forest · -reversed</span></div>
-    <div class="tile t-green"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on green"><span class="cap">Raisory green · -reversed</span></div>
+    <div class="tile t-forest"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on deep navy"><span class="cap">Deep navy · -reversed</span></div>
+    <div class="tile t-green"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on navy"><span class="cap">Navy · -reversed</span></div>
     <div class="tile t-white"><img src="logo/raisory-mark.svg" alt="Raisory mark" style="width:96px"><span class="cap">Mark · raisory-mark</span></div>
     <div class="tile t-mono"><div class="mono-lock" role="img" aria-label="Raisory one colour"></div><span class="cap">One colour · -mono (currentColor)</span></div>
   </div>
 
   <div class="panel" style="margin-top:12px">
     <h3>Sizes and favicon</h3>
-    <p class="note">Below 20 px the favicon takes over: a Forest tile with a heavier ring and a bigger dot, so it still reads at 16 px in a tab.</p>
+    <p class="note">Below 20 px the favicon takes over: a deep navy tile with a heavier ring and a bigger dot, so it still reads at 16 px in a tab.</p>
     <div class="sizes">
       <figure><img class="on-light" src="logo/raisory-mark.svg" width="96" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" width="96" alt="">96</figure>
       <figure><img class="on-light" src="logo/raisory-mark.svg" width="48" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" width="48" alt="">48</figure>
@@ -152,11 +152,11 @@ ul.rules li { margin: 4px 0; } ul.rules b { color: var(--ink); font-weight: 500;
     <div class="cs"><span class="guide clear"></span><span class="guide"></span><img class="on-light" src="logo/raisory-mark.svg" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" alt=""></div>
     <ul class="rules">
       <li><b>Ring:</b> radius 13 and stroke 5.5 in a 48 grid, with round ends. The gap is 64°, centred on the top right (45°).</li>
-      <li><b>Dot:</b> radius 4.75, on the 45° line, 20 from the ring's centre. Always brass.</li>
+      <li><b>Dot:</b> radius 4.75, on the 45° line, 20 from the ring's centre. Always orange.</li>
       <li><b>Optical centre:</b> the ring and dot together sit centred in the box (grey dashed line), not the ring alone.</li>
-      <li><b>Clear space:</b> at least one dot diameter on every side (brass dashed line).</li>
+      <li><b>Clear space:</b> at least one dot diameter on every side (orange dashed line).</li>
       <li><b>Lockup:</b> the mark is 1.18 times the cap height, centred on the capitals, with a gap of 0.38 times the cap height.</li>
-      <li><b>Don't:</b> move the dot or the gap, turn the dot green, box the mark, or add a shadow, gradient or stretch.</li>
+      <li><b>Don't:</b> move the dot or the gap, recolour the dot, box the mark, or add a shadow, gradient or stretch.</li>
     </ul>
   </div>
 
@@ -198,18 +198,18 @@ ul.rules li { margin: 4px 0; } ul.rules b { color: var(--ink); font-weight: 500;
 
   <h2>Colour</h2>
   <div class="sw-grid">
-    <div class="sw"><div style="background:var(--paper)"></div><p><b>Paper</b>--paper · #F6F4EE / #0B1411</p></div>
-    <div class="sw"><div style="background:var(--surface)"></div><p><b>Surface</b>--surface · #FFFFFF / #111D18</p></div>
-    <div class="sw"><div style="background:var(--ink)"></div><p><b>Ink</b>--ink · #10241D / #E8EDE9</p></div>
-    <div class="sw"><div style="background:var(--muted)"></div><p><b>Muted</b>--muted · #5D6B64 / #94A39B</p></div>
-    <div class="sw"><div style="background:var(--brand)"></div><p><b>Raisory green</b>--brand · #1D4A38 / #7CC29A</p></div>
-    <div class="sw"><div style="background:var(--brand-deep)"></div><p><b>Forest</b>--brand-deep · #0E2B21</p></div>
-    <div class="sw"><div style="background:var(--brand-soft)"></div><p><b>Mint wash</b>--brand-soft · #E3EEE7 / #18302A</p></div>
-    <div class="sw"><div style="background:var(--accent)"></div><p><b>Brass</b>--accent · #A8834A / #CDAA6E</p></div>
-    <div class="sw"><div style="background:var(--up)"></div><p><b>Up</b>--up · #2E7553 / #7CC29A</p></div>
-    <div class="sw"><div style="background:var(--down)"></div><p><b>Down</b>--down · #B23A2E / #EE8A7C</p></div>
-    <div class="sw"><div style="background:var(--warn)"></div><p><b>Warn</b>--warn · #8A5710 / #E2B05A</p></div>
-    <div class="sw"><div style="background:var(--info)"></div><p><b>Info</b>--info · #3E6A8A / #86AFCF</p></div>
+    <div class="sw"><div style="background:var(--paper)"></div><p><b>Paper</b>--paper · #F3F5FA / #0A1222</p></div>
+    <div class="sw"><div style="background:var(--surface)"></div><p><b>Surface</b>--surface · #FFFFFF / #111B30</p></div>
+    <div class="sw"><div style="background:var(--ink)"></div><p><b>Raised</b>--raised · #FFFFFF / #18253F</p></div>
+    <div class="sw"><div style="background:var(--muted)"></div><p><b>Muted</b>--muted · #465474 / #9DAAC2</p></div>
+    <div class="sw"><div style="background:var(--brand)"></div><p><b>Navy</b>--brand · #1D49A9 / #82A8FF</p></div>
+    <div class="sw"><div style="background:var(--ink)"></div><p><b>Ink</b>--ink · #0E1C3B / #E8EDF6</p></div>
+    <div class="sw"><div style="background:var(--brand-soft)"></div><p><b>Navy wash</b>--brand-soft · #E1E9FC / #1D3260</p></div>
+    <div class="sw"><div style="background:var(--accent)"></div><p><b>Orange</b>--accent · #E95D10 / #FF7A30</p></div>
+    <div class="sw"><div style="background:var(--up)"></div><p><b>Up</b>--up · #0B7A4B / #4FD08F</p></div>
+    <div class="sw"><div style="background:var(--down)"></div><p><b>Down</b>--down · #B5302A / #FF8A7D</p></div>
+    <div class="sw"><div style="background:var(--warn)"></div><p><b>Warn</b>--warn · #806200 / #F0CF4A</p></div>
+    <div class="sw"><div style="background:var(--info)"></div><p><b>Info</b>--info · #1F65AD / #6FB6F2</p></div>
   </div>
   <div class="panel" style="margin-top:12px">
     <h3>Chart series</h3>
