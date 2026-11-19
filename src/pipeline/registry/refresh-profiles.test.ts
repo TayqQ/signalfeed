@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { recordLink } from "./link-store";
+import { RequestBudget, RunDeadline } from "./link-companies";
 import { profilesDue, refreshProfiles } from "./refresh-profiles";
 import { storeChCompany } from "./store-registry";
 import { fakeChClient } from "./testing";
@@ -238,5 +239,28 @@ describe("refreshProfiles", () => {
     });
     expect(client.requestsMade()).toBe(1);
     expect(stats.stoppedAtLimit).toBe(true);
+  });
+
+  it("stops between profiles at the shared deadline and leaves the profile due", async () => {
+    await linkedCompany({
+      decidedBy: "auto",
+      ageDays: null,
+      rounds: ["2026-10-01"],
+    });
+    const state = { ms: NOW.getTime() };
+    const clock = { now: () => new Date(state.ms) };
+    const client = fakeChClient({ companies: [profile()] });
+    const budget = new RequestBudget(client, 100, new RunDeadline(clock, 5));
+    state.ms += 5 * 60_000;
+    const stats = await refreshProfiles({
+      db,
+      client,
+      now: NOW,
+      maxRequests: 100,
+      budget,
+    });
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(client.requestsMade()).toBe(0);
+    expect(await profilesDue(db, NOW)).toHaveLength(1);
   });
 });

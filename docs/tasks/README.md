@@ -172,6 +172,7 @@ Phase 3 is specified in `docs/spec-phase3.md`. The same rules apply as before: o
 | 5 | [065 Phase 3 pipeline integration, CLI and workflows](065-phase3-pipeline-integration.md) | 2 | 056, 057, 058, 060, 061, 062 |
 | 6 | [066 Phase 3 go-live and link review](066-phase3-go-live.md) **[maintainer]** | 1 | 065, and 045 run |
 | 7 | [067 SH01 document reader prototype](067-sh01-document-reader.md) **[maintainer]** _(deferred, D61)_ | 3 | 066 |
+| fix | [068 Registry step: time limit, clearer errors, news companies first](068-registry-time-budget.md) | 2 | 065 |
 
 Tier counts: 3 at Tier 1, 8 at Tier 2, 9 at Tier 3.
 

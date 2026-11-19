@@ -123,6 +123,8 @@ export interface PipelineConfig {
   maxGrantOrgFetchesPerRun: number;
   /** `MAX_CH_REQUESTS_PER_RUN`. */
   maxChRequestsPerRun: number;
+  /** `MAX_CH_MINUTES_PER_RUN`. The registry step uses 17 when missing. */
+  maxChMinutesPerRun?: number;
   /** `MAX_EDGAR_DAYS_PER_RUN`. */
   maxEdgarDaysPerRun: number;
   /** `MAX_EDGAR_REQUESTS_PER_RUN`. */
@@ -834,6 +836,7 @@ export async function companiesHouseRegistryStep(
       client: deps.companiesHouse,
       clock: deps.clock,
       maxRequests: maxRequests ?? deps.config.maxChRequestsPerRun,
+      maxMinutes: deps.config.maxChMinutesPerRun,
       log: (message) => {
         if (DEMOTED_LINE.test(message)) linksDemoted += 1;
         deps.log(message);

@@ -38,6 +38,7 @@ describe("parsePipelineEnv", () => {
       GTR_REQUESTS_PER_SECOND: 3,
       MAX_GRANT_ORG_FETCHES_PER_RUN: 1500,
       MAX_CH_REQUESTS_PER_RUN: 2000,
+      MAX_CH_MINUTES_PER_RUN: 17,
       MAX_EDGAR_DAYS_PER_RUN: 10,
       MAX_EDGAR_REQUESTS_PER_RUN: 3000,
     });
@@ -167,12 +168,14 @@ describe("Phase 2 pipeline settings", () => {
 describe("Phase 3 pipeline settings", () => {
   const phase3Defaults = {
     MAX_CH_REQUESTS_PER_RUN: 2000,
+    MAX_CH_MINUTES_PER_RUN: 17,
     MAX_EDGAR_DAYS_PER_RUN: 10,
     MAX_EDGAR_REQUESTS_PER_RUN: 3000,
   };
   const phase3Overrides = {
     COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
     MAX_CH_REQUESTS_PER_RUN: "500",
+    MAX_CH_MINUTES_PER_RUN: "30",
     MAX_EDGAR_DAYS_PER_RUN: "180",
     MAX_EDGAR_REQUESTS_PER_RUN: "40000",
   };
@@ -195,16 +198,26 @@ describe("Phase 3 pipeline settings", () => {
     const env = parsePipelineEnv({
       ...secrets,
       MAX_CH_REQUESTS_PER_RUN: "",
+      MAX_CH_MINUTES_PER_RUN: "",
       MAX_EDGAR_DAYS_PER_RUN: "",
       MAX_EDGAR_REQUESTS_PER_RUN: "",
     });
     expect(env).toMatchObject(phase3Defaults);
   });
 
+  it("rejects a registry time limit outside 1-60 whole minutes", () => {
+    for (const bad of ["0", "61", "2.5"]) {
+      expect(() =>
+        parsePipelineEnv({ ...secrets, MAX_CH_MINUTES_PER_RUN: bad }),
+      ).toThrow();
+    }
+  });
+
   it("reads overrides in both pipeline schemas", () => {
     const expected = {
       COMPANIES_HOUSE_API_KEY: "ch-test-key-789",
       MAX_CH_REQUESTS_PER_RUN: 500,
+      MAX_CH_MINUTES_PER_RUN: 30,
       MAX_EDGAR_DAYS_PER_RUN: 180,
       MAX_EDGAR_REQUESTS_PER_RUN: 40000,
     };

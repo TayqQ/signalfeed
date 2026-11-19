@@ -14,7 +14,6 @@ import {
   notInArray,
   sql,
 } from "drizzle-orm";
-import type { RegistryStats } from "@/core/domain";
 import type { Db } from "@/db/client";
 import {
   chCompanies,
@@ -25,11 +24,12 @@ import {
   fundingRounds,
   registryLinks,
 } from "@/db/schema";
-import { RateLimitedError, type ChClient } from "./ch-client";
+import { RateLimitedError, TimeLimitReached, type ChClient } from "./ch-client";
 import { isEquityRound } from "./confirm-rules";
 import {
   RequestBudget,
   RequestLimitReached,
+  type RegistryRunStats,
   describeError,
   emptyRegistryStats,
   filingsSince,
@@ -162,7 +162,7 @@ export interface RefreshProfilesOptions {
   /** Shared with the linking pass. Made from `maxRequests` when missing. */
   budget?: RequestBudget;
   /** Added to in place. A new one when missing. */
-  stats?: RegistryStats;
+  stats?: RegistryRunStats;
   log?: (message: string) => void;
 }
 
@@ -170,11 +170,11 @@ export interface RefreshProfilesOptions {
  * Refreshes due profiles and fetches new capital filings for companies with
  * equity rounds that need them: a recent unconfirmed round, or rounds and no
  * filing stored yet. Re-checks the conflicts and demotes an automatic link
- * that now conflicts. Stops at the request limit or a rate limit.
+ * that now conflicts. Stops at the request limit, the time limit (between profiles) or a rate limit.
  */
 export async function refreshProfiles(
   options: RefreshProfilesOptions,
-): Promise<RegistryStats> {
+): Promise<RegistryRunStats> {
   const { db, client, now } = options;
   const stats = options.stats ?? emptyRegistryStats();
   const budget =
@@ -185,6 +185,7 @@ export async function refreshProfiles(
   try {
     const due = await profilesDue(db, now);
     for (const item of due) {
+      budget.checkTime();
       try {
         budget.require(1);
         const profile = await client.getCompany(item.companyNumber);
@@ -236,6 +237,7 @@ export async function refreshProfiles(
         if (
           error instanceof RateLimitedError ||
           error instanceof RequestLimitReached ||
+          error instanceof TimeLimitReached ||
           isFatal(error)
         ) {
           throw error;

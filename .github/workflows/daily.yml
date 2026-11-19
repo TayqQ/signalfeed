@@ -33,7 +33,7 @@ jobs:
     # Each step has its own budget so a slow one cannot starve the rest:
     # grants 25 minutes, Companies House 25, Form D 15, plus setup. At the
     # default limits grants takes about 9 minutes (1,500 organisations at
-    # 3 requests a second), registry about 21 and Form D about 10.
+    # 3 requests a second), registry at most 17 (its time limit) and Form D about 10.
     timeout-minutes: 75
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -44,6 +44,7 @@ jobs:
       GTR_REQUESTS_PER_SECOND: ${{ vars.GTR_REQUESTS_PER_SECOND }}
       MAX_GRANT_ORG_FETCHES_PER_RUN: ${{ vars.MAX_GRANT_ORG_FETCHES_PER_RUN }}
       MAX_CH_REQUESTS_PER_RUN: ${{ vars.MAX_CH_REQUESTS_PER_RUN }}
+      MAX_CH_MINUTES_PER_RUN: ${{ vars.MAX_CH_MINUTES_PER_RUN }}
       MAX_EDGAR_DAYS_PER_RUN: ${{ vars.MAX_EDGAR_DAYS_PER_RUN }}
       MAX_EDGAR_REQUESTS_PER_RUN: ${{ vars.MAX_EDGAR_REQUESTS_PER_RUN }}
       TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}
@@ -129,7 +130,7 @@ jobs:
                   ["Profiles refreshed", r.profilesRefreshed],
                   ["SH01 filings stored", r.filingsStored],
                   ["Requests", r.requests],
-                  ["Stopped early", r.rateLimited ? "rate limited" : r.stoppedAtLimit ? "request limit" : "no"],
+                  ["Stopped early", r.rateLimited ? "rate limited" : r.stoppedAtLimit ? "request limit" : r.stoppedAtTime ? "time limit" : "no"],
                   ["Confirmations", rebuilt(t.confirm)],
                   ["Ambiguous records", t.confirm ? (t.confirm.ambiguousRecords ?? 0) : "-"],
                   ["Locations", rebuilt(t.locations)],

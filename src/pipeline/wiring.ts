@@ -95,6 +95,7 @@ export function createPipelineDeps(env: EnvSource): Wired {
               windowMs: CH_WINDOW_MS,
               clock,
             }),
+            clock,
           })
         : null,
       edgar: edgarClientOrNull(fetcher, parsed.HTTP_CONTACT, clock),
@@ -116,6 +117,7 @@ export function createPipelineDeps(env: EnvSource): Wired {
         maxGrantTaggingsPerRun: parsed.MAX_GRANT_TAGGINGS_PER_RUN,
         maxGrantOrgFetchesPerRun: parsed.MAX_GRANT_ORG_FETCHES_PER_RUN,
         maxChRequestsPerRun: parsed.MAX_CH_REQUESTS_PER_RUN,
+        maxChMinutesPerRun: parsed.MAX_CH_MINUTES_PER_RUN,
         maxEdgarDaysPerRun: parsed.MAX_EDGAR_DAYS_PER_RUN,
         maxEdgarRequestsPerRun: parsed.MAX_EDGAR_REQUESTS_PER_RUN,
       },

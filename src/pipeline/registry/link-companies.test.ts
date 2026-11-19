@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoundType } from "@/core/enums";
 import type { CapitalFiling, RegistryCompanyFacts } from "@/core/registry";
 import type { Db } from "@/db/client";
@@ -22,10 +22,28 @@ import {
   sources,
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
-import { RateLimitedError, type ChClient, type ChSearchHit } from "./ch-client";
-import { eligibleCompanies, linkCompanies } from "./link-companies";
+import {
+  ChApiError,
+  RateLimitedError,
+  createChClient,
+  type ChClient,
+  type ChSearchHit,
+} from "./ch-client";
+import {
+  RequestBudget,
+  RunDeadline,
+  describeError,
+  eligibleCompanies,
+  linkCompanies,
+} from "./link-companies";
+import { createWindowLimiter } from "./rate-limit";
 import { recordLink } from "./link-store";
-import { fakeChClient, type FakeChClientOptions } from "./testing";
+import {
+  fakeChClient,
+  fakeChFetcher,
+  jsonResponse,
+  type FakeChClientOptions,
+} from "./testing";
 
 const NOW = new Date("2026-11-12T09:00:00Z");
 const LEEDS = { placeSlug: "leeds", latitude: 53.8016, longitude: -1.5472 };
@@ -603,6 +621,169 @@ describe("linkCompanies: limits", () => {
   });
 });
 
+describe("linkCompanies: time limit (D63)", () => {
+  /** A clock the test moves; each search takes `searchMs`. */
+  function slowClient(clockState: { ms: number }, searchMs: number) {
+    const inner = fakeChClient({});
+    const client: ChClient = {
+      ...inner,
+      searchCompanies: (name) => {
+        clockState.ms += searchMs;
+        return inner.searchCompanies(name);
+      },
+    };
+    return client;
+  }
+
+  it("stops between companies at the deadline and leaves the rest due", async () => {
+    const first = await insertCompany("Alpha Works");
+    await addRound(first.id, "2026-10-03");
+    const second = await insertCompany("Beta Works");
+    await addRound(second.id, "2026-10-02");
+    const third = await insertCompany("Gamma Works");
+    await addRound(third.id, "2026-10-01");
+
+    const state = { ms: NOW.getTime() };
+    const clock = { now: () => new Date(state.ms) };
+    const client = slowClient(state, 6 * 60_000);
+    const budget = new RequestBudget(client, 100, new RunDeadline(clock, 10));
+    const stats = await linkCompanies({
+      db,
+      client,
+      now: NOW,
+      maxRequests: 100,
+      budget,
+    });
+
+    // Two searches take 12 minutes; the check before the third sees 10 passed.
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(stats.stoppedAtLimit).toBe(false);
+    expect(stats.rateLimited).toBe(false);
+    expect(await searchOf(first.id)).toBeDefined();
+    expect(await searchOf(second.id)).toBeDefined();
+    expect(await searchOf(third.id)).toBeUndefined();
+  });
+
+  it("finishes every company when the deadline is not reached", async () => {
+    const a = await insertCompany("Alpha Works");
+    await addRound(a.id, "2026-10-03");
+    const b = await insertCompany("Beta Works");
+    await addRound(b.id, "2026-10-02");
+    const state = { ms: NOW.getTime() };
+    const clock = { now: () => new Date(state.ms) };
+    const client = slowClient(state, 60_000);
+    const budget = new RequestBudget(client, 100, new RunDeadline(clock, 10));
+    const stats = await linkCompanies({
+      db,
+      client,
+      now: NOW,
+      maxRequests: 100,
+      budget,
+    });
+    expect(stats.stoppedAtTime).toBe(false);
+    expect(await searchOf(b.id)).toBeDefined();
+  });
+
+  it("skips the rate-limit wait when less than 5 minutes remain, and leaves the company due", async () => {
+    const company = await insertCompany("Alpha Works");
+    await addRound(company.id, "2026-10-03");
+    const state = { ms: NOW.getTime() };
+    const clock = { now: () => new Date(state.ms) };
+    const sleep = vi.fn(() => Promise.resolve());
+    const fake = fakeChFetcher(() => jsonResponse("slow down", 429));
+    const client = createChClient({
+      http: fake.fetcher,
+      apiKey: "test-key-abc123",
+      limiter: createWindowLimiter({
+        max: 500,
+        windowMs: 300_000,
+        clock,
+        sleep,
+      }),
+      sleep,
+      clock,
+    });
+    const deadline = new RunDeadline(clock, 4);
+    client.setDeadline?.(deadline.endsAt);
+    const stats = await linkCompanies({
+      db,
+      client,
+      now: NOW,
+      maxRequests: 100,
+      budget: new RequestBudget(client, 100, deadline),
+    });
+    expect(sleep).not.toHaveBeenCalled();
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(stats.rateLimited).toBe(false);
+    expect(fake.paths).toHaveLength(1);
+    expect(await searchOf(company.id)).toBeUndefined();
+  });
+});
+
+describe("describeError (D63)", () => {
+  const KEY = "test-key-abc123";
+
+  it("gives name and message for a plain error", () => {
+    expect(describeError(new Error("boom"))).toBe("Error: boom");
+    expect(describeError("odd")).toBe("unknown error");
+  });
+
+  it("keeps a ChApiError message as it is", () => {
+    expect(describeError(new ChApiError(500, "search"))).toBe(
+      "Companies House search failed: HTTP 500",
+    );
+  });
+
+  it("gives the cause's code and message for a wrapped query error, without params", () => {
+    const driver = Object.assign(
+      new Error("connection terminated unexpectedly"),
+      { code: "57P01" },
+    );
+    const wrapped = new Error(
+      'Failed query: insert into "ch_companies" ("company_number") values ($1)\nparams: 09100417,secret-value',
+      { cause: driver },
+    );
+    const text = describeError(wrapped);
+    expect(text).toContain("57P01");
+    expect(text).toContain("connection terminated unexpectedly");
+    expect(text).not.toContain("params");
+    expect(text).not.toContain("09100417");
+    expect(text).not.toContain("secret-value");
+    expect(text.length).toBeLessThanOrEqual(300);
+  });
+
+  it("caps the text at 300 characters", () => {
+    const text = describeError(
+      new Error("x".repeat(1000), { cause: new Error("y".repeat(1000)) }),
+    );
+    expect(text.length).toBeLessThanOrEqual(300);
+  });
+
+  it("never carries the API key, from the client or in an encoded form", async () => {
+    const failing = createChClient({
+      http: {
+        get: () => Promise.reject(new Error(`boom for ${KEY}`)),
+      },
+      apiKey: KEY,
+      limiter: createWindowLimiter({
+        max: 5,
+        windowMs: 1000,
+        clock: { now: () => new Date(0) },
+      }),
+    });
+    const caught = await failing.searchCompanies("x").catch((e: unknown) => e);
+    const encoded = Buffer.from(`${KEY}:`).toString("base64");
+    const wrapped = new Error(`failed with Basic ${encoded}`, {
+      cause: caught,
+    });
+    for (const error of [caught, wrapped]) {
+      const text = describeError(error);
+      expect(text).not.toContain(KEY);
+      expect(text).not.toContain(encoded);
+    }
+  });
+});
+
 describe("linkCompanies: country hints (D62)", () => {
   let itemCounter = 0;
 
@@ -829,6 +1010,26 @@ describe("linkCompanies: country hints (D62)", () => {
       [newerGbp.id, 3],
       [gbp.id, 3],
       [place.id, 4],
+    ]);
+  });
+
+  it("puts a news company before a grant-only company in the same tier (D63)", async () => {
+    // Tier 1 for both: the grant-only company has the newer event.
+    const grantOnly = await insertCompany("Grant Only Ltd");
+    await addRound(grantOnly.id, "2026-11-01");
+    await addGrantParticipant(grantOnly.id, { name: "Grant Only Ltd" });
+    const news = await insertCompany("News Reported Ltd");
+    const newsEvent = await addRound(news.id, "2026-02-01");
+    await addReport(newsEvent.id, "uktech-news", { name: "News Reported Ltd" });
+    const newerGrant = await insertCompany("Newer Grant Ltd");
+    await addRound(newerGrant.id, "2026-11-05");
+    await addGrantParticipant(newerGrant.id, { name: "Newer Grant Ltd" });
+
+    const queue = await eligibleCompanies(db);
+    expect(queue.map((c) => [c.id, c.tier])).toEqual([
+      [news.id, 1],
+      [newerGrant.id, 1],
+      [grantOnly.id, 1],
     ]);
   });
 
