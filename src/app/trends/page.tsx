@@ -20,19 +20,17 @@ export default async function TrendsPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-        Which themes are rising
-      </h1>
-      <p className="mt-3 max-w-2xl text-muted">
-        Themes with the most funding rounds in the last 8 weeks, compared with
-        their usual share. Click a theme to see its companies and backers.
-      </p>
+    <main>
+      <h1 className="sr-only">Trends</h1>
 
-      <section className="mt-8" aria-labelledby="rising-heading">
-        <h2 id="rising-heading" className="mb-3 text-xl font-semibold">
+      <section aria-labelledby="rising-heading">
+        <h2 id="rising-heading" className="text-xl font-semibold">
           Rising themes
         </h2>
+        <p className="mb-3 mt-1 text-[13px] text-muted">
+          Themes with the most funding rounds in the last 8 weeks, compared with
+          their usual share. Click a theme to see its companies and backers.
+        </p>
         <RisingThemesTable
           rows={rising.rows}
           notEnoughHistory={rising.notEnoughHistory}
@@ -44,7 +42,7 @@ export default async function TrendsPage() {
         <h2 id="early-heading" className="text-xl font-semibold">
           Early momentum
         </h2>
-        <p className="mb-3 mt-1 max-w-2xl text-sm text-muted">
+        <p className="mb-3 mt-1 text-[13px] text-muted">
           Pre-seed and seed rounds picking up in themes where few companies have
           reached Series A. Late share is the share of companies with a known
           round type that have raised a Series A or later.
@@ -56,11 +54,11 @@ export default async function TrendsPage() {
         />
       </section>
 
-      <section className="mt-12 max-w-2xl" aria-labelledby="score-heading">
+      <section className="mt-12" aria-labelledby="score-heading">
         <h2 id="score-heading" className="text-xl font-semibold">
           How the score works
         </h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 max-w-prose text-sm text-muted">
           The score compares a theme&apos;s rounds in the last 8 weeks with what
           its share of the previous 26 weeks would predict. Small counts are
           pulled towards zero, so one round cannot top the list. It counts

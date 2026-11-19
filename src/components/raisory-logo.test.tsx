@@ -14,15 +14,15 @@ describe("RaisoryLogo", () => {
     const { container } = render(<RaisoryLogo />);
     expect(container.querySelector("path[stroke]")).toHaveAttribute(
       "stroke",
-      "var(--brand)",
+      "var(--logo-ring)",
     );
     expect(container.querySelector("circle")).toHaveAttribute(
       "fill",
-      "var(--accent)",
+      "var(--logo-dot)",
     );
     expect(container.querySelector("path[transform]")).toHaveAttribute(
       "fill",
-      "var(--ink)",
+      "var(--logo-ink)",
     );
   });
 });

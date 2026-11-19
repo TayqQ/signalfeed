@@ -650,9 +650,9 @@ export default async function StatusPage() {
   ) as Record<EventType, string>;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 text-ink">
-      <h1 className="text-3xl font-semibold tracking-tight">Pipeline status</h1>
-      <p className="mt-3 text-ink">
+    <main className="text-ink">
+      <h1 className="sr-only">Status</h1>
+      <p className="text-[13px] text-muted">
         Ingestion health, item and event counts, and language-model spend
         against the monthly cap. Cached for about 60 seconds.
       </p>

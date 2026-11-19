@@ -72,7 +72,7 @@ export default async function ThemePage({ params }: Params) {
   const stageTotal = stageItems.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main>
       <p className="mb-3 text-sm">
         <Link
           href="/themes"
@@ -114,7 +114,7 @@ export default async function ThemePage({ params }: Params) {
           valueLabel="Rounds"
           labelEvery={8}
         />
-        <p className="mt-2 max-w-2xl text-sm text-muted">
+        <p className="mt-2 text-sm text-muted">
           {firstWeek && lastWeek
             ? `Weeks from ${formatDate(firstWeek)} to ${formatDate(lastWeek)}. `
             : ""}

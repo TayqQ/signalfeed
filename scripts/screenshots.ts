@@ -133,6 +133,42 @@ function otherPageShots(): Shot[] {
   return shots;
 }
 
+/**
+ * The app shell (task 083) at 1440, 1100, 800 and 375 px, light and dark: the
+ * full sidebar, the icon rail (twice, at 1100 and 800) and the phone top bar
+ * with the bottom tab bar. An investor page shows a non-home active item.
+ */
+function shellShots(): Shot[] {
+  const sizes = [
+    { width: 1440, height: 900 },
+    { width: 1100, height: 800 },
+    { width: 800, height: 900 },
+    { width: 375, height: 812 },
+  ];
+  const shots: Shot[] = [];
+  for (const theme of ["light", "dark"] as const) {
+    for (const { width, height } of sizes) {
+      shots.push(
+        {
+          path: "/",
+          file: `shell-${width}-${theme}.png`,
+          width,
+          height,
+          theme,
+        },
+        {
+          path: "/investors",
+          file: `shell-investors-${width}-${theme}.png`,
+          width,
+          height,
+          theme,
+        },
+      );
+    }
+  }
+  return shots;
+}
+
 const SHOTS: Shot[] = [
   { path: "/", file: "funding-table.png", width: 1280, height: 800 },
   {
@@ -146,6 +182,7 @@ const SHOTS: Shot[] = [
   ...homeShots(),
   ...splitShots(),
   ...otherPageShots(),
+  ...shellShots(),
   ...companyShots(company, "company-confirmed"),
   ...(newsOnlyCompany
     ? companyShots(newsOnlyCompany, "company-news-only")

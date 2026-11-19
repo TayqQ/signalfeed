@@ -21,7 +21,7 @@ export function Stat({
       ) : (
         <div
           className={`mt-0.5 font-display font-semibold tabular-nums tracking-tight text-ink ${
-            size === "lg" ? "text-[30px]" : "text-[20px]"
+            size === "lg" ? "text-[20px] sm:text-[30px]" : "text-[20px]"
           }`}
         >
           {value}

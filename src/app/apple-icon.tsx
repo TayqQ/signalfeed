@@ -12,16 +12,16 @@ export default function AppleIcon() {
       width="180"
       height="180"
     >
-      <rect width="48" height="48" fill="#0E2B21" />
+      <rect width="48" height="48" fill="#0E1C3B" />
       <g transform="translate(6 6) scale(0.75)">
         <path
-          d="M35.1 22.65A13 13 0 1 1 25.35 12.9"
+          d="M33.83 24.14A12 12 0 1 1 23.86 14.17"
           fill="none"
-          stroke="#F6F4EE"
-          strokeWidth="5.5"
+          stroke="#FFFFFF"
+          strokeWidth="7"
           strokeLinecap="round"
         />
-        <circle cx="36.57" cy="11.43" r="4.75" fill="#CDAA6E" />
+        <circle cx="35.77" cy="12.23" r="5.75" fill="#FF7A30" />
       </g>
     </svg>,
     size,

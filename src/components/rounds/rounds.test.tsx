@@ -402,7 +402,19 @@ describe("ViewSwitch", () => {
       fireEvent.click(screen.getByRole("radio", { name: "Split" }));
     });
     expect(document.cookie).toContain("raisory_view=split");
-    expect(replace).toHaveBeenCalledWith("/?view=split", { scroll: false });
+    // Split is the default, so its URL stays plain.
+    expect(replace).toHaveBeenCalledWith("/", { scroll: false });
+  });
+
+  it("puts List in the URL, since Split is the default", () => {
+    stubWidth(false);
+    window.history.replaceState(null, "", "/");
+    render(<ViewSwitch view="split" href="/" />);
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: "List" }));
+    });
+    expect(document.cookie).toContain("raisory_view=list");
+    expect(replace).toHaveBeenCalledWith("/?view=list", { scroll: false });
   });
 
   it("remembers the choice in the cookie and puts it in the URL", () => {

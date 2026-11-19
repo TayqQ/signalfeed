@@ -92,7 +92,7 @@ export default async function CompanyPage({ params }: Params) {
   );
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 sm:px-8 sm:pt-8">
+    <main className="w-full">
       <CompanyHeader
         name={company.name}
         description={company.description}
@@ -124,7 +124,7 @@ export default async function CompanyPage({ params }: Params) {
         move to a sticky side column; the inline copies are hidden there, so
         each appears once at any width.
       */}
-      <div className="mt-3 flex flex-col gap-3 sm:mt-6 sm:gap-6 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <div className="mt-3 flex flex-col gap-3 sm:mt-6 sm:gap-6 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-col gap-3 sm:gap-6">
           <LatestRound round={latest} companyName={company.name} />
           <div className="lg:hidden">{signals("signals-heading-inline")}</div>

@@ -23,11 +23,9 @@ export default async function ThemesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-        Themes
-      </h1>
-      <p className="mt-3 max-w-2xl text-muted">
+    <main>
+      <h1 className="sr-only">Themes</h1>
+      <p className="text-[13px] text-muted">
         Groups of related companies, by sector. Themes with fewer than{" "}
         {MIN_THEME_COMPANIES} companies are listed but kept out of the trend
         tables.

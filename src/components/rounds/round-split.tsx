@@ -315,7 +315,7 @@ function SplitRow({
       aria-current={current ? "true" : undefined}
       onClick={onClick}
       onKeyDown={onKeyDown}
-      className="grid grid-cols-[28px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-b border-line px-4 py-3 text-[13px] transition-colors duration-[120ms] ease-out hover:bg-surface-sunk focus-visible:-outline-offset-2 motion-reduce:transition-none aria-[current=true]:bg-brand-soft aria-[current=true]:shadow-[inset_2px_0_0_var(--brand)]"
+      className="grid grid-cols-[28px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-b border-line px-4 py-3 text-[13px] transition-colors duration-[120ms] ease-out hover:bg-surface-sunk focus-visible:-outline-offset-2 motion-reduce:transition-none aria-[current=true]:bg-sel aria-[current=true]:shadow-[inset_3px_0_0_var(--sel-bar)]"
     >
       <span className="row-span-3 pt-px">
         <Monogram name={row.companyName} size={28} />

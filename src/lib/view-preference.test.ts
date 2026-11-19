@@ -14,8 +14,14 @@ import {
 } from "./view-preference";
 
 describe("resolveListView", () => {
-  it("is List with no cookie and no parameter", () => {
-    expect(resolveListView({})).toBe("list");
+  it("is Split with no cookie and no parameter", () => {
+    expect(resolveListView({})).toBe("split");
+  });
+
+  it("lets a stored List or Cards choice win over the Split default", () => {
+    expect(resolveListView({ cookie: "list" })).toBe("list");
+    expect(resolveListView({ cookie: "cards" })).toBe("cards");
+    expect(resolveListView({ param: "list" })).toBe("list");
   });
 
   it("uses the cookie on its own", () => {
@@ -31,8 +37,8 @@ describe("resolveListView", () => {
 
   it("ignores invalid values and falls through to the next source", () => {
     expect(resolveListView({ param: "grid", cookie: "cards" })).toBe("cards");
-    expect(resolveListView({ param: "", cookie: "tiles" })).toBe("list");
-    expect(resolveListView({ param: 3, cookie: undefined })).toBe("list");
+    expect(resolveListView({ param: "", cookie: "tiles" })).toBe("split");
+    expect(resolveListView({ param: 3, cookie: undefined })).toBe("split");
     expect(parseListView(" Cards ")).toBe("cards");
     expect(parseListView("table")).toBeUndefined();
   });
@@ -86,9 +92,13 @@ describe("withViewParam", () => {
     );
   });
 
-  it("drops the parameter for List, the default", () => {
-    expect(withViewParam("/?view=cards&q=acme", "list")).toBe("/?q=acme");
-    expect(withViewParam("/?view=cards", "list")).toBe("/");
+  it("drops the parameter for Split, the default", () => {
+    expect(withViewParam("/?view=cards&q=acme", "split")).toBe("/?q=acme");
+    expect(withViewParam("/?view=cards", "split")).toBe("/");
+  });
+
+  it("keeps the parameter for List, so it overrides the default", () => {
+    expect(withViewParam("/?q=acme", "list")).toBe("/?q=acme&view=list");
   });
 });
 

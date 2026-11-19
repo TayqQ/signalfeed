@@ -48,7 +48,7 @@ export default async function InvestorPage({ params }: Params) {
   );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main>
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {investor.name}
       </h1>

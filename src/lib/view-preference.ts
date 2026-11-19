@@ -9,7 +9,7 @@
 export const LIST_VIEWS = ["list", "cards", "split"] as const;
 export type ListView = (typeof LIST_VIEWS)[number];
 
-export const DEFAULT_LIST_VIEW: ListView = "list";
+export const DEFAULT_LIST_VIEW: ListView = "split";
 
 export const VIEW_COOKIE = "raisory_view";
 export const SUMMARY_COOKIE = "raisory_summary";
@@ -37,8 +37,8 @@ export function parseListView(value: unknown): ListView | undefined {
 }
 
 /**
- * The view to render: a valid `?view=` first, then a valid cookie, then List.
- * A split choice is rendered as Split; under 1100 px CSS shows List instead
+ * The view to render: a valid `?view=` first, then a valid cookie, then Split.
+ * Split is rendered as Split; under 1100 px CSS shows List instead
  * (see `viewsByScreen`).
  */
 export function resolveListView({
@@ -117,7 +117,7 @@ export function summaryCookie(open: boolean): string {
 }
 
 /**
- * `href` (path plus query) with the view set: List, the default, drops the
+ * `href` (path plus query) with the view set: Split, the default, drops the
  * parameter, so the plain URL stays canonical. Paging and filters are kept.
  */
 export function withViewParam(href: string, view: ListView): string {

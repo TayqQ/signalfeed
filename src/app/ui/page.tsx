@@ -56,7 +56,7 @@ export default function UiGalleryPage() {
   if (process.env.VERCEL_ENV === "production") notFound();
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-[30px] font-semibold">UI primitives</h1>
@@ -216,11 +216,36 @@ export default function UiGalleryPage() {
           </Row>
         </Section>
 
+        <Section title="Surfaces and selection">
+          <div className="rounded-[var(--radius)] bg-paper p-3 text-xs text-muted">
+            paper
+            <div className="mt-2 rounded-[var(--radius)] border border-line bg-surface p-3 text-ink">
+              surface
+              <div className="mt-2 rounded-[var(--radius)] border border-line bg-raised p-3 shadow-[var(--shadow-1)]">
+                raised
+                <div className="mt-2 rounded-[var(--radius)] border border-line bg-overlay p-3 shadow-[var(--shadow-2)]">
+                  overlay
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-px overflow-hidden rounded-[var(--radius)] border border-line text-[13px]">
+            <div className="bg-sel px-4 py-3 shadow-[inset_3px_0_0_var(--sel-bar)]">
+              Selected row
+            </div>
+            <div className="bg-surface px-4 py-3">Unselected row</div>
+          </div>
+        </Section>
+
         <Section title="Button">
           <Row label="Primary">
             <Button variant="primary">Apply</Button>
             <Button variant="primary" size="sm">
               Apply
+            </Button>
+            <Button variant="accent">Add company</Button>
+            <Button variant="accent" size="sm">
+              Add
             </Button>
             <Button variant="primary" disabled>
               Disabled

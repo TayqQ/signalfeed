@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost";
+export type ButtonVariant = "primary" | "accent" | "secondary" | "ghost";
 export type ButtonSize = "sm" | "md";
 
 const VARIANTS: Readonly<Record<ButtonVariant, string>> = {
   primary: "bg-brand text-on-brand hover:bg-brand-hover border-transparent",
+  accent: "bg-accent text-on-accent hover:bg-accent-hover border-transparent",
   secondary: "bg-surface text-ink border-line-strong hover:bg-surface-sunk",
   ghost: "bg-transparent text-ink border-transparent hover:bg-surface-sunk",
 };
@@ -33,7 +34,10 @@ type ButtonProps = Omit<
   children: ReactNode;
 };
 
-/** At most one `primary` per view. */
+/**
+ * At most one `primary` per view. `accent` is only for the top bar's main
+ * action and a page's single most important action.
+ */
 export function Button({
   variant = "secondary",
   size = "md",

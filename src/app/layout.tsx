@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 import { pageRobots } from "@/lib/indexing";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/shell/app-shell";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,8 +30,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F6F4EE" },
-    { media: "(prefers-color-scheme: dark)", color: "#0B1411" },
+    { media: "(prefers-color-scheme: light)", color: "#F3F5FA" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A1222" },
   ],
 };
 
@@ -50,10 +49,8 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="flex min-h-screen flex-col font-sans antialiased">
-        <SiteHeader />
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
+      <body className="font-sans antialiased">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

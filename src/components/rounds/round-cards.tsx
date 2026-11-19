@@ -30,7 +30,7 @@ export function RoundCards({
   return (
     <ul
       aria-label="Funding rounds"
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-5"
     >
       {rows.map((row) => (
         <li key={row.eventId} className="min-w-0">

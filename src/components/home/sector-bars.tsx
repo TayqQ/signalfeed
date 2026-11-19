@@ -19,7 +19,7 @@ export interface SectorBar {
 export type SectorMetric = "gbp" | "count";
 
 /** How many named sectors to show; "Sector pending" is added after them. */
-export const SECTOR_BAR_LIMIT = 8;
+export const SECTOR_BAR_LIMIT = 5;
 
 function plural(count: number): string {
   return count === 1 ? "1 round" : `${count.toLocaleString("en-GB")} rounds`;

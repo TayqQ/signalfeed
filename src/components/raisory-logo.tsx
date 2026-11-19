@@ -19,16 +19,16 @@ export function RaisoryLogo({ className }: { className?: string }) {
         <path
           d={RING_PATH}
           fill="none"
-          stroke="var(--brand)"
+          stroke="var(--logo-ring)"
           strokeWidth="5.5"
           strokeLinecap="round"
         />
-        <circle cx="36.57" cy="11.43" r="4.75" fill="var(--accent)" />
+        <circle cx="36.57" cy="11.43" r="4.75" fill="var(--logo-dot)" />
       </g>
       <path
         transform="translate(108.22 0)"
         d={WORDMARK_PATH}
-        fill="var(--ink)"
+        fill="var(--logo-ink)"
       />
     </svg>
   );

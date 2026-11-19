@@ -112,17 +112,10 @@ export default async function HomePage({
   const currentHref = withViewParam(key ? `/?${key}` : "/", view);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <h1 className="max-w-3xl font-display text-[30px] font-semibold leading-tight tracking-tight text-ink sm:text-[38px]">
-        Who just raised, how much, and from whom
-      </h1>
-      <p className="mt-3 max-w-2xl text-[15px] text-muted">
-        Funding rounds pulled from startup news and merged across outlets, so
-        one raise is one row. Every figure links back to the articles it came
-        from.
-      </p>
+    <main>
+      <h1 className="sr-only">Funding</h1>
 
-      <div className="mt-8 space-y-8">
+      <div className="space-y-6">
         <FundingSummary
           summary={summaryData}
           filters={filters}
@@ -168,13 +161,13 @@ export default async function HomePage({
           </div>
 
           {unknownNear ? (
-            <p className="mb-3 max-w-2xl text-[13px] text-ink" role="alert">
+            <p className="mb-3 text-[13px] text-ink" role="alert">
               We couldn&apos;t find a UK town called &lsquo;{unknownNear}
               &rsquo;. The distance filter was not applied.
             </p>
           ) : null}
           {filters.near ? (
-            <p className="mb-3 max-w-2xl text-[13px] text-muted">
+            <p className="mb-3 text-[13px] text-muted">
               {unlocated === 1
                 ? "1 company in these results has"
                 : `${unlocated} companies in these results have`}{" "}

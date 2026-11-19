@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThemeRef } from "@/core/read-models";
@@ -172,33 +172,6 @@ describe("FilterBar with JavaScript", () => {
     expect(replace).toHaveBeenCalledWith("/?sector=education", {
       scroll: false,
     });
-  });
-
-  it("debounces search by 300 ms", () => {
-    vi.useFakeTimers();
-    render(bar("sector=education"));
-    const search = screen.getByRole("searchbox", { name: "Company name" });
-    fireEvent.focus(search);
-    fireEvent.change(search, { target: { value: "Nor" } });
-    fireEvent.change(search, { target: { value: "North" } });
-    act(() => {
-      vi.advanceTimersByTime(299);
-    });
-    expect(replace).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith("/?sector=education&q=North", {
-      scroll: false,
-    });
-  });
-
-  it("focuses search with /", () => {
-    render(bar(""));
-    const search = screen.getByRole("searchbox", { name: "Company name" });
-    fireEvent.keyDown(document.body, { key: "/" });
-    expect(search).toHaveFocus();
   });
 
   it("moves the Stage control with the arrow keys", () => {

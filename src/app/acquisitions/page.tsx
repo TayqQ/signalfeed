@@ -120,17 +120,10 @@ export default async function AcquisitionsPage({
   const filtered = key.length > 0;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-        Who buys young startups, and how old were they
-      </h1>
-      <p className="mt-3 max-w-2xl text-muted">
-        Acquisitions of startups, with the buyer and the age of the company when
-        it was bought. Many founded years are unknown, so each figure shows how
-        many deals it rests on.
-      </p>
+    <main>
+      <h1 className="sr-only">Acquisitions</h1>
 
-      <div className="mt-8">
+      <div>
         <ThemeSelect
           action="/acquisitions"
           themes={themes}
@@ -167,8 +160,13 @@ export default async function AcquisitionsPage({
       <div className="mt-8 space-y-8">
         <AcquisitionsSummary summary={summary} />
         <section aria-label="Acquisitions">
-          <p className="mb-3 text-sm tabular-nums text-muted" role="status">
+          <p className="text-sm tabular-nums text-muted" role="status">
             {all.length === 1 ? "1 acquisition" : `${all.length} acquisitions`}
+          </p>
+          <p className="mb-3 text-[13px] text-muted">
+            Startups bought, with the buyer and the company&apos;s age at the
+            time. Many founded years are unknown, so each figure shows how many
+            deals it rests on.
           </p>
           <AcquisitionsTable rows={rows} filtered={filtered} />
           <AcquisitionsPager

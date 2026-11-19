@@ -5,47 +5,74 @@
  * dark follows the system unless the visitor picks a theme (data-theme on <html>).
  */
 
+/* Surfaces and text. Dark mode layers paper < surface < raised < overlay. */
 :root {
-  /* Surfaces and text */
-  --paper: #f6f4ee; /* page background */
-  --surface: #ffffff; /* cards, tables, inputs */
-  --surface-sunk: #efece4; /* table header, hover, code */
-  --line: #e3dfd4; /* borders, dividers */
-  --line-strong: #cfc9ba;
-  --ink: #10241d; /* body text */
-  --muted: #5d6b64; /* secondary text (5.1:1 on paper) */
-  --faint: #8a958f; /* placeholders, disabled (decorative only) */
+  --paper: #f3f5fa; /* page background */
+  --surface: #ffffff; /* panels, cards, tables, inputs */
+  --surface-sunk: #e8ecf5; /* table header, hover, wells */
+  --raised: #ffffff; /* cards on a surface */
+  --overlay: #ffffff; /* popovers, sheets, menus */
+  --line: #d8deeb;
+  --line-strong: #b4bfd6;
+  --ink: #0e1c3b;
+  --muted: #465474;
+  --faint: #8792ac; /* placeholders, disabled (decorative only) */
 
-  /* Brand */
-  --brand: #1d4a38; /* Raisory green: links, primary buttons, the mark's ring */
-  --brand-hover: #163b2c;
-  --brand-deep: #0e2b21; /* Forest: app icon, hero bands */
-  --brand-soft: #e3eee7; /* Mint wash: selected rows, chips */
-  --on-brand: #f6f4ee; /* text on --brand / --brand-deep */
-  --accent: #a8834a; /* Brass: the mark's dot, "new" and highlights. Never for body text */
-  --accent-soft: #f3eadb;
-  --accent-ink: #7a5c2c; /* brass-coloured text (5.6:1 on paper) */
-  --focus: #2e7553;
+  /* Brand: navy for identity, links and selection */
+  --brand: #1d49a9;
+  --brand-hover: #173b8a;
+  --brand-soft: #e1e9fc;
+  --on-brand: #ffffff;
+
+  /* Accent: orange for what must be noticed */
+  --accent: #e95d10;
+  --accent-hover: #f27632;
+  --accent-soft: #ffe7d7;
+  --accent-ink: #b0430a; /* orange text; never use --accent for text */
+  --on-accent: #0e1c3b; /* text on orange (white fails at 3.4:1) */
+  --focus: #2559d6;
 
   /* Meaning (always paired with an icon or word) */
-  --up: #2e7553; /* growth, up round, confirmed */
-  --up-soft: #e1efe6;
-  --down: #b23a2e; /* down round, errors */
-  --down-soft: #f7e3df;
-  --warn: #8a5710; /* unconfirmed, stale data */
-  --warn-soft: #f6ead3;
-  --info: #3e6a8a;
-  --info-soft: #e2ebf2;
+  --up: #0b7a4b;
+  --up-soft: #dcf2e7;
+  --down: #b5302a;
+  --down-soft: #fce3e0;
+  --warn: #806200;
+  --warn-soft: #faf0c4;
+  --info: #1f65ad;
+  --info-soft: #e0ecfa;
 
   /* Charts: categorical series, in this order */
-  --data-1: #2e7553;
-  --data-2: #a8834a;
-  --data-3: #3e6a8a;
-  --data-4: #b4593c;
-  --data-5: #7a5c8e;
-  --data-6: #2f7f7a;
-  --data-7: #7a7f3a;
-  --data-8: #6b7570;
+  --data-1: #1d49a9;
+  --data-2: #e2580e;
+  --data-3: #1a8669;
+  --data-4: #2b83c6;
+  --data-5: #7a4db8;
+  --data-6: #c23b78;
+  --data-7: #6c7d1a;
+  --data-8: #5e6b84;
+
+  /* Funding stage colours (early to late) */
+  --stage-early: var(--data-3);
+  --stage-seed: var(--data-4);
+  --stage-venture: var(--data-1);
+  --stage-late: var(--data-5);
+  --stage-other: var(--data-8);
+
+  /* App shell */
+  --nav-bg: #ffffff;
+  --nav-ink: #0e1c3b;
+  --nav-muted: #465474;
+  --nav-active-bg: #e6edfc;
+  --nav-active-ink: #1d49a9;
+  --nav-line: #d8deeb;
+  --sel-bg: #e1e9fc; /* selected list row */
+  --sel-bar: #1d49a9; /* its 2-3 px inset bar */
+
+  /* Logo (inline SVG reads these) */
+  --logo-ring: #1d49a9;
+  --logo-dot: #e95d10;
+  --logo-ink: #0e1c3b;
 
   /* Type */
   --tracking-display: -0.025em;
@@ -64,107 +91,118 @@
   --radius: 10px;
   --radius-lg: 14px;
   --radius-pill: 999px;
-  --shadow-1: 0 1px 2px rgb(16 36 29 / 0.06);
+  --shadow-1: 0 1px 2px rgb(14 28 59 / 0.06);
   --shadow-2:
-    0 1px 2px rgb(16 36 29 / 0.06), 0 8px 24px -12px rgb(16 36 29 / 0.18);
-  --chart-axis: #6e7a74;
-  --stage-early: #4e8a69;
-  --stage-seed: #2e7553;
-  --stage-venture: #1d4a38;
-  --stage-late: #0e2b21;
-  --stage-other: #7f8a84;
+    0 1px 2px rgb(14 28 59 / 0.06), 0 8px 24px -12px rgb(14 28 59 / 0.22);
+  --chart-axis: var(--muted);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0b1411;
-    --surface: #111d18;
-    --surface-sunk: #0e1814;
-    --line: #22322b;
-    --line-strong: #2f433a;
-    --ink: #e8ede9;
-    --muted: #94a39b;
-    --faint: #64736b;
-    --brand: #7cc29a;
-    --brand-hover: #95d1ae;
-    --brand-deep: #0e2b21;
-    --brand-soft: #18302a;
-    --on-brand: #0b1411;
-    --accent: #cdaa6e;
-    --accent-soft: #2a2416;
-    --accent-ink: #ddbe86;
-    --focus: #7cc29a;
-    --up: #7cc29a;
-    --up-soft: #16301f;
-    --down: #ee8a7c;
-    --down-soft: #3a1c18;
-    --warn: #e2b05a;
-    --warn-soft: #33260f;
-    --info: #86afcf;
-    --info-soft: #172634;
-    --data-1: #7cc29a;
-    --data-2: #cdaa6e;
-    --data-3: #86afcf;
-    --data-4: #e08f72;
-    --data-5: #b59ac8;
-    --data-6: #6fc1ba;
-    --data-7: #b9be6e;
-    --data-8: #a3ada8;
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
-    --chart-axis: #7f8d86;
-    --stage-early: #3f8560;
-    --stage-seed: #5fa67f;
-    --stage-venture: #7cc29a;
-    --stage-late: #b5e0c6;
-    --stage-other: #7f8d86;
+    --paper: #0a1222;
+    --surface: #111b30;
+    --surface-sunk: #0d1628;
+    --raised: #18253f;
+    --overlay: #213152;
+    --line: #233250;
+    --line-strong: #36496f;
+    --ink: #e8edf6;
+    --muted: #9daac2;
+    --faint: #67758f;
+    --brand: #82a8ff;
+    --brand-hover: #9ab9ff;
+    --brand-soft: #1d3260;
+    --on-brand: #0a1222;
+    --accent: #ff7a30;
+    --accent-hover: #ff9254;
+    --accent-soft: #3a2314;
+    --accent-ink: #ff9a5c;
+    --on-accent: #0a1222;
+    --focus: #9ab9ff;
+    --up: #4fd08f;
+    --up-soft: #12301f;
+    --down: #ff8a7d;
+    --down-soft: #3d1a18;
+    --warn: #f0cf4a;
+    --warn-soft: #332a0c;
+    --info: #6fb6f2;
+    --info-soft: #12283f;
+    --data-1: #82a8ff;
+    --data-2: #ff8a45;
+    --data-3: #4fd0ae;
+    --data-4: #5bc0f5;
+    --data-5: #b795f5;
+    --data-6: #f27fb2;
+    --data-7: #c2d45c;
+    --data-8: #a3aec2;
+    --nav-bg: #070e1b;
+    --nav-ink: #c9d3e6;
+    --nav-muted: #8d9ab3;
+    --nav-active-bg: #18253f;
+    --nav-active-ink: #ffffff;
+    --nav-line: #18233a;
+    --sel-bg: #21386a;
+    --sel-bar: #82a8ff;
+    --logo-ring: #82a8ff;
+    --logo-dot: #ff7a30;
+    --logo-ink: #e8edf6;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
+    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.7);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #0b1411;
-  --surface: #111d18;
-  --surface-sunk: #0e1814;
-  --line: #22322b;
-  --line-strong: #2f433a;
-  --ink: #e8ede9;
-  --muted: #94a39b;
-  --faint: #64736b;
-  --brand: #7cc29a;
-  --brand-hover: #95d1ae;
-  --brand-deep: #0e2b21;
-  --brand-soft: #18302a;
-  --on-brand: #0b1411;
-  --accent: #cdaa6e;
-  --accent-soft: #2a2416;
-  --accent-ink: #ddbe86;
-  --focus: #7cc29a;
-  --up: #7cc29a;
-  --up-soft: #16301f;
-  --down: #ee8a7c;
-  --down-soft: #3a1c18;
-  --warn: #e2b05a;
-  --warn-soft: #33260f;
-  --info: #86afcf;
-  --info-soft: #172634;
-  --data-1: #7cc29a;
-  --data-2: #cdaa6e;
-  --data-3: #86afcf;
-  --data-4: #e08f72;
-  --data-5: #b59ac8;
-  --data-6: #6fc1ba;
-  --data-7: #b9be6e;
-  --data-8: #a3ada8;
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
-  --chart-axis: #7f8d86;
-  --stage-early: #3f8560;
-  --stage-seed: #5fa67f;
-  --stage-venture: #7cc29a;
-  --stage-late: #b5e0c6;
-  --stage-other: #7f8d86;
+  --paper: #0a1222;
+  --surface: #111b30;
+  --surface-sunk: #0d1628;
+  --raised: #18253f;
+  --overlay: #213152;
+  --line: #233250;
+  --line-strong: #36496f;
+  --ink: #e8edf6;
+  --muted: #9daac2;
+  --faint: #67758f;
+  --brand: #82a8ff;
+  --brand-hover: #9ab9ff;
+  --brand-soft: #1d3260;
+  --on-brand: #0a1222;
+  --accent: #ff7a30;
+  --accent-hover: #ff9254;
+  --accent-soft: #3a2314;
+  --accent-ink: #ff9a5c;
+  --on-accent: #0a1222;
+  --focus: #9ab9ff;
+  --up: #4fd08f;
+  --up-soft: #12301f;
+  --down: #ff8a7d;
+  --down-soft: #3d1a18;
+  --warn: #f0cf4a;
+  --warn-soft: #332a0c;
+  --info: #6fb6f2;
+  --info-soft: #12283f;
+  --data-1: #82a8ff;
+  --data-2: #ff8a45;
+  --data-3: #4fd0ae;
+  --data-4: #5bc0f5;
+  --data-5: #b795f5;
+  --data-6: #f27fb2;
+  --data-7: #c2d45c;
+  --data-8: #a3aec2;
+  --nav-bg: #070e1b;
+  --nav-ink: #c9d3e6;
+  --nav-muted: #8d9ab3;
+  --nav-active-bg: #18253f;
+  --nav-active-ink: #ffffff;
+  --nav-line: #18233a;
+  --sel-bg: #21386a;
+  --sel-bar: #82a8ff;
+  --logo-ring: #82a8ff;
+  --logo-dot: #ff7a30;
+  --logo-ink: #e8edf6;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.7);
   color-scheme: dark;
 }
 
@@ -213,6 +251,23 @@
   --color-data-7: var(--data-7);
   --color-data-8: var(--data-8);
 
+  /* v2 surfaces, accent and app shell */
+  --color-raised: var(--raised);
+  --color-overlay: var(--overlay);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-nav: var(--nav-bg);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-active: var(--nav-active-bg);
+  --color-nav-active-ink: var(--nav-active-ink);
+  --color-nav-line: var(--nav-line);
+  --color-sel: var(--sel-bg);
+  --color-sel-bar: var(--sel-bar);
+  --color-logo-ring: var(--logo-ring);
+  --color-logo-dot: var(--logo-dot);
+  --color-logo-ink: var(--logo-ink);
+
   /* Later funding stages read stronger, so a column of bars shows a stage at a glance. */
   --color-stage-early: var(--stage-early);
   --color-stage-seed: var(--stage-seed);
@@ -225,6 +280,15 @@ html {
   background: var(--paper);
   color: var(--ink);
   color-scheme: light dark;
+  /* App shell: anchors and focused elements clear the sticky top bar. */
+  scroll-padding-top: 4.5rem;
+}
+
+/* On phones they also clear the bottom tab bar (and the safe-area inset). */
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 @layer base {

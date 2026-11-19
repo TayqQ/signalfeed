@@ -14,7 +14,6 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Sheet, useSheetClose } from "@/components/ui/sheet";
 import {
   ChoiceChip,
-  CommitInput,
   Group,
   Segmented,
   firstValue,
@@ -74,14 +73,6 @@ function filterCount(params: Params): number {
   return count;
 }
 
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.closest("input, textarea, select, [contenteditable]") != null
-  );
-}
-
 /** The sheet's primary button: closes the sheet, whose changes already applied. */
 function ShowResultsButton({ children }: { children: ReactNode }) {
   const close = useSheetClose();
@@ -107,7 +98,6 @@ export function FilterForm({ data }: { data: FilterFormData }) {
     (_current, next) => next,
   );
   const latest = useRef(params);
-  const searchRef = useRef<HTMLInputElement>(null);
   const ids = useId();
   const townListId = `${ids}-towns`;
   const toggleId = `${ids}-toggle`;
@@ -128,21 +118,6 @@ export function FilterForm({ data }: { data: FilterFormData }) {
     },
     [action, router, setOptimisticParams, view],
   );
-
-  // "/" focuses search, unless the visitor is typing or a sheet is open.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      if (isTyping(event.target)) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
-      event.preventDefault();
-      searchRef.current?.focus();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   const rounds = { stages: data.stages, nonGrantRounds: data.nonGrantRounds };
   const roundState = roundsState(paramValues(params, "round"), rounds);
@@ -310,31 +285,12 @@ export function FilterForm({ data }: { data: FilterFormData }) {
         <input type="checkbox" id={toggleId} className="peer sr-only" />
       ) : null}
       <div className="flex items-center gap-2 peer-focus-visible:[&_[data-filters-toggle]]:outline-2 peer-focus-visible:[&_[data-filters-toggle]]:outline-offset-2 peer-focus-visible:[&_[data-filters-toggle]]:outline-[color:var(--focus)]">
-        <div className="relative min-w-0 flex-1 md:max-w-md">
-          <label htmlFor={`${ids}-q`} className="sr-only">
-            Company name
-          </label>
-          <CommitInput
-            ref={searchRef}
-            id={`${ids}-q`}
-            name="q"
-            type="search"
-            value={firstValue(params, "q")}
-            debounceMs={300}
-            placeholder="Search companies"
-            aria-keyshortcuts="/"
-            className="h-9 w-full rounded-[var(--radius-sm)] border border-line-strong bg-surface pl-3 pr-9 text-[15px] text-ink placeholder:text-faint"
-            onCommit={(text) =>
-              update((p) => withValues(p, "q", text ? [text] : []))
-            }
-          />
-          <kbd
-            aria-hidden="true"
-            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-[4px] border border-line px-1.5 font-sans text-xs text-muted max-md:hidden"
-          >
-            /
-          </kbd>
-        </div>
+        {/* Search lives in the top bar (app shell). Keep the term in the
+            no-JavaScript submit; with JavaScript, `update` keeps it. */}
+        {firstValue(params, "q") ? (
+          <input type="hidden" name="q" value={firstValue(params, "q")} />
+        ) : null}
+        <div className="min-w-0 flex-1 max-md:hidden" />
         {enhanced ? (
           <div className="md:hidden">
             <Sheet

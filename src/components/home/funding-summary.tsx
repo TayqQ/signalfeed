@@ -166,19 +166,19 @@ export function FundingSummary({
             previousLabel={span.previous?.label}
           />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-8">
+          <div className="grid grid-cols-3 items-start gap-2 sm:gap-3 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,2fr)_minmax(0,2fr)]">
             <Headline
               summary={summary}
               previous={previous}
               previousLabel={span.previous?.label ?? null}
             />
-            <div className="min-w-0 border-line max-lg:border-t max-lg:pt-5 lg:border-l lg:pl-8">
+            <div className="min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-4 py-3 col-span-3 lg:col-span-2 xl:col-span-1">
               <SectorBars
                 headingId="summary-sectors"
                 sectors={sectorBars(summary, filters)}
               />
             </div>
-            <div className="min-w-0 border-line max-lg:border-t max-lg:pt-5 lg:border-l lg:pl-8">
+            <div className="min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-4 py-3 col-span-3 lg:col-span-1 xl:col-span-1">
               <BiggestRounds summary={summary} />
             </div>
           </div>
@@ -226,25 +226,33 @@ function Headline({
   const total = summary.totalGbpMinor > 0 ? summary.totalGbpMinor : null;
   const change = (current: number | null, before: number | null) =>
     previous ? <ChangeLine change={describeChange(current, before)} /> : null;
+  const tile =
+    "min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-2.5 py-2.5 sm:px-4 sm:py-3";
   return (
-    <div className="min-w-0">
-      <Stat
-        label="Raised, in GBP"
-        size="lg"
-        value={money(total)}
-        sub={change(
-          summary.totalGbpMinor,
-          previous ? previous.totalGbpMinor : null,
-        )}
-      />
-      <div className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-3">
+    <>
+      <div className={tile}>
+        <Stat
+          label="Raised, in GBP"
+          size="lg"
+          value={money(total)}
+          sub={change(
+            summary.totalGbpMinor,
+            previous ? previous.totalGbpMinor : null,
+          )}
+        />
+      </div>
+      <div className={tile}>
         <Stat
           label="Rounds"
+          size="lg"
           value={summary.count.toLocaleString("en-GB")}
           sub={change(summary.count, previous ? previous.count : null)}
         />
+      </div>
+      <div className={tile}>
         <Stat
           label="Median round"
+          size="lg"
           value={money(summary.medianGbpMinor)}
           sub={change(
             summary.medianGbpMinor,
@@ -253,12 +261,12 @@ function Headline({
         />
       </div>
       {previous && previousLabel ? (
-        <p className="mt-3 text-xs text-muted">
+        <p className="col-span-3 text-xs text-muted xl:col-span-5 xl:order-last">
           Changes compare with {previousLabel}, the window of the same length
           before.
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
