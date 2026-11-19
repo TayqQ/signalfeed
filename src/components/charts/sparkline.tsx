@@ -24,7 +24,7 @@ export function Sparkline({
 }) {
   const clean = values.filter((v) => Number.isFinite(v));
   if (clean.length === 0) {
-    return <span className="text-sm text-quiet">No data yet</span>;
+    return <span className="text-sm text-muted">No data yet</span>;
   }
 
   const first = clean[0]!;

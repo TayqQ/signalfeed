@@ -75,7 +75,7 @@ describe("AcquisitionsTable", () => {
         filtered={false}
       />,
     );
-    expect(screen.getByText("£12M")).toBeInTheDocument();
+    expect(screen.getByText("£12.0m")).toBeInTheDocument();
     expect(screen.getByText("Not disclosed")).toBeInTheDocument();
   });
 

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { BarChart } from "@/components/charts/bar-chart";
 import { ColumnChart } from "@/components/charts/column-chart";
-import { FundingTable } from "@/components/funding-table";
+import { RoundList } from "@/components/rounds/round-list";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ThemeHeader, describeWeeklyChange } from "@/components/theme-header";
 import { ThemeAcquisitions, ThemeLeaders } from "@/components/theme-leaders";
 import { ROUND_TYPES } from "@/core/enums";
@@ -32,9 +33,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const detail = await loadDetail(slug, new Date());
   return {
-    title: detail
-      ? `${detail.summary.name} | SignalFeed`
-      : "Theme not found | SignalFeed",
+    title: detail ? detail.summary.name : "Theme not found",
   };
 }
 
@@ -73,11 +72,11 @@ export default async function ThemePage({ params }: Params) {
   const stageTotal = stageItems.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main>
       <p className="mb-3 text-sm">
         <Link
           href="/themes"
-          className="text-signal underline underline-offset-4"
+          className="text-brand underline underline-offset-4"
         >
           All themes
         </Link>
@@ -115,11 +114,11 @@ export default async function ThemePage({ params }: Params) {
           valueLabel="Rounds"
           labelEvery={8}
         />
-        <p className="mt-2 max-w-2xl text-sm text-quiet">
+        <p className="mt-2 text-sm text-muted">
           {firstWeek && lastWeek
             ? `Weeks from ${formatDate(firstWeek)} to ${formatDate(lastWeek)}. `
             : ""}
-          SignalFeed only counts rounds it has collected, so weeks before
+          Raisory only counts rounds it has collected, so weeks before
           collection began show as empty. Grants are not counted.
         </p>
       </section>
@@ -144,11 +143,17 @@ export default async function ThemePage({ params }: Params) {
         <h2 id="recent-heading" className="mb-3 text-xl font-semibold">
           Recent rounds
         </h2>
-        <FundingTable page={rounds} filters={filters} />
+        {rounds.items.length === 0 ? (
+          <EmptyState title="No rounds in this theme yet">
+            Rounds appear here once collected articles have been processed.
+          </EmptyState>
+        ) : (
+          <RoundList rows={rounds.items} filters={filters} now={now} />
+        )}
         <p className="mt-3 text-sm">
           <Link
             href={`/?theme=${encodeURIComponent(slug)}`}
-            className="text-signal underline underline-offset-4"
+            className="text-brand underline underline-offset-4"
           >
             See all rounds in this theme
           </Link>

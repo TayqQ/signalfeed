@@ -1,6 +1,6 @@
 import type { CompanyEvent, RoundMomentum } from "@/core/read-models";
 
-/** When SignalFeed started collecting. "First round" only means first recorded. */
+/** When Raisory started collecting. "First round" only means first recorded. */
 export const HISTORY_STARTS = "November 2026";
 
 const MONTH_NAMES = [
@@ -88,9 +88,9 @@ export function describeRoundMomentumLong(
 }
 
 /**
- * Company-level momentum: how many equity rounds in the last 24 months, and
- * how the latest compares with the one before. Says plainly when history is
- * short. Renders nothing when there is no equity round.
+ * Company-level momentum, shown under the history: how many equity rounds in
+ * the last 24 months, and how the latest compares with the one before. Says
+ * plainly when history is short. Renders nothing when there is no equity round.
  */
 export function CompanyMomentum({
   events,
@@ -137,19 +137,28 @@ export function CompanyMomentum({
 
   const isFirst = momentum.equityRoundNumber <= 1;
   return (
-    <section className="mt-6" aria-labelledby="momentum-heading">
-      <h2 id="momentum-heading" className="text-sm font-semibold">
-        Momentum
-      </h2>
+    <div className="space-y-1 text-[13px]">
       {sentences.length > 0 ? (
-        <p className="mt-1">{sentences.join("; ")}.</p>
+        <p className="text-ink">{sentences.join("; ")}.</p>
       ) : null}
       {isFirst ? (
-        <p className="mt-1 text-sm text-quiet">
+        <p className="text-muted">
           First round we have recorded. History starts in {HISTORY_STARTS}, so
           the company may have raised before.
         </p>
       ) : null}
-    </section>
+    </div>
+  );
+}
+
+/** True when the latest equity round is the first one recorded. */
+export function latestIsFirstRecorded(events: CompanyEvent[]): boolean {
+  const latest = events
+    .filter((event) => event.type === "funding_round" && event.momentum != null)
+    .sort((a, b) => b.announcedOn.localeCompare(a.announcedOn))[0];
+  return (
+    latest?.type === "funding_round" &&
+    latest.momentum != null &&
+    latest.momentum.equityRoundNumber <= 1
   );
 }

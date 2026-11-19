@@ -24,10 +24,12 @@ import type {
   TagRef,
 } from "@/core/read-models";
 import type { CompanySizeBand } from "@/core/registry";
+import type { Sector } from "@/core/sectors";
 import { effectiveRoundTypes } from "@/lib/funding-filters";
 import { boundingBox } from "@/lib/geo/distance";
 import { findPlaceBySlug, normalisePlaceName } from "@/lib/geo/uk-places";
 import { ukRegionBySlug } from "@/lib/geo/uk-regions";
+import { chooseMainSector, type ThemeStrength } from "@/lib/main-sector";
 import { normaliseCompanyName } from "@/lib/normalise";
 import { confirmationText } from "@/lib/registry/confirmation-text";
 import {
@@ -83,7 +85,7 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-function normalisedQuery(q: string | undefined): string | null {
+export function normalisedQuery(q: string | undefined): string | null {
   if (q == null) return null;
   const normalised = normaliseCompanyName(q);
   return normalised.length > 0 ? normalised : null;
@@ -359,7 +361,10 @@ function momentumSql(): SQL<unknown> {
   )`;
 }
 
-function fundingWhere(filters: FundingFilters, query: string | null): SQL {
+export function fundingWhere(
+  filters: FundingFilters,
+  query: string | null,
+): SQL {
   const conditions: SQL[] = [
     eq(events.type, "funding_round"),
     isNull(companies.mergedIntoId),
@@ -537,12 +542,50 @@ function tagsSql(): SQL<unknown> {
   ), '[]'::json)`;
 }
 
+/**
+ * The company's themes with their strength, as JSON. Read with the row, so a
+ * list costs no extra query; `company_themes` is keyed by company.
+ */
+export function themeStrengthsSql(): SQL<unknown> {
+  return sql<unknown>`coalesce((
+    select json_agg(
+      json_build_object(
+        'themeId', ${companyThemes.themeId},
+        'tagCount', ${companyThemes.tagCount},
+        'sector', ${themes.sector}
+      )
+      order by ${companyThemes.themeId}
+    )
+    from ${companyThemes}
+    inner join ${themes} on ${themes.id} = ${companyThemes.themeId}
+    where ${companyThemes.companyId} = ${companies.id}
+  ), '[]'::json)`;
+}
+
+/** SIC codes of the company's linked Companies House record, as a JSON array. */
+export function sicCodesSql(): SQL<unknown> {
+  return sql<unknown>`coalesce((
+    select to_json(${chCompanies.sicCodes})
+    from ${registryLinks}
+    inner join ${chCompanies}
+      on ${chCompanies.companyNumber} = ${registryLinks.registryId}
+    where ${registryLinks.companyId} = ${companies.id}
+      and ${registryLinks.registry} = 'companies_house'
+      and ${registryLinks.status} = 'linked'
+    limit 1
+  ), '[]'::json)`;
+}
+
 export interface FundingRowSource {
   eventId: number;
   companySlug: string;
   companyName: string;
   countryCode: string | null;
   city: string | null;
+  companyDescription: string | null;
+  websiteDomain: string | null;
+  themeStrengths: unknown;
+  sicCodes: unknown;
   roundType: RoundType;
   roundLabel: string | null;
   amountMinor: number | null;
@@ -565,6 +608,10 @@ export function fundingColumns() {
     companyName: companies.name,
     countryCode: companies.countryCode,
     city: companies.city,
+    companyDescription: companies.description,
+    websiteDomain: companies.websiteDomain,
+    themeStrengths: themeStrengthsSql(),
+    sicCodes: sicCodesSql(),
     roundType: fundingRounds.roundType,
     roundLabel: fundingRounds.roundLabel,
     amountMinor: fundingRounds.amountMinor,
@@ -581,7 +628,7 @@ export function fundingColumns() {
   };
 }
 
-function asCount(value: unknown): number {
+export function asCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.trunc(value);
   }
@@ -654,6 +701,38 @@ function num(value: unknown): number | null {
   return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
 
+export function readThemeStrengths(value: unknown): ThemeStrength[] {
+  const strengths: ThemeStrength[] = [];
+  for (const item of readObjects(value)) {
+    const themeId = num(item.themeId);
+    const tagCount = num(item.tagCount);
+    if (themeId == null || tagCount == null) continue;
+    strengths.push({
+      themeId,
+      tagCount,
+      sector: typeof item.sector === "string" ? item.sector : null,
+    });
+  }
+  return strengths;
+}
+
+export function readStrings(value: unknown): string[] {
+  const parsed = typeof value === "string" ? parseJson(value) : value;
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((item): item is string => typeof item === "string");
+}
+
+/** The main sector of a row's company, from the columns above. */
+export function mainSectorOf(row: {
+  themeStrengths: unknown;
+  sicCodes: unknown;
+}): Sector | null {
+  return chooseMainSector({
+    themes: readThemeStrengths(row.themeStrengths),
+    sicCodes: readStrings(row.sicCodes),
+  });
+}
+
 /** Equity rounds only; debt and grant rounds have no momentum row. */
 export function readMomentum(value: unknown): RoundMomentum | null {
   const parsed = typeof value === "string" ? parseJson(value) : value;
@@ -679,6 +758,9 @@ export function toFundingRow(row: FundingRowSource): FundingRow {
     companyName: row.companyName,
     countryCode: trimOrNull(row.countryCode),
     city: row.city,
+    companyDescription: trimOrNull(row.companyDescription),
+    mainSector: mainSectorOf(row),
+    websiteDomain: trimOrNull(row.websiteDomain),
     roundType: row.roundType,
     roundLabel: row.roundLabel,
     amount: money(row.amountMinor, row.currency),
@@ -829,6 +911,26 @@ export async function loadConfirmations(
   return result;
 }
 
+/** Rows with their closest confirmation, one extra statement for all of them. */
+export async function withConfirmations(
+  db: Db,
+  rows: readonly FundingRowSource[],
+): Promise<FundingRow[]> {
+  const confirmations = await loadConfirmations(
+    db,
+    rows.map((row) => ({
+      eventId: row.eventId,
+      announcedOn: row.announcedOn,
+      evidence: row.evidence,
+      isGrant: row.roundType === "grant",
+    })),
+  );
+  return rows.map((row) => ({
+    ...toFundingRow(row),
+    confirmation: confirmations.get(row.eventId)?.[0] ?? null,
+  }));
+}
+
 export async function listFundingRounds(
   db: Db,
   filters: FundingFilters,
@@ -857,21 +959,8 @@ export async function listFundingRounds(
       .offset((page - 1) * pageSize),
   ]);
 
-  const confirmations = await loadConfirmations(
-    db,
-    rows.map((row) => ({
-      eventId: row.eventId,
-      announcedOn: row.announcedOn,
-      evidence: row.evidence,
-      isGrant: row.roundType === "grant",
-    })),
-  );
-
   return {
-    items: rows.map((row) => ({
-      ...toFundingRow(row),
-      confirmation: confirmations.get(row.eventId)?.[0] ?? null,
-    })),
+    items: await withConfirmations(db, rows),
     total: asCount(counted[0]?.total),
     page,
     pageSize,

@@ -22,58 +22,13 @@ const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
   USD: "US$",
 };
 
-const COMPACT_SCALES: ReadonlyArray<{ divisor: bigint; suffix: string }> = [
-  { divisor: BigInt("100000000000"), suffix: "B" },
-  { divisor: BigInt("100000000"), suffix: "M" },
-  { divisor: BigInt("100000"), suffix: "K" },
-];
-
-const NEXT_SCALE: Readonly<Record<string, string>> = {
-  K: "M",
-  M: "B",
-};
-
-function divHalfUp(numerator: bigint, denominator: bigint): bigint {
-  return (numerator + denominator / BigInt(2)) / denominator;
-}
-
-function formatTenths(tenths: bigint): string {
-  const whole = tenths / BigInt(10);
-  const fraction = tenths % BigInt(10);
-  if (fraction === BigInt(0)) return whole.toString();
-  return `${whole.toString()}.${fraction.toString()}`;
-}
-
-function formatSmallMajor(minor: bigint): string {
-  const whole = minor / BigInt(100);
-  const fraction = minor % BigInt(100);
-  if (fraction === BigInt(0)) return whole.toString();
-  if (fraction % BigInt(10) === BigInt(0)) {
-    return `${whole.toString()}.${(fraction / BigInt(10)).toString()}`;
-  }
-  return `${whole.toString()}.${fraction.toString().padStart(2, "0")}`;
-}
-
-function compactMinor(amountMinor: bigint): string {
-  for (const scale of COMPACT_SCALES) {
-    if (amountMinor < scale.divisor) continue;
-    let tenths = divHalfUp(amountMinor * BigInt(10), scale.divisor);
-    let suffix = scale.suffix;
-    const promoted = NEXT_SCALE[suffix];
-    if (promoted && tenths >= BigInt(10_000)) {
-      tenths = divHalfUp(tenths, BigInt(1_000));
-      suffix = promoted;
-    }
-    return `${formatTenths(tenths)}${suffix}`;
-  }
-  return formatSmallMajor(amountMinor);
-}
-
 /**
- * Compact en-GB money, such as "£8.2M", "US$10M" or "€950K".
+ * Money in the Raisory house style (docs/design/brand/brand.md): "£850k",
+ * "£4.2m", "£12.0m", "£2.3bn", "£950". Lower-case unit with no space; millions
+ * and billions always carry one decimal, thousands none.
  * `amountMinor` is an integer in 2-decimal minor units.
  */
-export function formatMoneyCompact(
+export function formatMoneyShort(
   amountMinor: number,
   currency: CurrencyCode,
 ): string {
@@ -82,9 +37,22 @@ export function formatMoneyCompact(
   }
   const code = currency.trim().toUpperCase();
   const symbol = CURRENCY_SYMBOLS[code] ?? `${code} `;
-  const negative = amountMinor < 0;
-  const rounded = BigInt(Math.round(Math.abs(amountMinor)));
-  return `${negative ? "-" : ""}${symbol}${compactMinor(rounded)}`;
+  const sign = amountMinor < 0 ? "-" : "";
+  const major = Math.abs(amountMinor) / 100;
+  const tenthsOf = (unit: number) => Math.round(major / (unit / 10));
+  let body: string;
+  if (tenthsOf(1e9) >= 10) {
+    body = `${(tenthsOf(1e9) / 10).toFixed(1)}bn`;
+  } else if (tenthsOf(1e6) >= 10) {
+    const tenths = tenthsOf(1e6);
+    body = tenths >= 10_000 ? "1.0bn" : `${(tenths / 10).toFixed(1)}m`;
+  } else if (Math.round(major) >= 1_000) {
+    const thousands = Math.round(major / 1e3);
+    body = thousands >= 1_000 ? "1.0m" : `${thousands}k`;
+  } else {
+    body = `${Math.round(major)}`;
+  }
+  return `${sign}${symbol}${body}`;
 }
 
 /** Calendar date as "8 Oct 2026". The date portion is read in UTC. */

@@ -1,6 +1,13 @@
 import Link from "next/link";
 import type { InvestorActivityRow } from "@/core/read-models";
-import { formatMoneyCompact } from "@/lib/format";
+import { formatMoneyShort } from "@/lib/format";
+
+/**
+ * Phones (under 768 px): each row stacks as a block, and each cell with a
+ * data-label shows "label ... value". The first cell (the name) has no label.
+ */
+const STACK_TABLE =
+  "max-md:block max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:block max-md:[&_tr]:py-3 max-md:[&_td]:block max-md:[&_th]:block max-md:[&_td]:p-0 max-md:[&_th]:p-0 max-md:[&_[data-label]]:flex max-md:[&_[data-label]]:justify-between max-md:[&_[data-label]]:gap-4 max-md:[&_[data-label]]:py-0.5 max-md:[&_[data-label]]:text-right max-md:[&_[data-label]]:before:text-left max-md:[&_[data-label]]:before:text-muted max-md:[&_[data-label]]:before:content-[attr(data-label)]";
 
 /** "3 of 4 with amounts". */
 export function describeAmountCoverage(row: {
@@ -20,20 +27,20 @@ export function InvestorActivityTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="border-y border-rule py-12">
+      <div className="border-y border-line py-12">
         <p className="text-lg font-medium">
           {filtered
             ? "No investors match these filters"
             : "No investor activity yet"}
         </p>
-        <p className="mt-2 max-w-xl text-quiet">
+        <p className="mt-2 max-w-xl text-muted">
           {filtered ? (
             <>
               Investors need at least 2 early rounds in the window to be listed.
               Try another theme, or{" "}
               <Link
                 href="/investors"
-                className="text-signal underline underline-offset-4"
+                className="text-brand underline underline-offset-4"
               >
                 reset the filters
               </Link>
@@ -48,9 +55,11 @@ export function InvestorActivityTable({
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+      <table
+        className={`w-full border-collapse text-left text-sm ${STACK_TABLE}`}
+      >
         <caption className="sr-only">First-cheque activity by investor</caption>
-        <thead className="border-b-2 border-ink text-quiet">
+        <thead className="border-b-2 border-ink text-muted">
           <tr>
             <th scope="col" className="py-2 pr-3 font-medium">
               Investor
@@ -70,27 +79,38 @@ export function InvestorActivityTable({
           {rows.map((row) => (
             <tr
               key={row.investor.slug}
-              className="border-b border-rule align-top"
+              className="border-b border-line align-top"
             >
               <td className="py-3 pr-3">
                 <Link
                   href={`/investors/${row.investor.slug}`}
-                  className="font-semibold text-ink underline-offset-4 hover:text-signal hover:underline"
+                  className="font-semibold text-ink underline-offset-4 hover:text-brand hover:underline"
                 >
                   {row.investor.name}
                 </Link>
               </td>
-              <td className="px-3 py-3 text-right tabular-nums">{row.led}</td>
-              <td className="px-3 py-3 text-right tabular-nums">
+              <td
+                data-label="Led"
+                className="px-3 py-3 text-right tabular-nums"
+              >
+                {row.led}
+              </td>
+              <td
+                data-label="Joined"
+                className="px-3 py-3 text-right tabular-nums"
+              >
                 {row.joined}
               </td>
-              <td className="py-3 pl-3 tabular-nums">
+              <td
+                data-label="Median round size"
+                className="py-3 pl-3 tabular-nums"
+              >
                 {row.medianRoundGbpMinor === null ? (
-                  <span className="text-quiet">Not reported</span>
+                  <span className="text-muted">Not reported</span>
                 ) : (
-                  formatMoneyCompact(row.medianRoundGbpMinor, "GBP")
+                  formatMoneyShort(row.medianRoundGbpMinor, "GBP")
                 )}
-                <div className="text-xs text-quiet">
+                <div className="text-xs text-muted">
                   {describeAmountCoverage(row)}
                 </div>
               </td>

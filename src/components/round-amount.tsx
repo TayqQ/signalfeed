@@ -1,6 +1,6 @@
 import type { Money } from "@/core/domain";
 import type { RoundType } from "@/core/enums";
-import { formatMoneyCompact } from "@/lib/format";
+import { formatMoneyShort } from "@/lib/format";
 
 const SCALE_MIN = 5; // log10 of £1,000 in pence
 const SCALE_MAX = 11; // log10 of £1bn in pence
@@ -34,23 +34,23 @@ export function RoundAmount({
   amountGbpMinor: number | null;
   roundType: RoundType;
 }) {
-  if (!amount) return <span className="text-quiet">Not reported</span>;
+  if (!amount) return <span className="text-muted">Not reported</span>;
 
   const isGbp = amount.currency === "GBP";
-  const original = formatMoneyCompact(amount.amountMinor, amount.currency);
+  const original = formatMoneyShort(amount.amountMinor, amount.currency);
   const headline =
     amountGbpMinor !== null
-      ? formatMoneyCompact(amountGbpMinor, "GBP")
+      ? formatMoneyShort(amountGbpMinor, "GBP")
       : original;
 
   return (
     <div className="min-w-24">
       <div className="font-semibold tabular-nums">{headline}</div>
       {amountGbpMinor !== null && !isGbp ? (
-        <div className="text-xs tabular-nums text-quiet">{original}</div>
+        <div className="text-xs tabular-nums text-muted">{original}</div>
       ) : null}
       {amountGbpMinor !== null ? (
-        <div className="mt-1 h-1 w-full bg-zinc-200" aria-hidden="true">
+        <div className="mt-1 h-1 w-full bg-line" aria-hidden="true">
           <div
             data-testid="amount-bar"
             className={`h-full ${STAGE_COLOUR[roundType]}`}

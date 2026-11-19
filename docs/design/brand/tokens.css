@@ -1,0 +1,117 @@
+/* Raisory brand tokens, v2 "Harbour+" (chosen 19 November 2026; replaces the green and brass v1).
+   Source of truth for src/app/globals.css. Light is the default. Dark follows the system unless the
+   visitor picks a theme (data-theme on <html>). Every pair used for text is at least 4.5:1, and every
+   mark and chart colour at least 3:1 (checked on brand/palette-v2.html). */
+
+:root {
+  /* Surfaces. Dark mode layers paper < surface < raised < overlay, so panels read as separate planes. */
+  --paper: #F3F5FA;         /* app background (cold off-white) */
+  --surface: #FFFFFF;       /* panels, cards, tables, inputs */
+  --surface-sunk: #E8ECF5;  /* table headers, hover, wells */
+  --raised: #FFFFFF;        /* cards on a surface */
+  --overlay: #FFFFFF;       /* popovers, sheets, menus */
+  --line: #D8DEEB;
+  --line-strong: #B4BFD6;
+
+  /* Text */
+  --ink: #0E1C3B;           /* body text */
+  --muted: #465474;         /* secondary text */
+  --faint: #8792AC;         /* placeholders, disabled (decorative only) */
+
+  /* Brand: navy for identity, links and selection */
+  --brand: #1D49A9;
+  --brand-hover: #173B8A;
+  --brand-soft: #E1E9FC;    /* selected rows, active chips */
+  --on-brand: #FFFFFF;
+
+  /* Accent: orange for what must be noticed (primary action, "New", the active quick view) */
+  --accent: #E95D10;
+  --accent-hover: #F27632;
+  --accent-soft: #FFE7D7;
+  --accent-ink: #B0430A;    /* orange text; never use --accent for text */
+  --on-accent: #0E1C3B;     /* text on orange buttons (white fails at 3.4:1) */
+  --focus: #2559D6;
+
+  /* Meaning (always with an icon or word) */
+  --up: #0B7A4B;   --up-soft: #DCF2E7;
+  --down: #B5302A; --down-soft: #FCE3E0;
+  --warn: #806200; --warn-soft: #FAF0C4;  /* yellow-amber, kept clear of the orange accent */
+  --info: #1F65AD; --info-soft: #E0ECFA;
+
+  /* Charts: categorical series, in this order */
+  --data-1: #1D49A9; --data-2: #E2580E; --data-3: #1A8669; --data-4: #2B83C6;
+  --data-5: #7A4DB8; --data-6: #C23B78; --data-7: #6C7D1A; --data-8: #5E6B84;
+
+  /* Funding stage colours (early to late), with text labels always */
+  --stage-early: var(--data-3);
+  --stage-seed: var(--data-4);
+  --stage-venture: var(--data-1);
+  --stage-late: var(--data-5);
+  --stage-other: var(--data-8);
+
+  /* App shell */
+  --nav-bg: #FFFFFF;        /* sidebar: the same family as the page in light mode */
+  --nav-ink: #0E1C3B;
+  --nav-muted: #465474;
+  --nav-active-bg: #E6EDFC;
+  --nav-active-ink: #1D49A9;
+  --nav-line: #D8DEEB;
+  --sel-bg: #E1E9FC;        /* selected list row */
+  --sel-bar: #1D49A9;       /* its 2-3 px inset bar */
+
+  /* Logo (inline SVG reads these) */
+  --logo-ring: #1D49A9;
+  --logo-dot: #E95D10;
+  --logo-ink: #0E1C3B;
+
+  /* Type, shape, depth: unchanged from v1 */
+  --font-display: "Inter Tight", Inter, system-ui, sans-serif;
+  --font-ui: Inter, system-ui, sans-serif;
+  --tracking-display: -0.025em;
+  --text-xs: 12px;  --text-sm: 13px;  --text-base: 15px; --text-md: 17px;
+  --text-lg: 20px;  --text-xl: 24px;  --text-2xl: 30px;  --text-3xl: 38px; --text-4xl: 48px;
+  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px; --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(14 28 59 / 0.06);
+  --shadow-2: 0 1px 2px rgb(14 28 59 / 0.06), 0 8px 24px -12px rgb(14 28 59 / 0.22);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0A1222; --surface: #111B30; --surface-sunk: #0D1628; --raised: #18253F; --overlay: #213152;
+    --line: #233250; --line-strong: #36496F;
+    --ink: #E8EDF6; --muted: #9DAAC2; --faint: #67758F;
+    --brand: #82A8FF; --brand-hover: #9AB9FF; --brand-soft: #1D3260; --on-brand: #0A1222;
+    --accent: #FF7A30; --accent-hover: #FF9254; --accent-soft: #3A2314; --accent-ink: #FF9A5C; --on-accent: #0A1222;
+    --focus: #9AB9FF;
+    --up: #4FD08F; --up-soft: #12301F; --down: #FF8A7D; --down-soft: #3D1A18;
+    --warn: #F0CF4A; --warn-soft: #332A0C; --info: #6FB6F2; --info-soft: #12283F;
+    --data-1: #82A8FF; --data-2: #FF8A45; --data-3: #4FD0AE; --data-4: #5BC0F5;
+    --data-5: #B795F5; --data-6: #F27FB2; --data-7: #C2D45C; --data-8: #A3AEC2;
+    --nav-bg: #070E1B; --nav-ink: #C9D3E6; --nav-muted: #8D9AB3; --nav-active-bg: #18253F; --nav-active-ink: #FFFFFF; --nav-line: #18233A;
+    --sel-bg: #21386A; --sel-bar: #82A8FF;
+    --logo-ring: #82A8FF; --logo-dot: #FF7A30; --logo-ink: #E8EDF6;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
+    --shadow-2: 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0A1222; --surface: #111B30; --surface-sunk: #0D1628; --raised: #18253F; --overlay: #213152;
+  --line: #233250; --line-strong: #36496F;
+  --ink: #E8EDF6; --muted: #9DAAC2; --faint: #67758F;
+  --brand: #82A8FF; --brand-hover: #9AB9FF; --brand-soft: #1D3260; --on-brand: #0A1222;
+  --accent: #FF7A30; --accent-hover: #FF9254; --accent-soft: #3A2314; --accent-ink: #FF9A5C; --on-accent: #0A1222;
+  --focus: #9AB9FF;
+  --up: #4FD08F; --up-soft: #12301F; --down: #FF8A7D; --down-soft: #3D1A18;
+  --warn: #F0CF4A; --warn-soft: #332A0C; --info: #6FB6F2; --info-soft: #12283F;
+  --data-1: #82A8FF; --data-2: #FF8A45; --data-3: #4FD0AE; --data-4: #5BC0F5;
+  --data-5: #B795F5; --data-6: #F27FB2; --data-7: #C2D45C; --data-8: #A3AEC2;
+  --nav-bg: #070E1B; --nav-ink: #C9D3E6; --nav-muted: #8D9AB3; --nav-active-bg: #18253F; --nav-active-ink: #FFFFFF; --nav-line: #18233A;
+  --sel-bg: #21386A; --sel-bar: #82A8FF;
+  --logo-ring: #82A8FF; --logo-dot: #FF7A30; --logo-ink: #E8EDF6;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}

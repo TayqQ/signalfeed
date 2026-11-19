@@ -22,7 +22,7 @@ describe("confirmationText", () => {
         confirmsAmount: true,
         amountUsdMinor: 440_000_000,
       }),
-    ).toBe("Confirmed: Form D, $4.4M sold, first sale 5 January 2026 (SEC)");
+    ).toBe("Confirmed: Form D, $4.4m sold, first sale 5 January 2026 (SEC)");
   });
 
   it("words a Form D without an amount", () => {

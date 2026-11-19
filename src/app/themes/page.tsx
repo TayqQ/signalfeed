@@ -9,7 +9,7 @@ import { cached } from "@/lib/cached";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Themes | SignalFeed" };
+export const metadata: Metadata = { title: "Themes" };
 
 export default async function ThemesPage() {
   const themes = await cached(
@@ -23,15 +23,15 @@ export default async function ThemesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Themes</h1>
-      <p className="mt-3 max-w-2xl text-quiet">
+    <main>
+      <h1 className="sr-only">Themes</h1>
+      <p className="text-[13px] text-muted">
         Groups of related companies, by sector. Themes with fewer than{" "}
         {MIN_THEME_COMPANIES} companies are listed but kept out of the trend
         tables.
       </p>
       {themes.length === 0 ? (
-        <p className="mt-8 border-y border-rule py-8 text-quiet">
+        <p className="mt-8 border-y border-line py-8 text-muted">
           No themes yet. They appear once enough companies have been collected.
         </p>
       ) : (
@@ -40,7 +40,7 @@ export default async function ThemesPage() {
             <h2 className="border-b-2 border-ink pb-1 text-lg font-semibold">
               {label}
             </h2>
-            <ul className="divide-y divide-rule">
+            <ul className="divide-y divide-line">
               {group.map((theme) => (
                 <li
                   key={theme.slug}
@@ -48,11 +48,11 @@ export default async function ThemesPage() {
                 >
                   <Link
                     href={`/themes/${theme.slug}`}
-                    className="text-signal underline underline-offset-4"
+                    className="text-brand underline underline-offset-4"
                   >
                     {theme.name}
                   </Link>
-                  <span className="text-sm text-quiet">
+                  <span className="text-sm text-muted">
                     {theme.companyCount === 1
                       ? "1 company"
                       : `${theme.companyCount} companies`}

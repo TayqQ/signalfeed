@@ -23,24 +23,24 @@ interface BandRange {
 }
 
 export const SIZE_BAND_RANGES: Readonly<Record<SizeBand, BandRange>> = {
-  "under-1m": { label: "Under £1M", minGbpMinor: 0, maxGbpMinor: MILLION },
+  "under-1m": { label: "Under £1m", minGbpMinor: 0, maxGbpMinor: MILLION },
   "1m-5m": {
-    label: "£1M–£5M",
+    label: "£1m–£5m",
     minGbpMinor: MILLION,
     maxGbpMinor: 5 * MILLION,
   },
   "5m-20m": {
-    label: "£5M–£20M",
+    label: "£5m–£20m",
     minGbpMinor: 5 * MILLION,
     maxGbpMinor: 20 * MILLION,
   },
   "20m-100m": {
-    label: "£20M–£100M",
+    label: "£20m–£100m",
     minGbpMinor: 20 * MILLION,
     maxGbpMinor: 100 * MILLION,
   },
   "100m-plus": {
-    label: "£100M+",
+    label: "£100m+",
     minGbpMinor: 100 * MILLION,
     maxGbpMinor: null,
   },

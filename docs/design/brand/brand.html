@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raisory brand</title>
+<link rel="icon" href="logo/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 var(--text-base)/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 16px 80px; }
+@media (min-width: 720px) { .wrap { padding: 48px 32px 96px; } }
+header.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+header.top img { height: 30px; }
+.lede { color: var(--muted); max-width: 640px; margin: 20px 0 0; }
+h2 { font: 600 var(--text-xs)/1 var(--font-ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 64px 0 16px; }
+h3 { font: 600 var(--text-lg)/1.25 var(--font-display); letter-spacing: var(--tracking-display); margin: 0 0 6px; }
+p.note { color: var(--muted); font-size: var(--text-sm); margin: 0; max-width: 640px; }
+button.toggle { font: 500 var(--text-sm) var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+
+/* theme-aware logo swaps */
+.on-dark { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .on-light { display: none; } :root:not([data-theme="light"]) .on-dark { display: inline; } }
+:root[data-theme="dark"] .on-light { display: none; } :root[data-theme="dark"] .on-dark { display: inline; }
+
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.tile { border-radius: var(--radius-lg); min-height: 180px; display: grid; place-items: center; padding: 28px; position: relative; }
+.tile img.lock { width: min(220px, 100%); }
+.tile .cap { position: absolute; left: 14px; bottom: 10px; font-size: var(--text-xs); }
+.t-paper { background: #F3F5FA; border: 1px solid #D8DEEB; } .t-paper .cap { color: #465474; }
+.t-white { background: #FFFFFF; border: 1px solid #D8DEEB; } .t-white .cap { color: #465474; }
+.t-forest { background: #0E1C3B; } .t-forest .cap { color: #9DAAC2; }
+.t-green { background: #1D49A9; } .t-green .cap { color: #E1E9FC; }
+.t-night { background: #0A1222; border: 1px solid #233250; } .t-night .cap { color: #9DAAC2; }
+.t-mono { background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
+.t-mono .cap { color: var(--muted); }
+.mono-lock { width: 220px; max-width: 100%; aspect-ratio: 425.43 / 99.71; background: currentColor; -webkit-mask: url(logo/raisory-lockup-mono.svg) center / contain no-repeat; mask: url(logo/raisory-lockup-mono.svg) center / contain no-repeat; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px; }
+.sizes { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; margin-top: 20px; }
+.sizes figure { margin: 0; text-align: center; font-size: var(--text-xs); color: var(--muted); }
+.sizes figure img { display: block; margin: 0 auto 8px; }
+
+.construct { display: grid; gap: 24px; grid-template-columns: 1fr; align-items: center; }
+@media (min-width: 720px) { .construct { grid-template-columns: 260px 1fr; } }
+.cs { position: relative; width: 240px; height: 240px; margin: 0 auto; background: var(--paper); border-radius: var(--radius); }
+.cs img { position: absolute; left: 5.23%; top: 5.23%; width: 89.49%; }
+.cs .guide { position: absolute; inset: 17.71%; border: 1px dashed var(--line-strong); }
+.cs .guide.clear { inset: 0; border-color: var(--accent); opacity: .7; border-radius: var(--radius); }
+ul.rules { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--text-sm); }
+ul.rules li { margin: 4px 0; } ul.rules b { color: var(--ink); font-weight: 500; }
+
+/* browser tab mock */
+.tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.tabbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px 8px 0 0; font: 400 12px var(--font-ui); min-width: 200px; }
+.tabbar.l { background: #FFFFFF; color: #10241D; border: 1px solid #D8DEEB; border-bottom: 0; }
+.tabbar.d { background: #2A2D2E; color: #E8EDE9; }
+.tabbar img { width: 16px; height: 16px; }
+
+/* product context */
+.app { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--paper); }
+.appbar { display: flex; align-items: center; gap: 24px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; }
+.appbar img { height: 22px; }
+.appbar nav { display: flex; gap: 18px; font-size: var(--text-sm); color: var(--muted); }
+.appbar nav b { color: var(--ink); font-weight: 500; }
+.appbar .sp { flex: 1; }
+.btn { font: 500 var(--text-sm) var(--font-ui); border-radius: var(--radius-sm); padding: 8px 14px; border: 1px solid transparent; cursor: pointer; }
+.btn.primary { background: var(--brand); color: var(--on-brand); }
+.btn.primary:hover { background: var(--brand-hover); }
+.btn.ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.appbody { padding: 20px 16px; display: grid; gap: 16px; }
+@media (min-width: 860px) { .appbody { grid-template-columns: 1fr 300px; } }
+.kicker { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.title { font: 600 var(--text-2xl)/1.15 var(--font-display); letter-spacing: var(--tracking-display); margin: 4px 0 12px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip { font-size: var(--text-sm); padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.chip.on { background: var(--brand-soft); border-color: transparent; color: var(--brand); font-weight: 500; }
+.rows { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.row { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.mono { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font: 600 14px var(--font-display); background: var(--brand-soft); color: var(--brand); }
+.row .n { font-weight: 600; } .row .n .new { font: 600 10px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft); border-radius: 4px; padding: 2px 5px; margin-left: 6px; vertical-align: 2px; }
+.row .m { font-size: var(--text-sm); color: var(--muted); }
+.amt { text-align: right; font: 600 var(--text-md)/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.amt small { display: block; font: 500 var(--text-xs) var(--font-ui); margin-top: 3px; }
+.s-up { color: var(--up); } .s-warn { color: var(--warn); } .s-down { color: var(--down); }
+.side { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.big { font: 600 var(--text-3xl)/1 var(--font-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+.bars { display: grid; gap: 8px; margin-top: 14px; }
+.bar { display: grid; grid-template-columns: 92px 1fr 52px; gap: 8px; align-items: center; font-size: var(--text-sm); }
+.bar i { display: block; height: 10px; border-radius: 3px; }
+.bar span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* colour */
+.sw-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.sw { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.sw div { height: 64px; border-bottom: 1px solid var(--line); }
+.sw p { margin: 0; padding: 8px 10px; font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.sw p b { display: block; color: var(--ink); font-weight: 500; font-size: var(--text-sm); }
+.data { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.data span { width: 44px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: var(--paper); font-weight: 600; }
+
+/* type */
+.scale { display: grid; gap: 14px; }
+.scale div { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: baseline; }
+.scale code { font: 400 var(--text-xs) var(--font-ui); color: var(--muted); }
+.d { font-family: var(--font-display); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1.15; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img class="on-light" src="logo/raisory-lockup.svg" alt="Raisory">
+    <img class="on-dark" src="logo/raisory-lockup-dark.svg" alt="Raisory">
+    <button class="toggle" id="toggle" type="button">Switch to dark</button>
+  </header>
+  <p class="lede">Final brand: logo chosen 17 November 2026, colours v2 "Harbour+" 19 November 2026. The breakout mark is an open ring, a funding round, with an orange dot breaking out of it. The wordmark is Inter Tight SemiBold, outlined. Every logo here is the real file in <code>logo/</code>, and every colour comes from <code>tokens.css</code>.</p>
+
+  <h2>Logo</h2>
+  <div class="grid">
+    <div class="tile t-paper"><img class="lock" src="logo/raisory-lockup.svg" alt="Raisory on paper"><span class="cap">Paper · raisory-lockup</span></div>
+    <div class="tile t-night"><img class="lock" src="logo/raisory-lockup-dark.svg" alt="Raisory on night"><span class="cap">Night · -dark</span></div>
+    <div class="tile t-forest"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on deep navy"><span class="cap">Deep navy · -reversed</span></div>
+    <div class="tile t-green"><img class="lock" src="logo/raisory-lockup-reversed.svg" alt="Raisory on navy"><span class="cap">Navy · -reversed</span></div>
+    <div class="tile t-white"><img src="logo/raisory-mark.svg" alt="Raisory mark" style="width:96px"><span class="cap">Mark · raisory-mark</span></div>
+    <div class="tile t-mono"><div class="mono-lock" role="img" aria-label="Raisory one colour"></div><span class="cap">One colour · -mono (currentColor)</span></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <h3>Sizes and favicon</h3>
+    <p class="note">Below 20 px the favicon takes over: a deep navy tile with a heavier ring and a bigger dot, so it still reads at 16 px in a tab.</p>
+    <div class="sizes">
+      <figure><img class="on-light" src="logo/raisory-mark.svg" width="96" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" width="96" alt="">96</figure>
+      <figure><img class="on-light" src="logo/raisory-mark.svg" width="48" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" width="48" alt="">48</figure>
+      <figure><img class="on-light" src="logo/raisory-mark.svg" width="24" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" width="24" alt="">24</figure>
+      <figure><img src="logo/app-icon.svg" width="64" style="border-radius:14px" alt="">App icon</figure>
+      <figure><img src="logo/favicon.svg" width="32" alt="">32</figure>
+      <figure><img src="logo/favicon.svg" width="16" alt="">16</figure>
+    </div>
+    <div class="tabs">
+      <div class="tabbar l"><img src="logo/favicon.svg" alt="">Funding · Raisory</div>
+      <div class="tabbar d"><img src="logo/favicon.svg" alt="">Funding · Raisory</div>
+    </div>
+  </div>
+
+  <h2>Construction</h2>
+  <div class="panel construct">
+    <div class="cs"><span class="guide clear"></span><span class="guide"></span><img class="on-light" src="logo/raisory-mark.svg" alt=""><img class="on-dark" src="logo/raisory-mark-dark.svg" alt=""></div>
+    <ul class="rules">
+      <li><b>Ring:</b> radius 13 and stroke 5.5 in a 48 grid, with round ends. The gap is 64°, centred on the top right (45°).</li>
+      <li><b>Dot:</b> radius 4.75, on the 45° line, 20 from the ring's centre. Always orange.</li>
+      <li><b>Optical centre:</b> the ring and dot together sit centred in the box (grey dashed line), not the ring alone.</li>
+      <li><b>Clear space:</b> at least one dot diameter on every side (orange dashed line).</li>
+      <li><b>Lockup:</b> the mark is 1.18 times the cap height, centred on the capitals, with a gap of 0.38 times the cap height.</li>
+      <li><b>Don't:</b> move the dot or the gap, recolour the dot, box the mark, or add a shadow, gradient or stretch.</li>
+    </ul>
+  </div>
+
+  <h2>In the product</h2>
+  <div class="app">
+    <div class="appbar">
+      <img class="on-light" src="logo/raisory-lockup.svg" alt="Raisory"><img class="on-dark" src="logo/raisory-lockup-dark.svg" alt="Raisory">
+      <nav><b>Funding</b><span>Sectors</span><span>Companies</span></nav>
+      <span class="sp"></span>
+      <button class="btn ghost" type="button">Sign in</button>
+      <button class="btn primary" type="button">Get the weekly brief</button>
+    </div>
+    <div class="appbody">
+      <div>
+        <div class="kicker">UK and Europe · last 30 days</div>
+        <div class="title">Who raised this week</div>
+        <div class="chips"><span class="chip on">All sectors</span><span class="chip">Climate</span><span class="chip">Health</span><span class="chip">Fintech</span><span class="chip">Seed to Series A</span></div>
+        <div class="rows">
+          <div class="row"><div class="mono">FB</div><div><div class="n">Ferrum Bio<span class="new">New</span></div><div class="m">Seed · Biotech · London, GB · 2 days ago</div></div><div class="amt">£4.2m<small class="s-up">✓ Confirmed</small></div></div>
+          <div class="row"><div class="mono">NG</div><div><div class="n">Northgrid</div><div class="m">Series A · Energy · Leeds, GB · 4 days ago</div></div><div class="amt">£12.0m<small class="s-up">↑ Up round</small></div></div>
+          <div class="row"><div class="mono">QP</div><div><div class="n">Quillpay</div><div class="m">Pre-seed · Fintech · Dublin, IE · 6 days ago</div></div><div class="amt">£850k<small class="s-warn">◔ 1 source</small></div></div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="kicker">Raised this month</div>
+        <div class="big">£318.4m</div>
+        <div class="s-up" style="font-size:var(--text-sm);font-weight:500">↑ 12% on October</div>
+        <div class="bars">
+          <div class="bar"><span>Climate</span><i style="width:100%;background:var(--data-1)"></i><span>£92m</span></div>
+          <div class="bar"><span>Health</span><i style="width:74%;background:var(--data-2)"></i><span>£68m</span></div>
+          <div class="bar"><span>Fintech</span><i style="width:61%;background:var(--data-3)"></i><span>£56m</span></div>
+          <div class="bar"><span>AI tools</span><i style="width:48%;background:var(--data-4)"></i><span>£44m</span></div>
+          <div class="bar"><span>Deep tech</span><i style="width:30%;background:var(--data-5)"></i><span>£28m</span></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <p class="note" style="margin-top:10px">These are sample rows and numbers. Status always pairs an icon and a word with its colour.</p>
+
+  <h2>Colour</h2>
+  <div class="sw-grid">
+    <div class="sw"><div style="background:var(--paper)"></div><p><b>Paper</b>--paper · #F3F5FA / #0A1222</p></div>
+    <div class="sw"><div style="background:var(--surface)"></div><p><b>Surface</b>--surface · #FFFFFF / #111B30</p></div>
+    <div class="sw"><div style="background:var(--ink)"></div><p><b>Raised</b>--raised · #FFFFFF / #18253F</p></div>
+    <div class="sw"><div style="background:var(--muted)"></div><p><b>Muted</b>--muted · #465474 / #9DAAC2</p></div>
+    <div class="sw"><div style="background:var(--brand)"></div><p><b>Navy</b>--brand · #1D49A9 / #82A8FF</p></div>
+    <div class="sw"><div style="background:var(--ink)"></div><p><b>Ink</b>--ink · #0E1C3B / #E8EDF6</p></div>
+    <div class="sw"><div style="background:var(--brand-soft)"></div><p><b>Navy wash</b>--brand-soft · #E1E9FC / #1D3260</p></div>
+    <div class="sw"><div style="background:var(--accent)"></div><p><b>Orange</b>--accent · #E95D10 / #FF7A30</p></div>
+    <div class="sw"><div style="background:var(--up)"></div><p><b>Up</b>--up · #0B7A4B / #4FD08F</p></div>
+    <div class="sw"><div style="background:var(--down)"></div><p><b>Down</b>--down · #B5302A / #FF8A7D</p></div>
+    <div class="sw"><div style="background:var(--warn)"></div><p><b>Warn</b>--warn · #806200 / #F0CF4A</p></div>
+    <div class="sw"><div style="background:var(--info)"></div><p><b>Info</b>--info · #1F65AD / #6FB6F2</p></div>
+  </div>
+  <div class="panel" style="margin-top:12px">
+    <h3>Chart series</h3>
+    <p class="note">Use them in order. Each passes 3:1 against the surface in both modes.</p>
+    <div class="data">
+      <span style="background:var(--data-1)">1</span><span style="background:var(--data-2)">2</span><span style="background:var(--data-3)">3</span><span style="background:var(--data-4)">4</span><span style="background:var(--data-5)">5</span><span style="background:var(--data-6)">6</span><span style="background:var(--data-7)">7</span><span style="background:var(--data-8)">8</span>
+    </div>
+  </div>
+
+  <h2>Type</h2>
+  <div class="panel scale">
+    <div><code>48 · Tight</code><span class="d" style="font-size:var(--text-4xl)">£318.4m raised</span></div>
+    <div><code>30 · Tight</code><span class="d" style="font-size:var(--text-2xl)">Who raised this week</span></div>
+    <div><code>20 · Tight</code><span class="d" style="font-size:var(--text-lg)">Climate is the busiest sector</span></div>
+    <div><code>15 · Inter</code><span>Body and UI text. Ferrum Bio raised a £4.2m seed round led by a London fund, confirmed by Companies House.</span></div>
+    <div><code>13 · Inter</code><span style="font-size:var(--text-sm);color:var(--muted)">Secondary · Seed · Biotech · London · 2 days ago</span></div>
+    <div><code>Figures</code><span style="font-variant-numeric:tabular-nums;font-weight:600">£4.2m · £12.0m · £850k · £318.4m</span></div>
+  </div>
+</div>
+<script>
+  const root = document.documentElement, btn = document.getElementById('toggle');
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const label = () => { btn.textContent = isDark() ? 'Switch to light' : 'Switch to dark'; };
+  btn.addEventListener('click', () => { root.dataset.theme = isDark() ? 'light' : 'dark'; label(); });
+  label();
+</script>
+</body>
+</html>

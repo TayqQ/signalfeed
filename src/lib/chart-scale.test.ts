@@ -98,6 +98,6 @@ describe("formatAxisValue", () => {
   });
 
   it("formats GBP minor units with the shared formatter", () => {
-    expect(formatAxisValue(820_000_000, { currency: "GBP" })).toBe("£8.2M");
+    expect(formatAxisValue(820_000_000, { currency: "GBP" })).toBe("£8.2m");
   });
 });

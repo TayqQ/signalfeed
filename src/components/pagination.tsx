@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { FundingFilters } from "@/core/read-models";
+import { buttonClasses } from "@/components/ui/button";
 import { serialiseFundingFilters } from "@/lib/funding-filters";
 
 export function Pagination({
@@ -19,25 +20,25 @@ export function Pagination({
     const query = serialiseFundingFilters({ ...filters, page: target });
     return query ? `/?${query}` : "/";
   };
-  const linkClass = "underline underline-offset-4 hover:text-signal";
+  const linkClass = buttonClasses("secondary", "sm");
   return (
     <nav
       aria-label="Pages"
-      className="mt-4 flex items-center justify-between text-sm text-quiet"
+      className="mt-6 flex items-center justify-between gap-3 text-[13px] text-muted"
     >
       {page > 1 ? (
         <Link rel="prev" href={href(page - 1)} className={linkClass}>
-          Previous
+          <span aria-hidden="true">←</span> Previous
         </Link>
       ) : (
         <span />
       )}
       <span className="tabular-nums">
-        Page {page} of {pages}
+        Page {page.toLocaleString("en-GB")} of {pages.toLocaleString("en-GB")}
       </span>
       {page < pages ? (
         <Link rel="next" href={href(page + 1)} className={linkClass}>
-          Next
+          Next <span aria-hidden="true">→</span>
         </Link>
       ) : (
         <span />

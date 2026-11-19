@@ -8,6 +8,13 @@ import { getWebDb } from "@/db/web";
 import { cached } from "@/lib/cached";
 import { formatDate, formatRoundType } from "@/lib/format";
 
+/**
+ * Phones (under 768 px): each row stacks as a block, and each cell with a
+ * data-label shows "label ... value". The first cell (the name) has no label.
+ */
+const STACK_TABLE =
+  "max-md:block max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:block max-md:[&_tr]:py-3 max-md:[&_td]:block max-md:[&_th]:block max-md:[&_td]:p-0 max-md:[&_th]:p-0 max-md:[&_[data-label]]:flex max-md:[&_[data-label]]:justify-between max-md:[&_[data-label]]:gap-4 max-md:[&_[data-label]]:py-0.5 max-md:[&_[data-label]]:text-right max-md:[&_[data-label]]:before:text-left max-md:[&_[data-label]]:before:text-muted max-md:[&_[data-label]]:before:content-[attr(data-label)]";
+
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -19,9 +26,7 @@ function load(slug: string) {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const investor = await load((await params).slug);
   return {
-    title: investor
-      ? `${investor.name} investments | SignalFeed`
-      : "Investor not found | SignalFeed",
+    title: investor ? `${investor.name} investments` : "Investor not found",
   };
 }
 
@@ -43,12 +48,12 @@ export default async function InvestorPage({ params }: Params) {
   );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+    <main>
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {investor.name}
       </h1>
       {investor.rounds.length > 0 ? (
-        <p className="mt-3 text-quiet">
+        <p className="mt-3 text-muted">
           {counts
             .map(
               (round) =>
@@ -60,11 +65,13 @@ export default async function InvestorPage({ params }: Params) {
 
       <section className="mt-8" aria-label="Rounds">
         {investor.rounds.length === 0 ? (
-          <p className="text-quiet">No rounds recorded yet.</p>
+          <p className="text-muted">No rounds recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-              <thead className="border-b-2 border-ink text-quiet">
+            <table
+              className={`w-full border-collapse text-left text-sm ${STACK_TABLE}`}
+            >
+              <thead className="border-b-2 border-ink text-muted">
                 <tr>
                   <th scope="col" className="py-2 pr-3 font-medium">
                     Company
@@ -87,28 +94,36 @@ export default async function InvestorPage({ params }: Params) {
                 {investor.rounds.map((row) => (
                   <tr
                     key={row.eventId}
-                    className="border-b border-rule align-top"
+                    className="border-b border-line align-top"
                   >
                     <td className="py-3 pr-3">
                       <Link
                         href={`/companies/${row.companySlug}`}
-                        className="font-semibold underline-offset-4 hover:text-signal hover:underline"
+                        className="font-semibold underline-offset-4 hover:text-brand hover:underline"
                       >
                         {row.companyName}
                       </Link>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3">
+                    <td
+                      data-label="Round"
+                      className="whitespace-nowrap px-3 py-3"
+                    >
                       {row.roundLabel ?? formatRoundType(row.roundType)}
                     </td>
-                    <td className="px-3 py-3">
+                    <td data-label="Amount" className="px-3 py-3">
                       <RoundAmount
                         amount={row.amount}
                         amountGbpMinor={row.amountGbpMinor}
                         roundType={row.roundType}
                       />
                     </td>
-                    <td className="px-3 py-3">{ROLE_LABEL[row.role]}</td>
-                    <td className="whitespace-nowrap py-3 pl-3 tabular-nums">
+                    <td data-label="Role" className="px-3 py-3">
+                      {ROLE_LABEL[row.role]}
+                    </td>
+                    <td
+                      data-label="Date"
+                      className="whitespace-nowrap py-3 pl-3 tabular-nums"
+                    >
                       {formatDate(row.announcedOn)}
                     </td>
                   </tr>

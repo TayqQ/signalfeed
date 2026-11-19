@@ -3,7 +3,7 @@ import type { ThemeRef } from "@/core/read-models";
 import { SECTORS, SECTOR_LABELS, type Sector } from "@/core/sectors";
 
 const inputClass =
-  "mt-1 w-full border border-zinc-300 bg-white px-2 py-2 text-sm text-ink";
+  "mt-1 w-full border border-line-strong bg-surface px-2 py-2 text-sm text-ink";
 const labelClass = "block text-sm font-medium";
 
 /**
@@ -74,13 +74,13 @@ export function ThemeSelect({
       <div className="flex items-end gap-4 sm:col-span-2 lg:col-span-4">
         <button
           type="submit"
-          className="border border-ink bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-signal"
+          className="border border-ink bg-ink px-4 py-2 text-sm font-semibold text-on-brand hover:bg-brand"
         >
           {submitLabel}
         </button>
         <a
           href={action}
-          className="text-sm text-signal underline underline-offset-4"
+          className="text-sm text-brand underline underline-offset-4"
         >
           Reset filters
         </a>

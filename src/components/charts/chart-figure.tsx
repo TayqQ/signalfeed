@@ -32,22 +32,22 @@ export function ChartFigure({
     <figure className="my-0">
       {children}
       {legend}
-      <figcaption className="mt-2 text-sm text-quiet">{summary}</figcaption>
+      <figcaption className="mt-2 text-sm text-muted">{summary}</figcaption>
       <details className="mt-2 text-sm">
-        <summary className="cursor-pointer text-signal">Show data</summary>
+        <summary className="cursor-pointer text-brand">Show data</summary>
         <div className="mt-2 max-h-80 overflow-auto">
           <table className="w-full border-collapse text-left tabular-nums">
             <caption className="sr-only">{table.caption}</caption>
             <thead>
               <tr>
-                <th scope="col" className="border-b border-rule py-1 pr-4">
+                <th scope="col" className="border-b border-line py-1 pr-4">
                   {table.rowHeader}
                 </th>
                 {table.columns.map((column) => (
                   <th
                     key={column}
                     scope="col"
-                    className="border-b border-rule py-1 pr-4 text-right"
+                    className="border-b border-line py-1 pr-4 text-right"
                   >
                     {column}
                   </th>
@@ -59,14 +59,14 @@ export function ChartFigure({
                 <tr key={`${row.label}-${index}`}>
                   <th
                     scope="row"
-                    className="border-b border-rule py-1 pr-4 font-normal"
+                    className="border-b border-line py-1 pr-4 font-normal"
                   >
                     {row.label}
                   </th>
                   {row.values.map((value, i) => (
                     <td
                       key={i}
-                      className="border-b border-rule py-1 pr-4 text-right"
+                      className="border-b border-line py-1 pr-4 text-right"
                     >
                       {value}
                     </td>
@@ -85,10 +85,10 @@ export function ChartFigure({
 export function EmptyChart({ summary }: { summary: string }) {
   return (
     <figure className="my-0">
-      <p className="rounded border border-dashed border-rule p-4 text-sm text-quiet">
+      <p className="rounded border border-dashed border-line p-4 text-sm text-muted">
         No data yet
       </p>
-      <figcaption className="mt-2 text-sm text-quiet">{summary}</figcaption>
+      <figcaption className="mt-2 text-sm text-muted">{summary}</figcaption>
     </figure>
   );
 }

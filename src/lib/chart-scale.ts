@@ -1,5 +1,5 @@
 import type { CurrencyCode } from "@/core/domain";
-import { formatMoneyCompact } from "@/lib/format";
+import { formatMoneyShort } from "@/lib/format";
 
 /** Maps a value from a domain onto a range. A flat domain maps to the range start. */
 export function linearScale(
@@ -117,7 +117,7 @@ export function formatAxisValue(
   value: number,
   options: { currency?: CurrencyCode } = {},
 ): string {
-  if (options.currency) return formatMoneyCompact(value, options.currency);
+  if (options.currency) return formatMoneyShort(value, options.currency);
   if (!Number.isFinite(value)) return "0";
   const abs = Math.abs(value);
   for (const { limit, suffix } of COMPACT_SUFFIXES) {

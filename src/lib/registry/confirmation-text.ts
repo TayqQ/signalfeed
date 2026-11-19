@@ -1,5 +1,5 @@
 import type { RecordKind } from "@/core/enums";
-import { formatDate, formatMoneyCompact } from "@/lib/format";
+import { formatDate, formatMoneyShort } from "@/lib/format";
 
 // The wording of the "Confirmed" marker (spec-phase3 section 9.1). It lives in
 // src/lib because pages must not import src/pipeline.
@@ -44,7 +44,7 @@ export function confirmationText(input: ConfirmationTextInput): string {
         return `Confirmed: Form D, first sale ${date} (SEC)`;
       }
       // The marker is about a US filing, so a bare "$" reads naturally here.
-      const amount = formatMoneyCompact(input.amountUsdMinor, "USD").replace(
+      const amount = formatMoneyShort(input.amountUsdMinor, "USD").replace(
         /^US\$/,
         "$",
       );
