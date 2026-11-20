@@ -6,7 +6,9 @@ import {
   parseFundingCriteria,
   parseFundingFilters,
 } from "@/lib/funding-filters";
+import { SECTORS, type Sector } from "@/core/sectors";
 import { FilterBar } from "./filter-bar";
+import { sectorButtonLabel } from "./sector-picker";
 
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -24,15 +26,37 @@ const THEMES: ThemeRef[] = [
   { slug: "generative-ai", name: "Generative AI", sector: "software-ai" },
 ];
 
+/** Busiest first, as `getSectorCounts` returns them; the rest have none. */
+const BUSY: ReadonlyArray<{ sector: Sector; count: number }> = [
+  { sector: "software-ai", count: 40 },
+  { sector: "health-life-sciences", count: 12 },
+  { sector: "education", count: 3 },
+];
+const SECTOR_COUNTS = [
+  ...BUSY,
+  ...SECTORS.filter((s) => !BUSY.some((b) => b.sector === s)).map((sector) => ({
+    sector,
+    count: 0,
+  })),
+];
+
 function bar(query: string, total = 12) {
   return (
     <FilterBar
       filters={parseFundingFilters(new URLSearchParams(query))}
       themes={THEMES}
       total={total}
+      sectorCounts={SECTOR_COUNTS}
       today={TODAY}
     />
   );
+}
+
+/** Opens the bar's sector dropdown and returns its panel. */
+function openSectors(name: string | RegExp = /^Sectors?\b/) {
+  const [trigger] = screen.getAllByRole("button", { name });
+  fireEvent.click(trigger as HTMLElement);
+  return screen.getByRole("dialog", { name: "Sector" });
 }
 
 /** What a browser with JavaScript off sends when the form is submitted as is. */
@@ -111,6 +135,18 @@ describe("FilterBar without JavaScript", () => {
     expect(
       within(date).getByRole("link", { name: "Last 30 days" }),
     ).toHaveAttribute("href", "/?size=1m-5m&from=2026-10-19&sort=amount");
+    // The sector dropdown is a <details> with the same checkbox list.
+    const sector = Array.from(document.querySelectorAll("details")).find(
+      (details) => details.querySelector("summary")?.textContent === "Sector",
+    );
+    expect(sector).toBeDefined();
+    const boxes = sector?.querySelectorAll(
+      'input[type="checkbox"][name="sector"]',
+    );
+    expect(boxes?.length).toBe(SECTORS.length);
+    expect((boxes?.[0] as HTMLInputElement | undefined)?.value).toBe(
+      "software-ai",
+    );
     // Popovers fall back to <details>, so their fields are in the form.
     expect(document.querySelectorAll("details").length).toBeGreaterThanOrEqual(
       2,
@@ -165,13 +201,45 @@ describe("FilterBar with JavaScript", () => {
     vi.useRealTimers();
   });
 
-  it("applies a sector chip at once with router.replace", () => {
+  it("applies a sector from the dropdown at once with router.replace", () => {
     render(bar(""));
-    const [chip] = screen.getAllByRole("checkbox", { name: "Education" });
-    fireEvent.click(chip as HTMLElement);
+    const panel = openSectors("Sector");
+    fireEvent.click(
+      within(panel).getByRole("checkbox", { name: /^Education/ }),
+    );
     expect(replace).toHaveBeenCalledWith("/?sector=education", {
       scroll: false,
     });
+  });
+
+  it("lists every sector busiest first, with counts and the ranking caption", () => {
+    render(bar(""));
+    const panel = openSectors("Sector");
+    const names = within(panel)
+      .getAllByRole("checkbox")
+      .map((box) => box.closest("label")?.textContent ?? "");
+    expect(names).toHaveLength(SECTORS.length);
+    expect(names.slice(0, 3)).toEqual([
+      "Software, AI and data, 40 rounds",
+      "Health and life sciences, 12 rounds",
+      "Education, 3 rounds",
+    ]);
+    expect(names[3]).toMatch(/, 0 rounds$/);
+    expect(
+      within(panel).getByText("Ranked by rounds in the last 90 days"),
+    ).toBeInTheDocument();
+    fireEvent.change(
+      within(panel).getByRole("searchbox", { name: "Find a sector or theme" }),
+      { target: { value: "health" } },
+    );
+    expect(within(panel).getAllByRole("checkbox")).toHaveLength(1);
+  });
+
+  it("names the trigger after the choice", () => {
+    render(bar("sector=education"));
+    expect(
+      screen.getAllByRole("button", { name: "Sector: Education" }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("moves the Stage control with the arrow keys", () => {
@@ -240,22 +308,21 @@ describe("FilterBar with JavaScript", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("lists the chosen sector's themes as a second level", () => {
+  it("lists the chosen sector's themes under it, in the same dropdown", () => {
     render(bar("sector=health-life-sciences"));
-    const [themes] = screen.getAllByRole("button", { name: "Themes" });
-    fireEvent.click(themes as HTMLElement);
-    const panel = screen.getByRole("dialog", { name: "Themes" });
+    const panel = openSectors("Sector: Health and life sciences");
+    const themes = within(panel).getByRole("group", {
+      name: "Themes in Health and life sciences",
+    });
     expect(
-      within(panel).getByRole("checkbox", { name: "AI drug discovery" }),
+      within(themes).getByRole("checkbox", { name: "AI drug discovery" }),
     ).toBeInTheDocument();
     expect(
       within(panel).queryByRole("checkbox", { name: "Generative AI" }),
     ).toBeNull();
     fireEvent.change(
-      within(panel).getByRole("searchbox", { name: "Find a theme" }),
-      {
-        target: { value: "medic" },
-      },
+      within(panel).getByRole("searchbox", { name: "Find a sector or theme" }),
+      { target: { value: "medic" } },
     );
     expect(
       within(panel).queryByRole("checkbox", { name: "AI drug discovery" }),
@@ -266,6 +333,64 @@ describe("FilterBar with JavaScript", () => {
     expect(replace).toHaveBeenCalledWith(
       "/?sector=health-life-sciences&theme=medtech",
       { scroll: false },
+    );
+  });
+
+  it("drops a sector's themes when the sector is unticked", () => {
+    render(bar("sector=health-life-sciences&sector=education&theme=medtech"));
+    const panel = openSectors("Sectors (2)");
+    fireEvent.click(
+      within(panel).getByRole("checkbox", {
+        name: /^Health and life sciences/,
+      }),
+    );
+    expect(replace).toHaveBeenCalledWith("/?sector=education", {
+      scroll: false,
+    });
+  });
+
+  it("keeps a theme chosen by URL without its sector, so it can be unticked", () => {
+    render(bar("theme=generative-ai"));
+    const panel = openSectors("Sector");
+    const theme = within(panel).getByRole("checkbox", {
+      name: "Generative AI",
+    });
+    expect(theme).toBeChecked();
+    fireEvent.click(theme);
+    expect(replace).toHaveBeenCalledWith("/", { scroll: false });
+  });
+
+  it("opens the sector list in place inside the phone sheet", () => {
+    render(bar("sector=education"));
+    fireEvent.click(screen.getByRole("button", { name: "Filters (1)" }));
+    const sheet = screen.getByRole("dialog", { name: "Filters" });
+    const trigger = within(sheet).getByRole("button", {
+      name: "Sector: Education",
+    });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(
+      within(sheet).getByRole("checkbox", { name: /^Software, AI and data/ }),
+    );
+    expect(replace).toHaveBeenCalledWith(
+      "/?sector=education&sector=software-ai",
+      { scroll: false },
+    );
+  });
+});
+
+describe("sectorButtonLabel", () => {
+  const sectors = [
+    { value: "education", label: "Education" },
+    { value: "software-ai", label: "Software, AI and data" },
+  ];
+
+  it("says Sector, the one sector, or how many", () => {
+    expect(sectorButtonLabel([], sectors)).toBe("Sector");
+    expect(sectorButtonLabel(["education"], sectors)).toBe("Sector: Education");
+    expect(sectorButtonLabel(["education", "software-ai"], sectors)).toBe(
+      "Sectors (2)",
     );
   });
 });

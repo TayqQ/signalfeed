@@ -4,6 +4,7 @@ import { getCompanyPreview } from "@/db/queries/companies";
 import {
   getFundingSummary,
   getQuickViewCounts,
+  getSectorCounts,
   quickViewBase,
   type QuickViewCriteria,
 } from "@/db/queries/summary";
@@ -57,6 +58,18 @@ export function cachedQuickViewCounts(
         (view) => `${view.id}:${serialiseFundingCriteria(view.criteria)}`,
       ),
     ],
+  );
+}
+
+/**
+ * Rounds per sector over the last `days` days, for the sector filter's order.
+ * It ignores the other filters, so one entry per day serves every page.
+ */
+export function cachedSectorCounts(days: number) {
+  const today = new Date().toISOString().slice(0, 10);
+  return cached(
+    () => getSectorCounts(getWebDb(), { days, today }),
+    ["sector-counts", String(days), today],
   );
 }
 

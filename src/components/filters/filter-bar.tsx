@@ -1,7 +1,7 @@
 import { MOMENTUM_FILTERS, NEAR_RADII_KM } from "@/core/read-models";
 import type { FundingFilters, ThemeRef } from "@/core/read-models";
 import { companySizeBandSlug } from "@/core/registry";
-import { SECTORS, SECTOR_LABELS } from "@/core/sectors";
+import { SECTORS, SECTOR_LABELS, type Sector } from "@/core/sectors";
 import {
   COMPANY_SIZE_FILTER_LABELS,
   COMPANY_SIZE_FILTER_OPTIONS,
@@ -48,8 +48,15 @@ function titleWords(slug: string): string {
 }
 
 /**
- * The short filter bar above the list (research section 2): search, sector
- * chips with themes, Stage, amount, date, place, "Confirmed only" and "More
+ * The window the sector list is ranked over: the "Last 90 days" preset and a
+ * business quarter. A week or a month is too few rounds to rank reliably; a
+ * year would rank by the past, not the present.
+ */
+export const SECTOR_RANK_DAYS = 90;
+
+/**
+ * The short filter bar above the list (research section 2): the sector
+ * dropdown with themes, Stage, amount, date, place, "Confirmed only" and "More
  * filters", with a removable chip for every applied value. `total` is the
  * number of matching rounds, for the phone sheet's "Show N results".
  */
@@ -57,12 +64,18 @@ export function FilterBar({
   filters,
   themes = [],
   total,
+  sectorCounts,
   today = new Date().toISOString().slice(0, 10),
   action = "/",
 }: {
   filters: FundingFilters;
   themes?: readonly ThemeRef[];
   total: number;
+  /**
+   * Rounds per sector over the last `SECTOR_RANK_DAYS` days, busiest first
+   * (`getSectorCounts`). Without it the sectors keep their fixed order.
+   */
+  sectorCounts?: ReadonlyArray<{ sector: Sector; count: number }>;
   /** YYYY-MM-DD (UTC), for the date presets. */
   today?: string;
   action?: string;
@@ -143,10 +156,19 @@ export function FilterBar({
       label: DATE_PRESET_LABELS[preset],
       from: datePresetFrom(preset, today),
     })),
-    sectors: SECTORS.map((sector) => ({
-      value: sector,
-      label: SECTOR_LABELS[sector],
-    })),
+    sectors: sectorCounts
+      ? sectorCounts.map(({ sector, count }) => ({
+          value: sector,
+          label: SECTOR_LABELS[sector],
+          count,
+        }))
+      : SECTORS.map((sector) => ({
+          value: sector,
+          label: SECTOR_LABELS[sector],
+        })),
+    sectorCaption: sectorCounts
+      ? `Ranked by rounds in the last ${SECTOR_RANK_DAYS} days`
+      : undefined,
     themes: themes.map((theme) => ({
       slug: theme.slug,
       name: theme.name,

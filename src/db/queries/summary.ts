@@ -6,7 +6,7 @@ import type {
   FundingTotals,
   SectorTotal,
 } from "@/core/read-models";
-import { SECTORS, type Sector } from "@/core/sectors";
+import { SECTORS, SECTOR_LABELS, type Sector } from "@/core/sectors";
 import type { Db } from "../client";
 import { companies, events, fundingRounds } from "../schema";
 import {
@@ -240,5 +240,57 @@ export async function getQuickViewCounts(
 
   return Object.fromEntries(
     views.map((view, index) => [view.id, asCount(row?.[`v${index}`])]),
+  );
+}
+
+/** A sector and its number of rounds, for the sector filter's order. */
+export interface SectorCount {
+  sector: Sector;
+  count: number;
+}
+
+/**
+ * Rounds per sector over the last `days` days up to `today`, for every sector
+ * in `SECTORS`: highest first, ties (including the sectors with none, which
+ * come last) in alphabetical order of their labels. The count is what that
+ * sector filter alone would list over the window (the default list, so grants
+ * are out, D44), and it ignores every other filter, so the order does not move
+ * as the visitor filters. One statement: a `count(*) filter (where ...)` per
+ * sector. A round whose company sits in two sectors counts in both.
+ */
+export async function getSectorCounts(
+  db: Db,
+  {
+    days,
+    today = new Date().toISOString().slice(0, 10),
+  }: {
+    days: number;
+    today?: string;
+  },
+): Promise<SectorCount[]> {
+  const start = new Date(`${today}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - days);
+  const from = start.toISOString().slice(0, 10);
+  const base: FundingFilters = { from, to: today, page: 1, pageSize: 1 };
+  const columns: Record<string, SQL<unknown>> = {};
+  SECTORS.forEach((sector, index) => {
+    const own = fundingWhere({ page: 1, pageSize: 1, sectors: [sector] }, null);
+    columns[`s${index}`] = sql<unknown>`(count(*) filter (where ${own}))::int`;
+  });
+
+  const [row] = await db
+    .select(columns)
+    .from(events)
+    .innerJoin(companies, eq(companies.id, events.companyId))
+    .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
+    .where(fundingWhere(base, null));
+
+  return SECTORS.map((sector, index) => ({
+    sector,
+    count: asCount(row?.[`s${index}`]),
+  })).sort(
+    (a, b) =>
+      b.count - a.count ||
+      SECTOR_LABELS[a.sector].localeCompare(SECTOR_LABELS[b.sector], "en-GB"),
   );
 }
