@@ -57,6 +57,8 @@ export function activeQuickView(
  * Tabs that set filters, each a plain link with the number of rounds it would
  * list. `base` is the current filters without the tabs' own keys, so a tab
  * keeps every other filter; the active tab is the one that matches exactly.
+ * The page draws the line under the tabs, so the toolbar row can hold
+ * "Show summary" at its right.
  */
 export function QuickViews({
   filters,
@@ -72,7 +74,7 @@ export function QuickViews({
   const active = activeQuickView(filters, base, views);
   return (
     <nav aria-label="Quick views" className="min-w-0">
-      <ul className="flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]">
+      <ul className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
         {views.map((view) => {
           const current = view.id === active?.id;
           const count = counts[view.id];

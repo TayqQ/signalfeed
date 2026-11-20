@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "./global-search";
 import { RaisoryMark } from "./icons";
 
 /**
  * Across the top of the content column, sticky: the logo mark on phones (the
- * sidebar has it from 768 px), global search, and the one orange action.
+ * sidebar has it from 768 px), then global search, which fills the rest of
+ * the bar on phones.
  */
 export function TopBar() {
   return (
@@ -18,12 +18,6 @@ export function TopBar() {
         <RaisoryMark className="h-7 w-7" />
       </Link>
       <GlobalSearch />
-      <div className="ml-auto flex shrink-0 items-center">
-        <Button variant="accent" href="/about#brief">
-          <span className="hidden sm:inline">Get the weekly brief</span>
-          <span className="sm:hidden">Weekly brief</span>
-        </Button>
-      </div>
     </header>
   );
 }

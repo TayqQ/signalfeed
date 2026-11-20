@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isCompanySlug,
-  isSummaryClosed,
   parseListView,
   parseOpenSlug,
+  parseSummaryState,
   resolveListView,
   resolveOpenSlug,
   summaryCookie,
@@ -75,13 +75,37 @@ describe("cookies", () => {
       "raisory_view=cards; Path=/; Max-Age=31536000; SameSite=Lax",
     );
   });
+});
 
-  it("reads and writes the summary state", () => {
-    expect(isSummaryClosed("closed")).toBe(true);
-    expect(isSummaryClosed("open")).toBe(false);
-    expect(isSummaryClosed(undefined)).toBe(false);
-    expect(summaryCookie(false)).toContain("raisory_summary=closed");
-    expect(summaryCookie(true)).toContain("Max-Age=0");
+describe("summary state", () => {
+  it("is open with no cookie or an unknown value", () => {
+    expect(parseSummaryState(undefined)).toBe("open");
+    expect(parseSummaryState("")).toBe("open");
+    expect(parseSummaryState("open")).toBe("open");
+    expect(parseSummaryState(3)).toBe("open");
+  });
+
+  it("reads closed for the session and hidden by default", () => {
+    expect(parseSummaryState("closed")).toBe("closed");
+    expect(parseSummaryState(" hidden ")).toBe("hidden");
+  });
+
+  it("writes closed as a session cookie, with no Max-Age", () => {
+    expect(summaryCookie("closed")).toBe(
+      "raisory_summary=closed; Path=/; SameSite=Lax",
+    );
+  });
+
+  it("keeps hidden by default for a year", () => {
+    expect(summaryCookie("hidden")).toBe(
+      "raisory_summary=hidden; Path=/; Max-Age=31536000; SameSite=Lax",
+    );
+  });
+
+  it("clears the cookie to open it", () => {
+    expect(summaryCookie("open")).toBe(
+      "raisory_summary=; Path=/; Max-Age=0; SameSite=Lax",
+    );
   });
 });
 

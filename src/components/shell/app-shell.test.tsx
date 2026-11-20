@@ -21,7 +21,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("main")).toHaveTextContent("Page");
   });
 
-  it("has the sidebar nav, the mobile nav, search and the one accent action", () => {
+  it("has the sidebar nav, the mobile nav and search, and no brief button", () => {
     render(
       <AppShell>
         <p>Page</p>
@@ -41,8 +41,8 @@ describe("AppShell", () => {
       screen.getByRole("navigation", { name: "Main (mobile)" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("search")).toBeInTheDocument();
-    const brief = screen.getByRole("link", { name: /weekly brief/i });
-    expect(brief).toHaveAttribute("href", "/about#brief");
-    expect(brief).toHaveClass("bg-accent");
+    // "Get the weekly brief" is gone until the brief exists.
+    expect(screen.queryByRole("link", { name: /weekly brief/i })).toBeNull();
+    expect(document.querySelector('a[href="/about#brief"]')).toBeNull();
   });
 });

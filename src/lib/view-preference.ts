@@ -104,16 +104,32 @@ export function viewCookie(view: ListView): string {
   return `${VIEW_COOKIE}=${view}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 
-/** True when the summary cookie says the visitor closed it. Open by default. */
-export function isSummaryClosed(cookie: unknown): boolean {
-  return typeof cookie === "string" && cookie.trim() === "closed";
+/**
+ * The summary's state from the `raisory_summary` cookie:
+ * - `open`: no cookie (the default);
+ * - `closed`: closed for this browser session (a session cookie);
+ * - `hidden`: hidden by default (a one-year cookie). "Show summary" then
+ *   opens it for this visit without changing the cookie.
+ */
+export type SummaryState = "open" | "closed" | "hidden";
+
+export function parseSummaryState(cookie: unknown): SummaryState {
+  if (typeof cookie !== "string") return "open";
+  const value = cookie.trim();
+  return value === "closed" || value === "hidden" ? value : "open";
 }
 
-/** Remembers a closed summary for a year; opening it clears the cookie. */
-export function summaryCookie(open: boolean): string {
-  return open
-    ? `${SUMMARY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
-    : `${SUMMARY_COOKIE}=closed; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+/**
+ * The `document.cookie` assignment for a summary state: `closed` is a session
+ * cookie (no Max-Age), `hidden` lasts a year, and `open` clears the cookie.
+ */
+export function summaryCookie(state: SummaryState): string {
+  if (state === "closed")
+    return `${SUMMARY_COOKIE}=closed; Path=/; SameSite=Lax`;
+  if (state === "hidden") {
+    return `${SUMMARY_COOKIE}=hidden; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+  }
+  return `${SUMMARY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 /**

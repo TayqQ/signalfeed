@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SummaryState } from "@/lib/view-preference";
 import type {
   FundingFilters,
   FundingRow,
@@ -13,6 +14,11 @@ import {
 } from "./funding-summary";
 import { QUICK_VIEWS, QuickViews, activeQuickView } from "./quick-views";
 import { sectorBarItems } from "./sector-bars";
+import {
+  ShowSummaryButton,
+  SummaryFrame,
+  SummaryProvider,
+} from "./summary-state";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
@@ -131,7 +137,7 @@ describe("FundingSummary", () => {
 
   it("shows the headline against the previous window", () => {
     render(
-      <FundingSummary summary={summary()} filters={dated} open today={TODAY} />,
+      <FundingSummary summary={summary()} filters={dated} today={TODAY} />,
     );
     expect(
       screen.getByRole("heading", { name: "What's happening" }),
@@ -151,7 +157,6 @@ describe("FundingSummary", () => {
       <FundingSummary
         summary={summary({ previous: null })}
         filters={filters()}
-        open
         today={TODAY}
       />,
     );
@@ -172,7 +177,6 @@ describe("FundingSummary", () => {
           biggest: [],
         })}
         filters={dated}
-        open
         today={TODAY}
       />,
     );
@@ -196,7 +200,6 @@ describe("FundingSummary", () => {
           sort: "amount",
           page: 3,
         })}
-        open
         today={TODAY}
       />,
     );
@@ -216,7 +219,7 @@ describe("FundingSummary", () => {
 
   it("lists the three biggest rounds", () => {
     render(
-      <FundingSummary summary={summary()} filters={dated} open today={TODAY} />,
+      <FundingSummary summary={summary()} filters={dated} today={TODAY} />,
     );
     const names = screen
       .getAllByRole("listitem")
@@ -227,24 +230,111 @@ describe("FundingSummary", () => {
     );
   });
 
-  it("opens and closes, remembering the state in the cookie", () => {
-    const { container } = render(
-      <FundingSummary
-        summary={summary()}
-        filters={dated}
-        open={false}
-        today={TODAY}
-      />,
+  it("is a section of the page, not a card, with a close control", () => {
+    render(
+      <FundingSummary summary={summary()} filters={dated} today={TODAY} />,
     );
-    const details = container.querySelector("details");
-    if (!details) throw new Error("no details");
-    expect(details.open).toBe(false);
-    details.open = true;
-    fireEvent(details, new Event("toggle"));
-    expect(document.cookie).not.toContain("raisory_summary=closed");
-    details.open = false;
-    fireEvent(details, new Event("toggle"));
-    expect(document.cookie).toContain("raisory_summary=closed");
+    const section = screen
+      .getByRole("heading", { name: "What's happening" })
+      .closest("section");
+    expect(section?.className ?? "").not.toMatch(/border|rounded|bg-/);
+    expect(
+      screen.getByRole("button", { name: "Hide summary" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Keep hidden by default" }),
+    ).not.toBeChecked();
+  });
+});
+
+function readCookie(): string | undefined {
+  return document.cookie
+    .split("; ")
+    .find((part) => part.startsWith("raisory_summary="))
+    ?.slice("raisory_summary=".length);
+}
+
+describe("summary state", () => {
+  beforeEach(() => {
+    document.cookie = "raisory_summary=; Path=/; Max-Age=0";
+  });
+
+  function page(initial: SummaryState) {
+    return render(
+      <SummaryProvider initial={initial}>
+        <SummaryFrame>
+          <FundingSummary
+            summary={summary()}
+            filters={filters({ from: "2026-10-19" })}
+            today={TODAY}
+          />
+        </SummaryFrame>
+        <ShowSummaryButton />
+      </SummaryProvider>,
+    );
+  }
+
+  const heading = () =>
+    screen.queryByRole("heading", { name: "What's happening" });
+  const showButton = () =>
+    screen.queryByRole("button", { name: "Show summary" });
+
+  it("is open by default; close removes it and sets the session cookie", () => {
+    page("open");
+    expect(heading()).toBeInTheDocument();
+    expect(showButton()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Hide summary" }));
+    // The whole section, header included, leaves the page.
+    expect(heading()).toBeNull();
+    expect(readCookie()).toBe("closed");
+    expect(showButton()).toHaveFocus();
+  });
+
+  it("starts hidden when closed for the session; Show summary clears it", () => {
+    page("closed");
+    expect(heading()).toBeNull();
+    fireEvent.click(showButton() as HTMLElement);
+    expect(heading()).toBeInTheDocument();
+    expect(showButton()).toBeNull();
+    expect(readCookie()).toBeUndefined();
+    expect(screen.getByRole("button", { name: "Hide summary" })).toHaveFocus();
+  });
+
+  it("keeps hidden by default with the one-year cookie", () => {
+    page("open");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Keep hidden by default" }),
+    );
+    expect(readCookie()).toBe("hidden");
+    // It stays on the page until the next load.
+    expect(heading()).toBeInTheDocument();
+  });
+
+  it("opens for this visit when hidden by default, keeping the cookie", () => {
+    document.cookie = "raisory_summary=hidden; Path=/";
+    page("hidden");
+    expect(heading()).toBeNull();
+    fireEvent.click(showButton() as HTMLElement);
+    expect(heading()).toBeInTheDocument();
+    expect(readCookie()).toBe("hidden");
+    const keep = screen.getByRole("checkbox", {
+      name: "Keep hidden by default",
+    });
+    expect(keep).toBeChecked();
+    // Closing again leaves the preference alone.
+    fireEvent.click(screen.getByRole("button", { name: "Hide summary" }));
+    expect(readCookie()).toBe("hidden");
+  });
+
+  it("removes the persistent cookie when Keep hidden is unticked", () => {
+    document.cookie = "raisory_summary=hidden; Path=/";
+    page("hidden");
+    fireEvent.click(showButton() as HTMLElement);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Keep hidden by default" }),
+    );
+    expect(readCookie()).toBeUndefined();
+    expect(heading()).toBeInTheDocument();
   });
 });
 

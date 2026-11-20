@@ -15,7 +15,7 @@ import {
   serialiseFundingCriteria,
 } from "@/lib/funding-filters";
 import { SectorBars, type SectorBar } from "./sector-bars";
-import { SummaryDisclosure } from "./summary-disclosure";
+import { SummaryControls } from "./summary-state";
 import { chipLabel } from "@/components/rounds/round-row-parts";
 
 const DAY_MS = 86_400_000;
@@ -124,21 +124,30 @@ function roundsText(count: number): string {
   return count === 1 ? "1 round" : `${count.toLocaleString("en-GB")} rounds`;
 }
 
+/** The light panel around each block inside the summary. */
+const PANEL =
+  "min-w-0 rounded-[var(--radius-lg)] border border-line bg-surface";
+
 /**
- * The collapsible "What's happening" summary (from direction B) for the same
- * filters as the list: £ raised, rounds and the median against the previous
- * window of the same length; sectors ranked by £ (or rounds), each a link
- * that filters the list; and the three biggest rounds.
+ * The "What's happening" summary (from direction B) for the same filters as
+ * the list: £ raised, rounds and the median against the previous window of the
+ * same length; sectors ranked by £ (or rounds), each a link that filters the
+ * list; and the three biggest rounds. A section of the page, not a card; its
+ * header has the close control (see `summary-state.tsx`).
+ *
+ * Layout, with no dead space:
+ * - phones: the stat tiles in a row, then sectors, then biggest rounds;
+ * - `md` to `xl`: the tiles, then sectors and biggest rounds side by side;
+ * - from `xl`: two columns, the tiles over biggest rounds on the left and
+ *   sectors on the right, both ending at the same height.
  */
 export function FundingSummary({
   summary,
   filters,
-  open,
   today,
 }: {
   summary: FundingSummaryData;
   filters: FundingFilters;
-  open: boolean;
   /** YYYY-MM-DD (UTC). */
   today: string;
 }) {
@@ -153,12 +162,19 @@ export function FundingSummary({
 
   return (
     <section aria-labelledby="summary-heading">
-      <SummaryDisclosure
-        defaultOpen={open}
-        headingId="summary-heading"
-        title="What's happening"
-        subtitle={subtitle}
-      >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2
+            id="summary-heading"
+            className="font-display text-[20px] font-semibold text-ink"
+          >
+            What&apos;s happening
+          </h2>
+          <p className="text-[13px] text-muted">{subtitle}</p>
+        </div>
+        <SummaryControls />
+      </div>
+      <div className="mt-3">
         {summary.count === 0 ? (
           <EmptyWindow
             summary={summary}
@@ -166,24 +182,28 @@ export function FundingSummary({
             previousLabel={span.previous?.label}
           />
         ) : (
-          <div className="grid grid-cols-3 items-start gap-2 sm:gap-3 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,2fr)_minmax(0,2fr)]">
-            <Headline
-              summary={summary}
-              previous={previous}
-              previousLabel={span.previous?.label ?? null}
-            />
-            <div className="min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-4 py-3 col-span-3 lg:col-span-2 xl:col-span-1">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-rows-[auto_1fr]">
+            <div className="min-w-0 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1">
+              <Headline
+                summary={summary}
+                previous={previous}
+                previousLabel={span.previous?.label ?? null}
+              />
+            </div>
+            <div
+              className={`${PANEL} px-4 py-3 xl:col-start-2 xl:row-span-2 xl:row-start-1`}
+            >
               <SectorBars
                 headingId="summary-sectors"
                 sectors={sectorBars(summary, filters)}
               />
             </div>
-            <div className="min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-4 py-3 col-span-3 lg:col-span-1 xl:col-span-1">
+            <div className={`${PANEL} px-4 py-3 xl:col-start-1 xl:row-start-2`}>
               <BiggestRounds summary={summary} />
             </div>
           </div>
         )}
-      </SummaryDisclosure>
+      </div>
     </section>
   );
 }
@@ -226,47 +246,48 @@ function Headline({
   const total = summary.totalGbpMinor > 0 ? summary.totalGbpMinor : null;
   const change = (current: number | null, before: number | null) =>
     previous ? <ChangeLine change={describeChange(current, before)} /> : null;
-  const tile =
-    "min-w-0 rounded-[var(--radius-lg)] border border-line bg-paper px-2.5 py-2.5 sm:px-4 sm:py-3";
+  const tile = `${PANEL} px-2.5 py-2.5 sm:px-4 sm:py-3`;
   return (
-    <>
-      <div className={tile}>
-        <Stat
-          label="Raised, in GBP"
-          size="lg"
-          value={money(total)}
-          sub={change(
-            summary.totalGbpMinor,
-            previous ? previous.totalGbpMinor : null,
-          )}
-        />
-      </div>
-      <div className={tile}>
-        <Stat
-          label="Rounds"
-          size="lg"
-          value={summary.count.toLocaleString("en-GB")}
-          sub={change(summary.count, previous ? previous.count : null)}
-        />
-      </div>
-      <div className={tile}>
-        <Stat
-          label="Median round"
-          size="lg"
-          value={money(summary.medianGbpMinor)}
-          sub={change(
-            summary.medianGbpMinor,
-            previous ? previous.medianGbpMinor : null,
-          )}
-        />
+    <div>
+      <div className="grid grid-cols-3 items-stretch gap-2 sm:gap-3">
+        <div className={tile}>
+          <Stat
+            label="Raised, in GBP"
+            size="lg"
+            value={money(total)}
+            sub={change(
+              summary.totalGbpMinor,
+              previous ? previous.totalGbpMinor : null,
+            )}
+          />
+        </div>
+        <div className={tile}>
+          <Stat
+            label="Rounds"
+            size="lg"
+            value={summary.count.toLocaleString("en-GB")}
+            sub={change(summary.count, previous ? previous.count : null)}
+          />
+        </div>
+        <div className={tile}>
+          <Stat
+            label="Median round"
+            size="lg"
+            value={money(summary.medianGbpMinor)}
+            sub={change(
+              summary.medianGbpMinor,
+              previous ? previous.medianGbpMinor : null,
+            )}
+          />
+        </div>
       </div>
       {previous && previousLabel ? (
-        <p className="col-span-3 text-xs text-muted xl:col-span-5 xl:order-last">
+        <p className="mt-2 text-xs text-muted">
           Changes compare with {previousLabel}, the window of the same length
           before.
         </p>
       ) : null}
-    </>
+    </div>
   );
 }
 

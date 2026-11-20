@@ -2,10 +2,12 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { RoundType } from "@/core/enums";
 import type { FundingFilters } from "@/core/read-models";
+import { SECTORS, SECTOR_LABELS } from "@/core/sectors";
 import { normaliseCompanyName, slugify } from "@/lib/normalise";
 import type { Db } from "../client";
 import {
   companies,
+  companySectors,
   companyThemes,
   events,
   fundingRounds,
@@ -16,6 +18,7 @@ import { createTestDb, type TestDb } from "../testing";
 import {
   getFundingSummary,
   getQuickViewCounts,
+  getSectorCounts,
   previousWindow,
   quickViewBase,
 } from "./summary";
@@ -340,5 +343,79 @@ describe("getQuickViewCounts", () => {
         VIEWS,
       ),
     ).toEqual(filters({ q: "robot" }));
+  });
+});
+
+describe("getSectorCounts", () => {
+  let test: TestDb;
+  let db: Db;
+  const TODAY = "2026-11-20";
+
+  beforeEach(async () => {
+    test = await createTestDb();
+    db = test.db;
+    const health = await addTheme(db, "health-ai", "health-life-sciences");
+    const fin = await addTheme(db, "payments", "financial-services");
+
+    const a = await addCompany(db, "Alpha Health");
+    const b = await addCompany(db, "Beta Pay");
+    const c = await addCompany(db, "Gamma Learn");
+    const d = await addCompany(db, "Delta Both");
+    await db.insert(companyThemes).values([
+      { companyId: a, themeId: health, tagCount: 2 },
+      { companyId: b, themeId: fin, tagCount: 1 },
+      { companyId: d, themeId: fin, tagCount: 1 },
+    ]);
+    // Sectors also come from company_sectors, as the sector filter reads both.
+    await db.insert(companySectors).values([
+      { companyId: c, sector: "education", source: "theme" },
+      { companyId: d, sector: "health-life-sciences", source: "theme" },
+    ]);
+
+    // Inside the 90 days (from 2026-08-22).
+    await addRound(db, a, "2026-11-19", 100);
+    await addRound(db, a, "2026-10-01", 100);
+    await addRound(db, b, "2026-09-15", 100);
+    await addRound(db, c, "2026-08-22", 100);
+    await addRound(db, c, "2026-11-01", null);
+    // Delta counts in both of its sectors.
+    await addRound(db, d, "2026-10-10", 100);
+    // Outside the window, and a grant (hidden by default): not counted.
+    await addRound(db, b, "2026-08-21", 100);
+    await addRound(db, b, "2026-01-05", 100);
+    await addRound(db, b, "2026-11-02", 100, "grant");
+  });
+
+  afterEach(async () => {
+    await test.close();
+  });
+
+  it("ranks by rounds in the window, ties alphabetical, empty sectors last", async () => {
+    const counts = await getSectorCounts(db, { days: 90, today: TODAY });
+    expect(counts.slice(0, 3)).toEqual([
+      { sector: "health-life-sciences", count: 3 },
+      // Two each: "Education" before "Financial services".
+      { sector: "education", count: 2 },
+      { sector: "financial-services", count: 2 },
+    ]);
+    const rest = counts.slice(3);
+    expect(rest.every((entry) => entry.count === 0)).toBe(true);
+    const labels = rest.map((entry) => SECTOR_LABELS[entry.sector]);
+    expect(labels).toEqual(
+      [...labels].sort((x, y) => x.localeCompare(y, "en-GB")),
+    );
+  });
+
+  it("lists every sector once", async () => {
+    const counts = await getSectorCounts(db, { days: 90, today: TODAY });
+    expect(counts.map((entry) => entry.sector).sort()).toEqual(
+      [...SECTORS].sort(),
+    );
+  });
+
+  it("follows the window length", async () => {
+    const week = await getSectorCounts(db, { days: 7, today: TODAY });
+    expect(week[0]).toEqual({ sector: "health-life-sciences", count: 1 });
+    expect(week.filter((entry) => entry.count > 0)).toHaveLength(1);
   });
 });
