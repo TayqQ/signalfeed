@@ -23,7 +23,7 @@ function response(
 describe("buildUserAgent", () => {
   it("includes the package version and contact", () => {
     expect(buildUserAgent("https://example.com/about")).toBe(
-      `SignalFeed/${packageJson.version} (+https://example.com/about)`,
+      `Raisory/${packageJson.version} (+https://example.com/about)`,
     );
   });
 });

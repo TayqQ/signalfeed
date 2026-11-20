@@ -4,6 +4,12 @@
 # GitHub disables scheduled workflows after 60 days with no repository activity
 # (A13). If that happens, re-enable this workflow from the Actions tab.
 #
+# It does only what must be fresh every hour (collect, extract, resolve, FX,
+# and the cheap rebuilds). Grant tagging and resolution, embeddings and themes
+# run in the daily workflow (`pnpm ingest enrich`, D67). The run stops itself
+# between items at MAX_INGEST_MINUTES_PER_RUN (default 12); timeout-minutes is
+# only the backstop.
+#
 # Set the repository variable INGEST_ENABLED to anything but "true" to stop it.
 # With no OPENAI_API_KEY secret, runs still collect and keep items for later.
 name: Ingest
@@ -31,6 +37,8 @@ jobs:
       EXTRACTION_MODEL: ${{ vars.EXTRACTION_MODEL }}
       LLM_MONTHLY_CAP_GBP: ${{ vars.LLM_MONTHLY_CAP_GBP }}
       HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
+      # Empty means the default (12 minutes).
+      MAX_INGEST_MINUTES_PER_RUN: ${{ vars.MAX_INGEST_MINUTES_PER_RUN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -52,23 +60,27 @@ jobs:
             const t = s.stats;
             // A missing step result means that step failed; the run error says why.
             const show = (step, value) => (step ? value(step) : "failed");
+            const seconds = (ms) => {
+              const parts = Object.entries(ms || {}).map(([name, n]) => `${name} ${(n / 1000).toFixed(1)}s`);
+              return parts.length ? parts.join(", ") : "-";
+            };
             const rebuilt = (step) => show(step, (r) => (r.skipped ? "skipped: no change" : "rebuilt"));
             const rows = t
               ? [
                   ["Status", s.status],
                   ["New items", t.collect.itemsInserted],
                   ["Feeds failed", t.collect.sourcesFailed],
+                  ["Feeds skipped (robots.txt)", t.collect.sourcesSkippedRobots ?? 0],
                   ["Filtered out", t.prefilter.itemsFilteredOut],
                   ["Extracted", t.extract.skipped ? "skipped: no key" : t.extract.itemsExtracted],
                   ["Events created", t.resolve.eventsCreated],
-                  ["Grant projects tagged", show(t.grantResolve, (g) => (g.taggingSkipped ? "skipped" : g.projectsTagged))],
-                  ["Grants resolved", show(t.grantResolve, (g) => g.participantsResolved)],
-                  ["Tags embedded", show(t.embed, (e) => (e.skipped ? "skipped" : e.tagsEmbedded))],
-                  ["Themes created", show(t.themes, (h) => (h.skipped ? "skipped" : h.themesCreated))],
-                  ["Themes named", show(t.themes, (h) => (h.skipped || h.namingSkipped ? "skipped" : h.themesNamed))],
+                  ["Stopped early", t.stoppedAtTime ? "time limit" : "no"],
                   ["Locations", rebuilt(t.locations)],
                   ["Stats", rebuilt(t.stats)],
+                  ["Confirmations", rebuilt(t.confirm)],
+                  ["Sectors", rebuilt(t.sectors)],
                   ["Run spend (USD micros)", t.spendUsdMicros],
+                  ["Step durations", seconds(t.stepMs)],
                 ]
               : [["Ran", String(s.ran)]];
             const lines = ["| Step | Result |", "|---|---|", ...rows.map(([a, b]) => `| ${a} | ${b} |`)];

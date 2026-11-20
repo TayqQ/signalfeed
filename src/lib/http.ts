@@ -98,7 +98,7 @@ export function createHttpFetcher(
   };
 }
 
-/** `SignalFeed/<version> (+<contact>)`, using the package version. */
+/** `Raisory/<version> (+<contact>)`, using the package version. */
 export function buildUserAgent(contact: string): string {
-  return `SignalFeed/${packageJson.version} (+${contact})`;
+  return `Raisory/${packageJson.version} (+${contact})`;
 }

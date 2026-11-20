@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type {
   CollectStats,
   ConfirmStats,
@@ -37,6 +37,7 @@ import {
   acquisitions,
   events,
   fundingRounds,
+  ingestRuns,
   investors,
   mergeCandidates,
 } from "@/db/schema";
@@ -70,7 +71,15 @@ import { confirmStep } from "./registry/confirm-events";
 import { registryStep as companiesHouseStep } from "./registry/registry-step";
 import { recomputeEvent } from "./resolve/canonicalise";
 import { resolveExtraction } from "./resolve/resolve-extraction";
+import { RobotsSkipError } from "@/lib/robots";
 import { SOURCES } from "./sources";
+import {
+  StepTimer,
+  TimeLimit,
+  timed,
+  timeLimitedBudget,
+  type TimingStats,
+} from "./step-timing";
 import { rebuildCompanyLocations } from "./stats/company-locations";
 import { rebuildCompanySectors } from "./stats/company-sectors";
 import { rebuildStatsStep } from "./stats/rebuild-stats";
@@ -102,6 +111,26 @@ import type { ThemeCheckDeps } from "./themes/theme-check";
 const STEP_BATCH_LIMIT = 5000;
 const FX_LOOKBACK_DAYS = 7;
 
+/** Default time limits (D67), used when the config has none. */
+export const DEFAULT_INGEST_MINUTES = 12;
+export const DEFAULT_ENRICH_MINUTES = 15;
+
+/** A `running` row this old, found inside the lock, belongs to a stopped job. */
+export const ABANDONED_AFTER_MINUTES = 60;
+export const ABANDONED_ERROR =
+  "abandoned: the job was stopped before it finished";
+
+/** What a run stores: the usual stats, plus step timings and the time-limit flag. */
+export type RunStats = Omit<IngestStats, "collect"> & {
+  collect: RunCollectStats;
+} & Partial<TimingStats>;
+
+/**
+ * Collect stats plus feeds skipped by robots.txt (D68). A skipped feed is not
+ * a failure: it was disallowed, or the host's robots.txt could not be read.
+ */
+export type RunCollectStats = CollectStats & { sourcesSkippedRobots: number };
+
 /**
  * Source kinds `collectStep` has a collector for. Other enabled sources, such
  * as `ukri-gtr` (collected by `pnpm ingest grants`), are left alone.
@@ -114,6 +143,10 @@ export interface PipelineConfig {
   /** Theme check model (D49). Absent: the extraction model. */
   themeCheckModel?: string;
   maxExtractionsPerRun: number;
+  /** `MAX_INGEST_MINUTES_PER_RUN`. The hourly run uses 12 when missing. */
+  maxIngestMinutesPerRun?: number;
+  /** `MAX_ENRICH_MINUTES_PER_RUN`. `enrich` uses 15 when missing. */
+  maxEnrichMinutesPerRun?: number;
   capGbp: number;
   embeddingModel: string;
   maxEmbeddingsPerRun: number;
@@ -159,6 +192,13 @@ export interface PipelineDeps {
   /** Never receives secrets or article text. */
   log: (message: string) => void;
   runId?: number;
+  /**
+   * Set by the runs that have a time limit (D67). Loops check it between
+   * items, never inside one. Absent: no limit, as for single steps by hand.
+   */
+  limit?: TimeLimit;
+  /** Set by the runs that time their steps. Absent: nothing is logged. */
+  timer?: StepTimer;
 }
 
 export type ExtractStepResult = ExtractStats & { budgetPaused: boolean };
@@ -184,11 +224,14 @@ function isProviderError(error: unknown): boolean {
   );
 }
 
-export async function collectStep(deps: PipelineDeps): Promise<CollectStats> {
-  const stats: CollectStats = {
+export async function collectStep(
+  deps: PipelineDeps,
+): Promise<RunCollectStats> {
+  const stats: RunCollectStats = {
     sourcesAttempted: 0,
     sourcesNotModified: 0,
     sourcesFailed: 0,
+    sourcesSkippedRobots: 0,
     itemsFound: 0,
     itemsInserted: 0,
   };
@@ -219,6 +262,15 @@ export async function collectStep(deps: PipelineDeps): Promise<CollectStats> {
         fetchedAt: deps.clock.now(),
       });
     } catch (error) {
+      if (error instanceof RobotsSkipError) {
+        stats.sourcesSkippedRobots += 1;
+        deps.log(
+          error.reason === "disallowed"
+            ? `Feed ${source.config.slug} skipped: disallowed by robots.txt`
+            : `Feed ${source.config.slug} skipped: robots.txt unavailable, retrying next run`,
+        );
+        continue;
+      }
       stats.sourcesFailed += 1;
       deps.log(`Feed ${source.config.slug} failed: ${describe(error)}`);
     }
@@ -298,6 +350,13 @@ export async function extractStep(
     deps.config.maxExtractionsPerRun,
   );
   for (const item of items) {
+    // Between items only: an item's LLM call and its writes always finish.
+    if (deps.limit?.reached()) {
+      deps.log(
+        "Time limit reached: extraction stopped, the rest stays pending.",
+      );
+      break;
+    }
     stats.itemsAttempted += 1;
     try {
       const { extraction } = await extractOne(deps, deps.llm, item, deps.runId);
@@ -344,6 +403,10 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
   const before = await resolutionCounts(deps.db);
   const pending = await listUnresolvedExtractions(deps.db, STEP_BATCH_LIMIT);
   for (const extraction of pending) {
+    if (deps.limit?.reached()) {
+      deps.log("Time limit reached: resolve stopped, the rest waits.");
+      break;
+    }
     try {
       const outcome = await resolveExtraction(deps.db, extraction.id);
       if (outcome.alreadyResolved) continue;
@@ -433,6 +496,10 @@ export async function fxStep(deps: PipelineDeps): Promise<FxStats> {
     );
 
   for (const event of unconverted) {
+    if (deps.limit?.reached()) {
+      deps.log("Time limit reached: FX conversion stopped, the rest waits.");
+      break;
+    }
     if (!(await getRatesOnOrBefore(deps.db, event.announcedOn))) {
       if (await fetchRatesNear(deps, event.announcedOn))
         stats.ratesFetched += 1;
@@ -507,19 +574,31 @@ export async function grantResolveStep(
   if (!deps.llm || !paidAllowed) {
     stats.taggingSkipped = true;
   } else {
+    // The guard refuses between batches once the time limit has passed.
+    const guard = timeLimitedBudget(deps.budget, deps.limit);
     try {
-      const tagged = await tagGrantsStep({
-        db: deps.db,
-        llm: deps.llm,
-        budget: deps.budget,
-        model: deps.config.model,
-        maxProjects: deps.config.maxGrantTaggingsPerRun,
-        runId: deps.runId,
-      });
+      const tagged = await timed(
+        deps.timer,
+        "grantTagging",
+        () =>
+          tagGrantsStep({
+            db: deps.db,
+            llm: deps.llm!,
+            budget: guard.budget,
+            model: deps.config.model,
+            maxProjects: deps.config.maxGrantTaggingsPerRun,
+            runId: deps.runId,
+          }),
+        (result) => `${result.projectsTagged} projects`,
+      );
       stats.projectsTagged = tagged.projectsTagged;
       if (tagged.budgetPaused) {
-        stats.budgetPaused = true;
-        deps.log("Budget reached: grant tagging paused.");
+        if (guard.tripped()) {
+          deps.log("Time limit reached: grant tagging stopped.");
+        } else {
+          stats.budgetPaused = true;
+          deps.log("Budget reached: grant tagging paused.");
+        }
       }
     } catch (error) {
       stats.providerError = providerMessage(error);
@@ -528,10 +607,18 @@ export async function grantResolveStep(
   }
 
   try {
-    const resolved = await resolveGrantsStep({
-      db: deps.db,
-      now: () => deps.clock.now(),
-    });
+    // Free and local, so it runs even after the time limit. It has no
+    // per-item hook yet (D67): its work is bounded by the backlog.
+    const resolved = await timed(
+      deps.timer,
+      "grantResolution",
+      () =>
+        resolveGrantsStep({
+          db: deps.db,
+          now: () => deps.clock.now(),
+        }),
+      (result) => `${result.participantsResolved} participants`,
+    );
     stats.participantsResolved = resolved.participantsResolved;
     stats.participantsSkipped = resolved.participantsSkipped;
     stats.companiesCreated = resolved.companiesCreated;
@@ -561,16 +648,32 @@ export async function embedStep(
       stopsPaidSteps: false,
     };
   }
+  const embedder = deps.embedder;
+  const guard = timeLimitedBudget(deps.budget, deps.limit);
   try {
-    const stats = await embedTagsStep({
-      db: deps.db,
-      embedder: deps.embedder,
-      budget: deps.budget,
-      model: deps.config.embeddingModel,
-      dimensions: EMBEDDING_DIMENSIONS,
-      maxTags: deps.config.maxEmbeddingsPerRun,
-      runId: deps.runId,
-    });
+    const stats = await timed(
+      deps.timer,
+      "embed",
+      () =>
+        embedTagsStep({
+          db: deps.db,
+          embedder,
+          budget: guard.budget,
+          model: deps.config.embeddingModel,
+          dimensions: EMBEDDING_DIMENSIONS,
+          maxTags: deps.config.maxEmbeddingsPerRun,
+          runId: deps.runId,
+        }),
+      (result) => `${result.tagsEmbedded} tags`,
+    );
+    if (stats.budgetPaused && guard.tripped()) {
+      deps.log("Time limit reached: embedding stopped.");
+      return {
+        stats: { tagsEmbedded: stats.tagsEmbedded, batches: stats.batches },
+        errors: [],
+        stopsPaidSteps: false,
+      };
+    }
     if (stats.budgetPaused) deps.log("Budget reached: embedding paused.");
     return {
       stats,
@@ -591,13 +694,17 @@ export async function embedStep(
  * The theme check runs on its own model when one is configured, and falls
  * back to the extraction model for the rest of the run if that fails (D49).
  */
-function themeCheckDeps(deps: PipelineDeps, llm: LlmClient): ThemeCheckDeps {
+function themeCheckDeps(
+  deps: PipelineDeps,
+  llm: LlmClient,
+  budget: BudgetGuard,
+): ThemeCheckDeps {
   const model = deps.config.themeCheckModel ?? deps.config.model;
   const own = deps.themeCheckLlm && model !== deps.config.model;
   return {
     llm: own ? deps.themeCheckLlm! : llm,
     model: own ? model : deps.config.model,
-    budget: deps.budget,
+    budget,
     purpose: "theme_naming",
     runId: deps.runId,
     fallbackLlm: own ? { llm, model: deps.config.model } : undefined,
@@ -626,15 +733,24 @@ export async function themesStep(
     };
   }
   const errors: string[] = [];
+  const guard = timeLimitedBudget(deps.budget, deps.limit);
 
   try {
     // Tags and themes store the model plus the input template. With a key,
     // tags in the similarity band get an LLM check (D47).
-    const assigned = await assignThemesStep({
-      db: deps.db,
-      model: tagEmbeddingIdentity(deps.config.embeddingModel),
-      check: deps.llm ? themeCheckDeps(deps, deps.llm) : undefined,
-    });
+    const assigned = await timed(
+      deps.timer,
+      "themesAssign",
+      () =>
+        assignThemesStep({
+          db: deps.db,
+          model: tagEmbeddingIdentity(deps.config.embeddingModel),
+          check: deps.llm
+            ? themeCheckDeps(deps, deps.llm, guard.budget)
+            : undefined,
+        }),
+      (result) => `${result.tagsAssigned} tags`,
+    );
     stats.tagsAssigned = assigned.tagsAssigned;
     stats.themesCreated = assigned.themesCreated;
     const check = assigned.check;
@@ -643,7 +759,9 @@ export async function themesStep(
         `Theme check: ${check.questions} questions in ${check.calls} calls; ${check.joined} joined, ${check.rejected} kept apart, ${check.fallbacks} fell back to the embedding rule.`,
       );
     }
-    if (check?.fallback === "budget") {
+    if (check?.fallback === "budget" && guard.tripped()) {
+      deps.log("Time limit reached: theme check stopped.");
+    } else if (check?.fallback === "budget") {
       stats.budgetPaused = true;
       deps.log("Budget reached: theme check paused.");
     } else if (check?.fallback === "error") {
@@ -656,21 +774,30 @@ export async function themesStep(
 
   if (!deps.llm) {
     stats.namingSkipped = true;
-  } else if (stats.budgetPaused || stats.providerError) {
-    // The check was refused: naming would be too. It waits for the next run.
+  } else if (stats.budgetPaused || stats.providerError || guard.tripped()) {
+    // The check was refused, or time ran out: naming waits for the next run.
   } else {
+    const llm = deps.llm;
     try {
-      const named = await nameThemesStep({
-        db: deps.db,
-        llm: deps.llm,
-        budget: deps.budget,
-        model: deps.config.model,
-        maxThemes: deps.config.maxThemeNamesPerRun,
-        runId: deps.runId,
-        clock: deps.clock,
-      });
+      const named = await timed(
+        deps.timer,
+        "themesName",
+        () =>
+          nameThemesStep({
+            db: deps.db,
+            llm,
+            budget: guard.budget,
+            model: deps.config.model,
+            maxThemes: deps.config.maxThemeNamesPerRun,
+            runId: deps.runId,
+            clock: deps.clock,
+          }),
+        (result) => `${result.themesNamed} themes`,
+      );
       stats.themesNamed = named.themesNamed;
-      if (named.budgetPaused) {
+      if (named.budgetPaused && guard.tripped()) {
+        deps.log("Time limit reached: theme naming stopped.");
+      } else if (named.budgetPaused) {
         stats.budgetPaused = true;
         deps.log("Budget reached: theme naming paused.");
       }
@@ -720,52 +847,6 @@ export async function derivedStatsStep(
   } catch (error) {
     return { errors: [failure("stats", error)], stopsPaidSteps: false };
   }
-}
-
-export interface Phase2Result {
-  grantResolve?: GrantResolveStats;
-  embed?: EmbedStats;
-  themes?: ThemeStats;
-  locations?: LocationStats;
-  stats?: DerivedStats;
-  errors: string[];
-  budgetPaused: boolean;
-}
-
-/**
- * Steps 8 to 12 in spec order. A budget pause or provider refusal stops the
- * paid steps after it; locations and stats always run.
- */
-export async function phase2Steps(
-  deps: PipelineDeps,
-  { paidAllowed: allowed }: PaidStepOptions,
-): Promise<Phase2Result> {
-  let paidAllowed = allowed;
-  const errors: string[] = [];
-  const track = <T>(outcome: StepOutcome<T>): T | undefined => {
-    errors.push(...outcome.errors);
-    if (outcome.stopsPaidSteps) paidAllowed = false;
-    return outcome.stats;
-  };
-
-  const grantResolve = track(await grantResolveStep(deps, { paidAllowed }));
-  const embed = track(await embedStep(deps, { paidAllowed }));
-  const themes = track(await themesStep(deps, { paidAllowed }));
-  const locations = track(await locationsStep(deps));
-  const stats = track(await derivedStatsStep(deps));
-
-  for (const message of errors) deps.log(`Step failed: ${message}`);
-  return {
-    grantResolve,
-    embed,
-    themes,
-    locations,
-    stats,
-    errors,
-    budgetPaused: Boolean(
-      grantResolve?.budgetPaused || embed?.budgetPaused || themes?.budgetPaused,
-    ),
-  };
 }
 
 // Phase 3 steps (spec-phase3 section 6). The local ones run in `run`; the
@@ -896,24 +977,11 @@ export async function formDStep(
   return { stats, errors, stopsPaidSteps: false };
 }
 
-/** Steps 13 and 14, after the Phase 2 steps. */
-async function phase3LocalSteps(deps: PipelineDeps): Promise<{
-  confirm?: ConfirmStats;
-  sectors?: SectorStats;
-  errors: string[];
-}> {
-  const confirm = await confirmEventsStep(deps);
-  const sectors = await sectorsStep(deps);
-  const errors = [...confirm.errors, ...sectors.errors];
-  for (const message of errors) deps.log(`Step failed: ${message}`);
-  return { confirm: confirm.stats, sectors: sectors.stats, errors };
-}
-
 export interface RunSummary {
   ran: boolean;
   status?: IngestStatus;
   runId?: number;
-  stats?: IngestStats;
+  stats?: RunStats;
 }
 
 async function spendSoFar(budget: BudgetGuard): Promise<number> {
@@ -921,65 +989,147 @@ async function spendSoFar(budget: BudgetGuard): Promise<number> {
   return spentUsdMicros;
 }
 
-/** One locked, idempotent ingest run. Spec section 7, spec-phase2 section 6 and spec-phase3 section 6. */
+/**
+ * Marks `running` rows started over an hour ago as failed. Call it inside the
+ * lock: while the lock is held no other run is alive, so such a row belongs to
+ * a job that was cancelled or killed before it could finish (D67).
+ */
+export async function closeAbandonedRuns(db: Db, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MINUTES * 60_000);
+  const closed = await db
+    .update(ingestRuns)
+    .set({ status: "failed", error: ABANDONED_ERROR, finishedAt: now })
+    .where(
+      and(eq(ingestRuns.status, "running"), lt(ingestRuns.startedAt, cutoff)),
+    )
+    .returning({ id: ingestRuns.id });
+  return closed.length;
+}
+
+/** Closes abandoned runs, then records the start of this one. Inside the lock. */
+async function beginRun(deps: PipelineDeps, trigger: IngestTrigger) {
+  const closed = await closeAbandonedRuns(deps.db, deps.clock.now());
+  if (closed > 0) {
+    deps.log(`Closed ${closed} abandoned run${closed === 1 ? "" : "s"}.`);
+  }
+  return startRun(deps.db, trigger);
+}
+
+/** The note on a rebuild step's log line. */
+function rebuildNote(outcome: StepOutcome<{ skipped?: boolean }>) {
+  if (!outcome.stats) return "failed";
+  return outcome.stats.skipped ? "no change" : "rebuilt";
+}
+
+/**
+ * One locked, idempotent hourly run: what must be fresh every hour (collect,
+ * prefilter, extract, resolve, FX), then the cheap database-only rebuilds
+ * (locations, stats, confirmations, sectors) so a new round is labelled within
+ * the hour. Grant tagging and resolution, embeddings and themes are slow and
+ * paid; they run in `runEnrich` (D67). Stops between items at
+ * `MAX_INGEST_MINUTES_PER_RUN`; the rebuilds always run. Spec section 7 and
+ * spec-phase3 section 6.
+ */
 export async function runAll(
   deps: PipelineDeps,
   lock: IngestLock,
   trigger: IngestTrigger,
 ): Promise<RunSummary> {
   const locked = await withIngestLock(lock, async () => {
-    const run = await startRun(deps.db, trigger);
-    const scoped: PipelineDeps = { ...deps, runId: run.id };
+    const run = await beginRun(deps, trigger);
+    const timer = new StepTimer(deps.clock, deps.log);
+    const limit = new TimeLimit(
+      deps.clock,
+      deps.config.maxIngestMinutesPerRun ?? DEFAULT_INGEST_MINUTES,
+    );
+    const scoped: PipelineDeps = { ...deps, runId: run.id, timer, limit };
     try {
       await upsertSources(deps.db, SOURCES);
       const spentBefore = await spendSoFar(deps.budget);
-      const collect = await collectStep(scoped);
-      const prefilter = await prefilterStep(scoped);
-      const { budgetPaused: extractPaused, ...extract } =
-        await extractStep(scoped);
-      const resolve = await resolveStep(scoped);
-      const fx = await fxStep(scoped);
-      const {
-        errors,
-        budgetPaused: phase2Paused,
-        ...phase2
-      } = await phase2Steps(scoped, {
-        paidAllowed: !extractPaused && !extract.providerError,
-      });
-      const { errors: phase3Errors, ...phase3 } =
-        await phase3LocalSteps(scoped);
+      const collect = await timer.time(
+        "collect",
+        () => collectStep(scoped),
+        (r) => `${r.itemsInserted} new items`,
+      );
+      const prefilter = await timer.time(
+        "prefilter",
+        () => prefilterStep(scoped),
+        (r) => `${r.itemsChecked} items`,
+      );
+      const { budgetPaused: extractPaused, ...extract } = await timer.time(
+        "extract",
+        () => extractStep(scoped),
+        (r) => `${r.itemsExtracted} items`,
+      );
+      const resolve = await timer.time(
+        "resolve",
+        () => resolveStep(scoped),
+        (r) => `${r.extractionsResolved} extractions`,
+      );
+      const fx = await timer.time(
+        "fx",
+        () => fxStep(scoped),
+        (r) => `${r.eventsConverted} events`,
+      );
+
+      // The cheap rebuilds always run, even after the time limit.
+      const errors: string[] = [];
+      const track = <T>(outcome: StepOutcome<T>): T | undefined => {
+        errors.push(...outcome.errors);
+        return outcome.stats;
+      };
+      const locations = track(
+        await timer.time("locations", () => locationsStep(scoped), rebuildNote),
+      );
+      const stats = track(
+        await timer.time("stats", () => derivedStatsStep(scoped), rebuildNote),
+      );
+      const confirm = track(
+        await timer.time(
+          "confirm",
+          () => confirmEventsStep(scoped),
+          rebuildNote,
+        ),
+      );
+      const sectors = track(
+        await timer.time("sectors", () => sectorsStep(scoped), rebuildNote),
+      );
+      for (const message of errors) deps.log(`Step failed: ${message}`);
       const monthToDate = await spendSoFar(deps.budget);
 
-      const budgetPaused = extractPaused || phase2Paused;
-      const stats: IngestStats = {
+      const budgetPaused = extractPaused;
+      const runStats: RunStats = {
         collect,
         prefilter,
         extract,
         resolve,
         fx,
-        ...phase2,
-        ...phase3,
+        locations,
+        stats,
+        confirm,
+        sectors,
         spendUsdMicros: monthToDate - spentBefore,
         monthToDateUsdMicros: monthToDate,
         capGbp: deps.config.capGbp,
         budgetPaused,
+        stepMs: timer.stepMs,
+        ...(limit.hit ? { stoppedAtTime: true } : {}),
       };
       const problems = [
         ...(extract.providerError
           ? [`extraction: ${extract.providerError}`]
           : []),
         ...errors,
-        ...phase3Errors,
       ];
       let status: IngestStatus = "succeeded";
       if (budgetPaused) status = "budget_paused";
       if (problems.length > 0) status = "failed";
       await finishRun(deps.db, run.id, {
         status,
-        stats,
+        stats: runStats,
         error: problems.length > 0 ? problems.join("; ") : null,
       });
-      return { ran: true, status, runId: run.id, stats };
+      return { ran: true, status, runId: run.id, stats: runStats };
     } catch (error) {
       await finishRun(deps.db, run.id, {
         status: "failed",
@@ -996,12 +1146,13 @@ export async function runAll(
  * Stats for a run that does none of the Phase 1 steps: their parts are zero,
  * so the stored stats keep the shape the status page reads.
  */
-async function emptyRunStats(deps: PipelineDeps): Promise<IngestStats> {
+async function emptyRunStats(deps: PipelineDeps): Promise<RunStats> {
   return {
     collect: {
       sourcesAttempted: 0,
       sourcesNotModified: 0,
       sourcesFailed: 0,
+      sourcesSkippedRobots: 0,
       itemsFound: 0,
       itemsInserted: 0,
     },
@@ -1039,19 +1190,30 @@ async function recordedRun(
   deps: PipelineDeps,
   lock: IngestLock,
   trigger: IngestTrigger,
-  body: (
-    scoped: PipelineDeps,
-  ) => Promise<{ stats: IngestStats; errors: string[]; warnings?: string[] }>,
+  body: (scoped: PipelineDeps) => Promise<{
+    stats: RunStats;
+    errors: string[];
+    warnings?: string[];
+    /** A budget pause makes a clean run `budget_paused`. */
+    budgetPaused?: boolean;
+  }>,
 ): Promise<RunSummary> {
   const locked = await withIngestLock(lock, async () => {
-    const run = await startRun(deps.db, trigger);
+    const run = await beginRun(deps, trigger);
     const scoped: PipelineDeps = { ...deps, runId: run.id };
     try {
-      const { stats, errors, warnings = [] } = await body(scoped);
+      const {
+        stats,
+        errors,
+        warnings = [],
+        budgetPaused = false,
+      } = await body(scoped);
       for (const message of errors) deps.log(`Step failed: ${message}`);
       for (const message of warnings)
         deps.log(`Step stopped early: ${message}`);
-      const status: IngestStatus = errors.length > 0 ? "failed" : "succeeded";
+      let status: IngestStatus = "succeeded";
+      if (budgetPaused) status = "budget_paused";
+      if (errors.length > 0) status = "failed";
       // A warning keeps the run green but leaves its text on the run row.
       const notes = errors.length > 0 ? errors : warnings;
       await finishRun(deps.db, run.id, {
@@ -1080,7 +1242,7 @@ export type GrantsRunOptions = Pick<
 /**
  * `pnpm ingest grants`: one locked, recorded run that fetches new Innovate UK
  * projects and organisations from Gateway to Research. Free, so it needs no
- * key. Tagging and resolution happen in the next `run`.
+ * key. Tagging and resolution happen in `enrich`, the next step of the daily workflow.
  */
 export async function runGrants(
   deps: PipelineDeps,
@@ -1106,6 +1268,80 @@ export async function runGrants(
       warnings: grantCollect.lastError
         ? [`grants stopped early: ${grantCollect.lastError}`]
         : [],
+    };
+  });
+}
+
+/**
+ * `pnpm ingest enrich`: the slow, paid work that used to run every hour, now
+ * in the daily workflow (D67). In order: grant tagging, grant resolution, tag
+ * embedding, then theme assignment and naming. A budget pause or provider
+ * refusal stops the paid steps after it. Stops at
+ * `MAX_ENRICH_MINUTES_PER_RUN`, between batches and between steps. The
+ * rebuilds of locations, stats, confirmations and sectors that depend on it
+ * happen in the next hourly run.
+ */
+export async function runEnrich(
+  deps: PipelineDeps,
+  lock: IngestLock,
+  trigger: IngestTrigger,
+): Promise<RunSummary> {
+  return recordedRun(deps, lock, trigger, async (base) => {
+    const timer = new StepTimer(deps.clock, deps.log);
+    const limit = new TimeLimit(
+      deps.clock,
+      deps.config.maxEnrichMinutesPerRun ?? DEFAULT_ENRICH_MINUTES,
+    );
+    const scoped: PipelineDeps = { ...base, timer, limit };
+    const errors: string[] = [];
+    let paidAllowed = true;
+    const track = <T>(outcome: StepOutcome<T>): T | undefined => {
+      errors.push(...outcome.errors);
+      if (outcome.stopsPaidSteps) paidAllowed = false;
+      return outcome.stats;
+    };
+    const spentBefore = await spendSoFar(deps.budget);
+    const empty = await emptyRunStats(scoped);
+
+    const grantResolve = track(await grantResolveStep(scoped, { paidAllowed }));
+    let embed: EmbedStats | undefined;
+    if (limit.reached()) {
+      deps.log("step embed: skipped, time limit reached");
+      embed = { tagsEmbedded: 0, batches: 0, skipped: true };
+    } else {
+      embed = track(await embedStep(scoped, { paidAllowed }));
+    }
+    let themes: ThemeStats | undefined;
+    if (limit.reached()) {
+      deps.log("step themes: skipped, time limit reached");
+      themes = {
+        tagsAssigned: 0,
+        themesCreated: 0,
+        themesNamed: 0,
+        skipped: true,
+      };
+    } else {
+      themes = track(await themesStep(scoped, { paidAllowed }));
+    }
+
+    const monthToDate = await spendSoFar(deps.budget);
+    const budgetPaused = Boolean(
+      grantResolve?.budgetPaused || embed?.budgetPaused || themes?.budgetPaused,
+    );
+    return {
+      stats: {
+        ...empty,
+        grantResolve,
+        embed,
+        themes,
+        spendUsdMicros: monthToDate - spentBefore,
+        monthToDateUsdMicros: monthToDate,
+        budgetPaused,
+        stepMs: timer.stepMs,
+        ...(limit.hit ? { stoppedAtTime: true } : {}),
+      },
+      errors,
+      budgetPaused,
     };
   });
 }

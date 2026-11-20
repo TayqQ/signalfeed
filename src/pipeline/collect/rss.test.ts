@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { SourceConfig } from "@/core/domain";
 import type { HttpFetcher, HttpGetOptions } from "@/core/ports";
+import { createRobotsChecker, RobotsSkipError } from "@/lib/robots";
 import { SOURCES } from "@/pipeline/sources";
 import { createRssCollector } from "./rss";
 
@@ -91,6 +92,27 @@ describe("SOURCES", () => {
   });
 });
 
+/** A robots checker over fake robots.txt answers; `null` throws like a network error. */
+function robotsFor(
+  answers: Record<string, { status: number; body: string } | null>,
+  asked: string[] = [],
+) {
+  return createRobotsChecker({
+    fetcher: {
+      get(url) {
+        asked.push(url);
+        const answer = answers[new URL(url).origin];
+        if (!answer) return Promise.reject(new Error("network down"));
+        return Promise.resolve({ ...answer, etag: null, lastModified: null });
+      },
+    },
+  });
+}
+
+const allowAll = robotsFor({
+  "https://example.com": { status: 404, body: "" },
+});
+
 describe("createRssCollector", () => {
   it("sends conditional validators and returns the response validators", async () => {
     let seenUrl = "";
@@ -108,7 +130,7 @@ describe("createRssCollector", () => {
       },
     };
 
-    const result = await createRssCollector(fetcher).collect(source, {
+    const result = await createRssCollector(fetcher, allowAll).collect(source, {
       etag: "old-etag",
       lastModified: "Wed, 07 Oct 2026 10:00:00 GMT",
     });
@@ -138,7 +160,7 @@ describe("createRssCollector", () => {
       },
     };
 
-    const result = await createRssCollector(fetcher).collect(source, {
+    const result = await createRssCollector(fetcher, allowAll).collect(source, {
       etag: "etag-1",
       lastModified: "Wed, 07 Oct 2026 09:30:00 GMT",
     });
@@ -164,12 +186,88 @@ describe("createRssCollector", () => {
     };
 
     await expect(
-      createRssCollector(fetcher).collect(source, {
+      createRssCollector(fetcher, allowAll).collect(source, {
         etag: null,
         lastModified: null,
       }),
     ).rejects.toThrow(
       'Failed to fetch RSS feed "example-feed" from https://example.com/feed.xml: HTTP 503',
     );
+  });
+});
+
+describe("createRssCollector and robots.txt", () => {
+  const techEu: SourceConfig = {
+    ...source,
+    slug: "tech-eu",
+    url: "https://tech.eu/feed/",
+  };
+
+  function countingFeedFetcher(urls: string[]): HttpFetcher {
+    return {
+      get(url) {
+        urls.push(url);
+        return Promise.resolve({
+          status: 200,
+          body: readFeed("rss2-basic.xml"),
+          etag: null,
+          lastModified: null,
+        });
+      },
+    };
+  }
+
+  it("skips a disallowed feed without ever requesting it", async () => {
+    const feedUrls: string[] = [];
+    const robots = robotsFor({
+      "https://tech.eu": {
+        status: 200,
+        body: "User-agent: *\nDisallow: /feed/\n",
+      },
+    });
+    const error = await createRssCollector(
+      countingFeedFetcher(feedUrls),
+      robots,
+    )
+      .collect(techEu, { etag: null, lastModified: null })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RobotsSkipError);
+    expect((error as RobotsSkipError).reason).toBe("disallowed");
+    expect(feedUrls).toEqual([]);
+  });
+
+  it("fetches the feed when robots.txt is 404 (no rules)", async () => {
+    const feedUrls: string[] = [];
+    const robots = robotsFor({ "https://tech.eu": { status: 404, body: "" } });
+    const result = await createRssCollector(
+      countingFeedFetcher(feedUrls),
+      robots,
+    ).collect(techEu, { etag: null, lastModified: null });
+    expect(feedUrls).toEqual(["https://tech.eu/feed/"]);
+    expect(result.items.length).toBeGreaterThan(0);
+  });
+
+  it("skips the host for this run when robots.txt is 503", async () => {
+    const feedUrls: string[] = [];
+    const robots = robotsFor({ "https://tech.eu": { status: 503, body: "" } });
+    const error = await createRssCollector(
+      countingFeedFetcher(feedUrls),
+      robots,
+    )
+      .collect(techEu, { etag: null, lastModified: null })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RobotsSkipError);
+    expect((error as RobotsSkipError).reason).toBe("unavailable");
+    expect(feedUrls).toEqual([]);
+  });
+
+  it("skips the host when the robots.txt request fails", async () => {
+    const robots = robotsFor({ "https://tech.eu": null });
+    await expect(
+      createRssCollector(countingFeedFetcher([]), robots).collect(techEu, {
+        etag: null,
+        lastModified: null,
+      }),
+    ).rejects.toBeInstanceOf(RobotsSkipError);
   });
 });

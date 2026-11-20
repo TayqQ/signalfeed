@@ -1,10 +1,12 @@
 # Runs the daily jobs (docs/spec-phase2.md section 10.2, docs/spec-phase3.md
 # section 6), in this order:
 #   1. new Innovate UK grants from UKRI Gateway to Research
-#   2. Companies House linking and profile refresh (needs COMPANIES_HOUSE_API_KEY)
-#   3. SEC Form D filings from EDGAR (needs an email address in HTTP_CONTACT)
-# None of them needs OPENAI_API_KEY. Each step has its own timeout. The hourly run tags and resolves what the
-# grants step collects. A failing step does not skip the ones after it.
+#   2. enrich: grant tagging and resolution, tag embeddings, themes (D67). Uses
+#      OPENAI_API_KEY and the LLM budget; without a key it still resolves grants
+#   3. Companies House linking and profile refresh (needs COMPANIES_HOUSE_API_KEY)
+#   4. SEC Form D filings from EDGAR (needs an email address in HTTP_CONTACT)
+# Grants, registry and Form D need no OPENAI_API_KEY. Each step has its own timeout.
+# A failing step does not skip the ones after it.
 #
 # It shares the "ingest" concurrency group with the hourly workflow, so the two
 # never overlap. Each command also takes the pipeline's database lock.
@@ -31,10 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     if: vars.INGEST_ENABLED == 'true'
     # Each step has its own budget so a slow one cannot starve the rest:
-    # grants 25 minutes, Companies House 25, Form D 15, plus setup. At the
-    # default limits grants takes about 9 minutes (1,500 organisations at
-    # 3 requests a second), registry at most 17 (its time limit) and Form D about 10.
-    timeout-minutes: 75
+    # grants 25 minutes, enrich 18, Companies House 25, Form D 15, plus setup.
+    # At the default limits grants takes about 9 minutes (1,500 organisations
+    # at 3 requests a second), enrich at most 15 (its time limit), registry at
+    # most 17 (its time limit) and Form D about 10.
+    timeout-minutes: 93
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -43,6 +46,7 @@ jobs:
       HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
       GTR_REQUESTS_PER_SECOND: ${{ vars.GTR_REQUESTS_PER_SECOND }}
       MAX_GRANT_ORG_FETCHES_PER_RUN: ${{ vars.MAX_GRANT_ORG_FETCHES_PER_RUN }}
+      MAX_ENRICH_MINUTES_PER_RUN: ${{ vars.MAX_ENRICH_MINUTES_PER_RUN }}
       MAX_CH_REQUESTS_PER_RUN: ${{ vars.MAX_CH_REQUESTS_PER_RUN }}
       MAX_CH_MINUTES_PER_RUN: ${{ vars.MAX_CH_MINUTES_PER_RUN }}
       MAX_EDGAR_DAYS_PER_RUN: ${{ vars.MAX_EDGAR_DAYS_PER_RUN }}
@@ -61,6 +65,14 @@ jobs:
         run: |
           set -o pipefail
           pnpm --silent ingest grants --trigger "$TRIGGER" | tee grants.json
+      - name: Enrich (grant tags, embeddings, themes)
+        # Runs when grants failed, but not after a cancel. Stops itself at
+        # MAX_ENRICH_MINUTES_PER_RUN (default 15); the timeout is the backstop.
+        if: ${{ !cancelled() }}
+        timeout-minutes: 18
+        run: |
+          set -o pipefail
+          pnpm --silent ingest enrich --trigger "$TRIGGER" | tee enrich.json
       - name: Link companies to Companies House
         # Runs when an earlier step failed, but not after a cancel.
         if: ${{ !cancelled() && vars.REGISTRY_ENABLED != 'false' }}
@@ -102,6 +114,10 @@ jobs:
                   : [["Status", s.status], ...rows(s.stats || {})];
               return [`### ${title}`, "", "| Step | Result |", "|---|---|", ...body.map(([a, b]) => `| ${a} | ${b} |`), ""];
             };
+            const seconds = (ms) => {
+              const parts = Object.entries(ms || {}).map(([name, n]) => `${name} ${(n / 1000).toFixed(1)}s`);
+              return parts.length ? parts.join(", ") : "-";
+            };
             const lines = [
               ...table("Grants", read("grants.json"), (t) => {
                 const g = t.grantCollect;
@@ -115,6 +131,21 @@ jobs:
                   ["Organisations skipped (name not a company form)", g.orgsSkipped ?? 0],
                   ["Organisations fetched", g.orgsFetched],
                   ["Organisations failed", g.orgsFailed],
+                ];
+              }),
+              ...table("Enrich", read("enrich.json"), (t) => {
+                const g = t.grantResolve;
+                const e = t.embed;
+                const h = t.themes;
+                return [
+                  ["Grant projects tagged", g ? (g.taggingSkipped ? "skipped" : g.projectsTagged) : "failed"],
+                  ["Grants resolved", g ? g.participantsResolved : "failed"],
+                  ["Tags embedded", e ? (e.skipped ? "skipped" : e.tagsEmbedded) : "failed"],
+                  ["Themes created", h ? (h.skipped ? "skipped" : h.themesCreated) : "failed"],
+                  ["Themes named", h ? (h.skipped || h.namingSkipped ? "skipped" : h.themesNamed) : "failed"],
+                  ["Stopped early", t.stoppedAtTime ? "time limit" : t.budgetPaused ? "budget" : "no"],
+                  ["Run spend (USD micros)", t.spendUsdMicros],
+                  ["Step durations", seconds(t.stepMs)],
                 ];
               }),
               ...table("Companies House", read("registry.json"), (t) => {
