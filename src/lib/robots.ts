@@ -200,10 +200,16 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+/** robots.txt answers that mean "not for you": treated as disallow-all. */
+const REFUSED_STATUSES: ReadonlySet<number> = new Set([401, 403, 429]);
+
 /**
- * Status rules (RFC 9309): 2xx parses the file; 4xx means no rules (allowed);
- * 5xx, any other status, a network error or a timeout disallows the whole
- * host for this run. Every outcome is cached per host for 24 hours, in memory.
+ * Status rules: 2xx parses the file. 404, 410 and other 4xx mean no rules
+ * (allowed), as RFC 9309 says. 401, 403 and 429 are stricter than the RFC: a
+ * host that refuses us its robots.txt is treated as disallowing everything
+ * for this run, because we can't see rules it may have (Tech.eu blocks
+ * GitHub's IPs and its robots.txt disallows /feed/). 5xx, any other status, a
+ * network error or a timeout also disallows the whole host for this run. Every outcome is cached per host for 24 hours, in memory.
  */
 export function createRobotsChecker(
   options: CreateRobotsCheckerOptions,
@@ -227,6 +233,9 @@ export function createRobotsChecker(
           robots: parseRobots(response.body, tokens),
           fetchedAt,
         };
+      }
+      if (REFUSED_STATUSES.has(response.status)) {
+        return { kind: "unavailable", fetchedAt };
       }
       if (response.status >= 400 && response.status < 500) {
         return { kind: "open", fetchedAt };

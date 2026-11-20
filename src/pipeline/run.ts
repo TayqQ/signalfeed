@@ -267,7 +267,7 @@ export async function collectStep(
         deps.log(
           error.reason === "disallowed"
             ? `Feed ${source.config.slug} skipped: disallowed by robots.txt`
-            : `Feed ${source.config.slug} skipped: robots.txt unavailable, retrying next run`,
+            : `Feed ${source.config.slug} skipped: robots.txt refused or unavailable, retrying next run`,
         );
         continue;
       }

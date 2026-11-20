@@ -211,14 +211,26 @@ describe("createRobotsChecker", () => {
     expect(asked).toContain("https://www.eu-startups.com/robots.txt");
   });
 
-  it("allows everything on 4xx", async () => {
-    for (const status of [401, 403, 404, 410]) {
+  it("allows everything when robots.txt is missing (404, 410)", async () => {
+    for (const status of [404, 410]) {
       const checker = createRobotsChecker({
         fetcher: fakeFetcher(() => ({ status, body: "Disallow: /" }), []),
       });
       expect((await checker.check("https://a.example/feed")).allowed).toBe(
         true,
       );
+    }
+  });
+
+  it("disallows the host when robots.txt is refused (401, 403, 429)", async () => {
+    for (const status of [401, 403, 429]) {
+      const checker = createRobotsChecker({
+        fetcher: fakeFetcher(() => ({ status, body: "" }), []),
+      });
+      expect(await checker.check("https://tech.eu/feed/")).toEqual({
+        allowed: false,
+        reason: "unavailable",
+      });
     }
   });
 
