@@ -12,12 +12,12 @@ import {
 } from "./search-hints";
 
 describe("source country hints", () => {
-  it("names only configured sources, and UKTN is the one UK-only source", () => {
+  it("names only configured sources, and UKTN and BusinessCloud are the UK-only sources", () => {
     const slugs = new Set(SOURCES.map((s) => s.slug));
     for (const slug of Object.keys(SOURCE_COUNTRY_HINTS)) {
       expect(slugs.has(slug), slug).toBe(true);
     }
-    expect(sourceSlugsFor("GB")).toEqual(["uktech-news"]);
+    expect(sourceSlugsFor("GB")).toEqual(["businesscloud", "uktech-news"]);
     expect(sourceSlugsFor("US")).toEqual([]);
   });
 });

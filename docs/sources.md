@@ -469,3 +469,20 @@ Verification date: **12 November 2026** (UTC). Methods: official documentation p
 ## A46 — Accounts reforms
 
 **Status: reported, not confirmed by Companies House on GOV.UK.** The ECCTA accounts changes (no abridged accounts for small companies, a profit and loss account for small and micro companies, software-only filing) were paused from April 2027. Several firms report April 2028. [PKF Smith Cooper](https://www.pkfsmithcooper.com/news-insights/companies-house-delays-2027-filing-rule-changes/), [Rapid Formations](https://www.rapidformations.co.uk/blog/companies-house-profit-and-loss-filing/)
+
+## Sources added on 20 November 2026
+
+Tech.eu and UKTN disallow their feeds in robots.txt, and EU-Startups blocks GitHub's IPs, so the reader skips all three (D68). These four were checked on 20 November 2026 (HTTP 200, recent items, robots.txt allows the feed). The full research, including rejected candidates, was done that day.
+
+| Feed | Funding share | Region | Text | Notes |
+|---|---|---|---|---|
+| Tech Funding News | about 80% | Global, UK and Europe heavy | Full | Funding category feed. Behind Cloudflare, so reachability from GitHub runners is unknown until the first run. [Feed](https://techfundingnews.com/category/funding/feed/) |
+| The Recursive | about 40% | Central and Eastern Europe | Full | No conditional GET. [Feed](https://www.therecursive.com/rss/) |
+| BusinessCloud | about 25% | UK (northern slant) | Full | Registry country hint GB (D62). [Feed](https://businesscloud.co.uk/feed/) |
+| Silicon Republic | about 20-25% | Ireland | Summaries | robots.txt `Crawl-delay: 5`. [Feed](https://www.siliconrepublic.com/feed/) |
+
+Rejected that day:
+- FinSMEs, Fintech Futures and Prolific North show a Cloudflare challenge even from a home connection.
+- GlobeNewswire and Business Wire return 403.
+- AltFi has closed; Maddyness UK and Silicon Canals are stale.
+- The British Business Bank, Innovate UK and UKRI feeds carry policy news, not rounds.

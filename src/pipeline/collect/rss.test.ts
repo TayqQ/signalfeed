@@ -27,7 +27,7 @@ const source: SourceConfig = {
 };
 
 describe("SOURCES", () => {
-  it("matches the phase 1 source table", () => {
+  it("matches the source table", () => {
     expect(SOURCES).toEqual([
       {
         slug: "techcrunch-venture",
@@ -67,6 +67,38 @@ describe("SOURCES", () => {
         kind: "rss",
         url: "https://www.uktech.news/feed/",
         priority: 7,
+        enabled: true,
+      },
+      {
+        slug: "tech-funding-news",
+        name: "Tech Funding News",
+        kind: "rss",
+        url: "https://techfundingnews.com/category/funding/feed/",
+        priority: 8,
+        enabled: true,
+      },
+      {
+        slug: "the-recursive",
+        name: "The Recursive",
+        kind: "rss",
+        url: "https://www.therecursive.com/rss/",
+        priority: 6,
+        enabled: true,
+      },
+      {
+        slug: "businesscloud",
+        name: "BusinessCloud",
+        kind: "rss",
+        url: "https://businesscloud.co.uk/feed/",
+        priority: 6,
+        enabled: true,
+      },
+      {
+        slug: "silicon-republic",
+        name: "Silicon Republic",
+        kind: "rss",
+        url: "https://www.siliconrepublic.com/feed/",
+        priority: 6,
         enabled: true,
       },
       {
