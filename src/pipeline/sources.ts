@@ -7,6 +7,7 @@ import type { SourceConfig } from "@/core/domain";
  */
 export const SOURCES: SourceConfig[] = [
   {
+    // robots.txt: checked every run (D68); not known to disallow this feed.
     slug: "techcrunch-venture",
     name: "TechCrunch Venture",
     kind: "rss",
@@ -15,6 +16,7 @@ export const SOURCES: SourceConfig[] = [
     enabled: true,
   },
   {
+    // robots.txt: checked every run (D68); not known to disallow this feed.
     slug: "crunchbase-news",
     name: "Crunchbase News",
     kind: "rss",
@@ -23,6 +25,8 @@ export const SOURCES: SourceConfig[] = [
     enabled: true,
   },
   {
+    // robots.txt: disallows /feed/ for all agents (20 Nov 2026), so the reader
+    // skips it (D68) until Tech.eu gives permission. Permission asked.
     slug: "tech-eu",
     name: "Tech.eu",
     kind: "rss",
@@ -31,6 +35,7 @@ export const SOURCES: SourceConfig[] = [
     enabled: true,
   },
   {
+    // robots.txt: allows the feed (20 Nov 2026).
     slug: "eu-startups",
     name: "EU-Startups",
     kind: "rss",
@@ -39,6 +44,8 @@ export const SOURCES: SourceConfig[] = [
     enabled: true,
   },
   {
+    // robots.txt: disallows /feed for all agents (20 Nov 2026), so the reader
+    // skips it (D68) until UKTN gives permission. Permission asked.
     slug: "uktech-news",
     name: "UKTN",
     kind: "rss",
@@ -47,6 +54,7 @@ export const SOURCES: SourceConfig[] = [
     enabled: true,
   },
   {
+    // Disabled, so never fetched and never checked.
     slug: "sifted",
     name: "Sifted",
     kind: "rss",

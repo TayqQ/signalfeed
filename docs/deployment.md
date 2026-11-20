@@ -49,14 +49,14 @@ Variables:
 | `INGEST_ENABLED` | `true`. Anything else stops ingestion |
 | `EXTRACTION_MODEL` | The model chosen in `docs/eval-results.md` |
 | `LLM_MONTHLY_CAP_GBP` | `3` |
-| `HTTP_CONTACT` | An email address where publishers and the SEC can reach you, sent in every User-Agent as `SignalFeed/<version> (+<HTTP_CONTACT>)`. SEC EDGAR needs an email address, so `pnpm ingest formd` refuses a URL |
+| `HTTP_CONTACT` | An email address where publishers and the SEC can reach you, sent in every User-Agent as `Raisory/<version> (+<HTTP_CONTACT>)`. SEC EDGAR needs an email address, so `pnpm ingest formd` refuses a URL |
 
-Optional variables, with their defaults: `GTR_REQUESTS_PER_SECOND` (3), `MAX_GRANT_ORG_FETCHES_PER_RUN` (1500), `EMBEDDING_MODEL` (`text-embedding-3-small`), `MAX_EXTRACTIONS_PER_RUN` (150), `MAX_EMBEDDINGS_PER_RUN` (2000), `MAX_THEME_NAMES_PER_RUN` (20) and `MAX_GRANT_TAGGINGS_PER_RUN` (200). The hourly workflow does not pass the Phase 2 ones yet, so their defaults apply. The daily workflow passes the two grants settings when set.
+Optional variables, with their defaults: `GTR_REQUESTS_PER_SECOND` (3), `MAX_GRANT_ORG_FETCHES_PER_RUN` (1500), `EMBEDDING_MODEL` (`text-embedding-3-small`), `MAX_EXTRACTIONS_PER_RUN` (150), `MAX_EMBEDDINGS_PER_RUN` (2000), `MAX_THEME_NAMES_PER_RUN` (20) and `MAX_GRANT_TAGGINGS_PER_RUN` (200). The hourly workflow does not pass the Phase 2 ones yet, so their defaults apply. The daily workflow passes the two grants settings when set. Time limits: `MAX_INGEST_MINUTES_PER_RUN` (12, hourly run) and `MAX_ENRICH_MINUTES_PER_RUN` (15, daily enrich step), whole minutes from 1 to 60. Empty means the default.
 
 Two workflows use these settings:
 
-- **Ingest** (`.github/workflows/ingest.yml`), hourly at minute 17. It runs `pnpm ingest run`: collect, prefilter, extract, resolve and FX, then grant tagging and resolution, tag embedding, theme assignment and naming, locations and stats. Paid steps skip cleanly with no key, and a budget pause stops the paid steps that follow it.
-- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. The job has 75 minutes, and each step has its own timeout (grants 25, Companies House 25, Form D 15), so a slow grants step cannot starve the later ones. It runs three steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). All three are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run tags and resolves the grants.
+- **Ingest** (`.github/workflows/ingest.yml`), hourly at minute 17. It runs `pnpm ingest run`: collect, prefilter, extract, resolve and FX, then the cheap database rebuilds (locations, stats, confirmations, sectors). It stops itself between items at `MAX_INGEST_MINUTES_PER_RUN` (12 minutes) and logs the time each step took (`step extract: 4.2s (6 items)`); the 20-minute `timeout-minutes` is only the backstop. Grant tagging and resolution, tag embedding and themes no longer run hourly: they are in the daily `enrich` step (D67). Extraction skips cleanly with no key, and a budget pause stops extraction. When a run starts, it also closes any run left `running` for over 60 minutes as failed ("abandoned").
+- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. The job has 93 minutes, and each step has its own timeout (grants 25, enrich 18, Companies House 25, Form D 15), so a slow step cannot starve the later ones. It runs four steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest enrich`, which tags and resolves grants, embeds tags and assigns and names themes (it uses the LLM key and budget, stops itself at `MAX_ENRICH_MINUTES_PER_RUN`, 15 minutes, and without a key still resolves grants); `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). Grants, registry and Form D are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run rebuilds locations, stats and sectors from what enrich changed.
 
 Both share the `ingest` concurrency group, so they never overlap, and the database run lock is a second guard. `INGEST_ENABLED` stops both.
 
@@ -103,7 +103,7 @@ That is about 6,000 projects. One run walks every page back to the `--since` dat
 
 Let the first walk finish. If it stops part way, later runs also stop after 3 pages with nothing new, so the older pages are not reached.
 
-Then run `pnpm ingest run` by hand once. It turns the backlog of participants into companies and grant events, which can take longer than the hourly workflow's 20-minute limit. Grant tagging continues at up to 200 projects a run. A grant event gets its USD amount on the run after it is created, because FX runs before grant resolution.
+Then run `pnpm ingest enrich` by hand once. It turns the backlog of participants into companies and grant events, tags up to 200 projects, embeds tags and updates themes. It stops itself at `MAX_ENRICH_MINUTES_PER_RUN` (15 minutes by default; set a larger value in `.env` for a one-off backlog) and leaves the rest for the next run, so run it again until `stoppedAtTime` is gone and tagging reaches 0. Grant tagging continues at up to 200 projects a run. A grant event gets its USD amount on the next hourly run, because FX runs before grant resolution. Then run `pnpm ingest run` once to rebuild locations, stats and sectors.
 
 ## 9. Review themes
 
@@ -120,7 +120,7 @@ Themes are created and named automatically. Review them from your machine with `
 
 Names and sectors show on the site at once. Merges and moves reach company themes and trends after the next stats rebuild, which the hourly run does when anything changed. To rebuild now, run `pnpm ingest stats`.
 
-Single steps can also be run by hand, each under the run lock: `pnpm ingest embed`, `pnpm ingest themes` and `pnpm ingest stats [--force]`. The first two need `OPENAI_API_KEY` for anything that costs money.
+Single steps can also be run by hand, each under the run lock (with no time limit): `pnpm ingest embed`, `pnpm ingest themes` and `pnpm ingest stats [--force]`. The first two need `OPENAI_API_KEY` for anything that costs money.
 
 ## 10. Phase 3: Companies House and SEC Form D
 
@@ -128,7 +128,7 @@ Phase 3 links companies to Companies House and SEC filings and marks news rounds
 
 ### What runs where
 
-- **Hourly** (`pnpm ingest run`): after the Phase 2 steps, it rebuilds confirmations (`event_confirmations` and `events.evidence`) and then sectors (`company_sectors`). Both use the database only, and skip when nothing changed. The locations step also uses registered offices. `run` never calls Companies House or EDGAR.
+- **Hourly** (`pnpm ingest run`): after extraction and FX, it rebuilds locations and stats, then confirmations (`event_confirmations` and `events.evidence`) and then sectors (`company_sectors`). Both use the database only, and skip when nothing changed. The locations step also uses registered offices. `run` never calls Companies House or EDGAR.
 - **Daily**, after grants:
   - `pnpm ingest registry`: links companies to Companies House, refreshes linked profiles and fetches SH01 filings, at most `MAX_CH_REQUESTS_PER_RUN` (2,000) requests, and it stops at `MAX_CH_MINUTES_PER_RUN` (17) minutes, checked between companies, whichever comes first. What is left stays due for the next run. Then it rebuilds confirmations, locations and sectors, so new links show at once. The summary shows "Stopped early: time limit" when the time limit ended it. Without `COMPANIES_HOUSE_API_KEY` the run is recorded as skipped and the step succeeds.
   - `pnpm ingest formd`: fetches the EDGAR daily indexes for days not yet done (up to yesterday, US Eastern time), stores each non-fund Form D and D/A, links issuers to companies, then rebuilds confirmations. At most `MAX_EDGAR_DAYS_PER_RUN` (10) days and `MAX_EDGAR_REQUESTS_PER_RUN` (3,000) requests, about 10 minutes. If `HTTP_CONTACT` has no email address it refuses, fetches nothing and the step fails.
@@ -154,7 +154,7 @@ Each command is recorded as a run under the run lock, and its stats show on `/st
    pnpm ingest relink-grants
    ```
 
-Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_CH_MINUTES_PER_RUN` (17, whole minutes from 1 to 60), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 75-minute limit: grants has 25 minutes, the registry step 25 (it stops itself at 17) and Form D 15.
+Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_CH_MINUTES_PER_RUN` (17, whole minutes from 1 to 60), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 93-minute limit: grants has 25 minutes, enrich 18 (it stops itself at 15), the registry step 25 (it stops itself at 17) and Form D 15.
 
 In short, you must set:
 
@@ -195,6 +195,10 @@ Remove the variable, or set it to anything else, to resume. Nothing is lost whil
 ### Review links
 
 Automatic links are strict, so some companies wait for review. Review them from your machine with `pnpm registry` (`list`, `show`, `approve`, `reject`, `link`, `unlink`). It never calls an API, and the web app cannot run it. Manual decisions are final. Confirmations and sectors catch up on the next hourly run.
+
+### Feeds and robots.txt
+
+The reader checks each publisher host's `robots.txt` before fetching a feed (D68). A disallowed feed is skipped, logged as `Feed <slug> skipped: disallowed by robots.txt`, and counted under "Feeds skipped (robots.txt)" in the run summary, not under "Feeds failed". Tech.eu and UKTN currently disallow their feeds, so expect 2 skipped feeds a run until they give permission. A host whose `robots.txt` answers 5xx or times out is skipped for that run only. The check needs no setting.
 
 ## Limits to keep in mind
 

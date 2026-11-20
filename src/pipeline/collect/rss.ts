@@ -1,10 +1,23 @@
 import type { HttpFetcher, Collector } from "@/core/ports";
+import { RobotsSkipError, type RobotsChecker } from "@/lib/robots";
 import { parseFeed } from "./parse-feed";
 
-/** RSS/Atom collector. URLs are returned raw; the store canonicalises them. */
-export function createRssCollector(fetcher: HttpFetcher): Collector {
+/**
+ * RSS/Atom collector. URLs are returned raw; the store canonicalises them.
+ * The feed URL is checked against the host's robots.txt first (D68). A
+ * disallowed feed, or a host whose robots.txt could not be read, throws
+ * `RobotsSkipError` before any request to the feed.
+ */
+export function createRssCollector(
+  fetcher: HttpFetcher,
+  robots: RobotsChecker,
+): Collector {
   return {
     async collect(source, state) {
+      const decision = await robots.beforeFetch(source.url);
+      if (!decision.allowed) {
+        throw new RobotsSkipError(source.url, decision.reason);
+      }
       const response = await fetcher.get(source.url, {
         etag: state.etag,
         lastModified: state.lastModified,

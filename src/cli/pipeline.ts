@@ -13,6 +13,7 @@ import {
   relinkGrantsStep,
   resolveStep,
   runAll,
+  runEnrich,
   runFormD,
   runGrants,
   runRegistry,
@@ -27,10 +28,14 @@ import { loadDotEnv } from "./env";
 const USAGE = `Usage: pnpm ingest <command> [options]
 
 Commands:
-  run        Collect, prefilter, extract, resolve and convert, then tag and
-             resolve grants, embed tags, assign and name themes, rebuild
-             locations and stats, then confirmations and sectors, under a lock.
-             Makes no Companies House or EDGAR request
+  run        The hourly run: collect, prefilter, extract, resolve and convert,
+             then rebuild locations, stats, confirmations and sectors, under a
+             lock. Stops between items at MAX_INGEST_MINUTES_PER_RUN. Logs the
+             time each step took. Makes no Companies House or EDGAR request,
+             and does no grant tagging, embedding or theme work (see enrich)
+  enrich     The slow, paid work, in the daily workflow: tag and resolve grants,
+             embed tags, assign and name themes. Stops between batches at
+             MAX_ENRICH_MINUTES_PER_RUN. Recorded as a run
   collect    Fetch feeds and store new items. Needs no LLM key
   extract    Prefilter pending items, then extract them
   resolve    Turn stored extractions into companies and events
@@ -51,7 +56,7 @@ Commands:
   stats      Rebuild company locations and the derived stats tables
 
 Options:
-  --trigger schedule|manual   run, grants, registry, formd: recorded on the run
+  --trigger schedule|manual   run, enrich, grants, registry, formd: recorded on the run
                               (default manual)
   --prompt-version <v>        reextract: must match this build's prompt
   --limit <n>                 reextract: most items to process (default 100)
@@ -70,8 +75,9 @@ Options:
   --force                     stats: rebuild even when nothing has changed
   -h, --help                  Show this help
 
-Without OPENAI_API_KEY, run still collects, resolves grants and rebuilds
-stats. Extraction, grant tagging, embedding and theme naming wait for a key.
+Without OPENAI_API_KEY, run still collects and rebuilds stats, and enrich
+still resolves grants. Extraction, grant tagging, embedding and theme naming
+wait for a key.
 registry and formd never need an LLM key.`;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -154,6 +160,7 @@ async function main(): Promise<number> {
     // Recorded runs: each prints its summary and fails on a failed run.
     const runs: Record<string, () => Promise<RunSummary>> = {
       run: () => runAll(deps, lock, trigger),
+      enrich: () => runEnrich(deps, lock, trigger),
       grants: () => runGrants(deps, lock, trigger, grantOptions),
       registry: () => runRegistry(deps, lock, trigger, { maxRequests }),
       formd: () => runFormD(deps, lock, trigger, formDOptions),

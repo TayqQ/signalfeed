@@ -30,6 +30,8 @@ describe("parsePipelineEnv", () => {
       EXTRACTION_MODEL: "gpt-5.6-luna",
       LLM_MONTHLY_CAP_GBP: 3,
       MAX_EXTRACTIONS_PER_RUN: 150,
+      MAX_INGEST_MINUTES_PER_RUN: 12,
+      MAX_ENRICH_MINUTES_PER_RUN: 15,
       EMBEDDING_MODEL: "text-embedding-3-small",
       MAX_EMBEDDINGS_PER_RUN: 2000,
       MAX_THEME_NAMES_PER_RUN: 20,
@@ -329,5 +331,56 @@ describe("grants speed settings and site indexing", () => {
     expect(isSiteIndexingEnabled({})).toBe(false);
     expect(isSiteIndexingEnabled({ SITE_INDEXING: "TRUE" })).toBe(false);
     expect(isSiteIndexingEnabled({ SITE_INDEXING: "true" })).toBe(true);
+  });
+});
+
+describe("run time limits (D67)", () => {
+  it("defaults to 12 minutes hourly and 15 for enrich, and treats empty as unset", () => {
+    expect(parsePipelineEnv(secrets)).toMatchObject({
+      MAX_INGEST_MINUTES_PER_RUN: 12,
+      MAX_ENRICH_MINUTES_PER_RUN: 15,
+    });
+    expect(
+      parsePipelineEnv({
+        ...secrets,
+        MAX_INGEST_MINUTES_PER_RUN: "",
+        MAX_ENRICH_MINUTES_PER_RUN: "",
+      }),
+    ).toMatchObject({
+      MAX_INGEST_MINUTES_PER_RUN: 12,
+      MAX_ENRICH_MINUTES_PER_RUN: 15,
+    });
+  });
+
+  it("reads overrides in both pipeline schemas", () => {
+    const overrides = {
+      MAX_INGEST_MINUTES_PER_RUN: "5",
+      MAX_ENRICH_MINUTES_PER_RUN: "40",
+    };
+    const expected = {
+      MAX_INGEST_MINUTES_PER_RUN: 5,
+      MAX_ENRICH_MINUTES_PER_RUN: 40,
+    };
+    expect(parsePipelineEnv({ ...secrets, ...overrides })).toMatchObject(
+      expected,
+    );
+    expect(
+      parseNoLlmPipelineEnv({
+        ...secrets,
+        OPENAI_API_KEY: undefined,
+        ...overrides,
+      }),
+    ).toMatchObject(expected);
+  });
+
+  it("rejects limits outside 1-60 whole minutes", () => {
+    for (const key of [
+      "MAX_INGEST_MINUTES_PER_RUN",
+      "MAX_ENRICH_MINUTES_PER_RUN",
+    ]) {
+      for (const bad of ["0", "61", "2.5"]) {
+        expect(() => parsePipelineEnv({ ...secrets, [key]: bad })).toThrow();
+      }
+    }
   });
 });

@@ -2,6 +2,7 @@ import { parseNoLlmPipelineEnv, type EnvSource } from "@/core/env";
 import type { Clock, HttpFetcher } from "@/core/ports";
 import { createPipelineDb } from "@/db/client";
 import { buildUserAgent, createHttpFetcher } from "@/lib/http";
+import { createRobotsChecker } from "@/lib/robots";
 import { createBudgetGuard } from "./budget/budget-guard";
 import { createRssCollector } from "./collect/rss";
 import { createOpenAiEmbeddingClient } from "./embed/openai-embeddings";
@@ -68,7 +69,7 @@ export function createPipelineDeps(env: EnvSource): Wired {
   return {
     deps: {
       db,
-      collector: createRssCollector(fetcher),
+      collector: createRssCollector(fetcher, createRobotsChecker({ fetcher })),
       llm: apiKey
         ? createOpenAiClient({ apiKey, model: parsed.EXTRACTION_MODEL })
         : null,
@@ -110,6 +111,8 @@ export function createPipelineDeps(env: EnvSource): Wired {
         model: parsed.EXTRACTION_MODEL,
         themeCheckModel: parsed.THEME_CHECK_MODEL,
         maxExtractionsPerRun: parsed.MAX_EXTRACTIONS_PER_RUN,
+        maxIngestMinutesPerRun: parsed.MAX_INGEST_MINUTES_PER_RUN,
+        maxEnrichMinutesPerRun: parsed.MAX_ENRICH_MINUTES_PER_RUN,
         capGbp: parsed.LLM_MONTHLY_CAP_GBP,
         embeddingModel: parsed.EMBEDDING_MODEL,
         maxEmbeddingsPerRun: parsed.MAX_EMBEDDINGS_PER_RUN,

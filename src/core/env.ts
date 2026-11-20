@@ -17,6 +17,20 @@ export const pipelineEnvSchema = z.object({
   EXTRACTION_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   LLM_MONTHLY_CAP_GBP: z.coerce.number().positive().default(3),
   MAX_EXTRACTIONS_PER_RUN: z.coerce.number().int().positive().default(150),
+  /** Time limit for the hourly run, checked between steps and items (D67). */
+  MAX_INGEST_MINUTES_PER_RUN: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(60)
+    .default(12),
+  /** Time limit for `pnpm ingest enrich`, checked between steps and batches (D67). */
+  MAX_ENRICH_MINUTES_PER_RUN: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(60)
+    .default(15),
   /** Contact URL or email sent in the User-Agent of outgoing requests. */
   HTTP_CONTACT: z.string().min(1),
   // Phase 2

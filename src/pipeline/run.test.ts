@@ -4,6 +4,7 @@ import type { SourceConfig } from "@/core/domain";
 import type { HttpGetOptions } from "@/core/ports";
 import type { ExtractedEventV1, ExtractionV1 } from "@/core/extraction-schema";
 import type {
+  Clock,
   Collector,
   CollectResult,
   EmbeddingClient,
@@ -13,6 +14,7 @@ import type {
   LlmCompleteResult,
 } from "@/core/ports";
 import { ExtractionValidationError } from "@/core/errors";
+import { RobotsSkipError } from "@/lib/robots";
 import type { RegistryCompanyFacts } from "@/core/registry";
 import {
   chFilings,
@@ -47,14 +49,18 @@ import { recordLink } from "./registry/link-store";
 import { storeChCompany } from "./registry/store-registry";
 import { fakeChClient } from "./registry/testing";
 import {
+  ABANDONED_ERROR,
+  closeAbandonedRuns,
   FormDContactError,
   reextractStep,
   relinkGrantsStep,
   runAll,
+  runEnrich,
   runFormD,
   runGrants,
   runRegistry,
   themesStep,
+  type PipelineConfig,
   type PipelineDeps,
 } from "./run";
 import { EXTRACTION_PROMPT_VERSION } from "./extract/prompt";
@@ -265,9 +271,11 @@ function deps(
     edgar?: EdgarClient | null;
     log?: string[];
     now?: Date;
+    clock?: Clock;
+    config?: Partial<PipelineConfig>;
   } = {},
 ): PipelineDeps {
-  const clock = { now: () => overrides.now ?? NOW };
+  const clock = overrides.clock ?? { now: () => overrides.now ?? NOW };
   return {
     db: testDb.db,
     collector,
@@ -298,6 +306,7 @@ function deps(
       maxChRequestsPerRun: 2000,
       maxEdgarDaysPerRun: 10,
       maxEdgarRequestsPerRun: 3000,
+      ...overrides.config,
     },
     log: (message) => {
       overrides.log?.push(message);
@@ -411,6 +420,32 @@ describe("runAll", () => {
     expect(summary.stats?.extract.itemsExtracted).toBe(1);
   });
 
+  it("counts robots.txt skips apart from failures and logs them", async () => {
+    const { llm } = fakeLlm();
+    const log: string[] = [];
+    const summary = await runAll(
+      deps(
+        llm,
+        fakeCollector({
+          "tech-eu": new RobotsSkipError("https://tech.eu/feed/", "disallowed"),
+          "uktech-news": new RobotsSkipError(
+            "https://www.uktech.news/feed/",
+            "unavailable",
+          ),
+          "eu-startups": [headline("1", "Alpha raises €4M seed")],
+        }),
+        { log },
+      ),
+      lock(),
+      "manual",
+    );
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.collect.sourcesSkippedRobots).toBe(2);
+    expect(summary.stats?.collect.sourcesFailed).toBe(0);
+    expect(summary.stats?.extract.itemsExtracted).toBe(1);
+    expect(log).toContain("Feed tech-eu skipped: disallowed by robots.txt");
+  });
+
   it("keeps collecting with no key and leaves items pending", async () => {
     const summary = await runAll(
       deps(null, fakeCollector(twoRaises)),
@@ -484,8 +519,12 @@ describe("runAll", () => {
 });
 
 /** Stores one invented grant project with a fetched lead organisation. */
-async function seedGrant(): Promise<void> {
-  await collectGrantsStep({ db: testDb.db, gtr: gtrClient(), maxPages: 1 });
+async function seedGrant(projects = 1): Promise<void> {
+  await collectGrantsStep({
+    db: testDb.db,
+    gtr: gtrClient(projects),
+    maxPages: 1,
+  });
 }
 
 /**
@@ -529,8 +568,32 @@ function recordingCollector(asked: string[]): Collector {
   };
 }
 
-describe("runAll, Phase 2 steps", () => {
-  it("runs grant tagging, embedding and naming in order, then locations and stats", async () => {
+/** An LLM that moves the fake clock on by `minutes` before each call. */
+function slowLlm(
+  inner: LlmClient,
+  clock: { advance(minutes: number): void },
+  minutes: number,
+): LlmClient {
+  return {
+    complete(request) {
+      clock.advance(minutes);
+      return inner.complete(request);
+    },
+  };
+}
+
+function fakeClock() {
+  let ms = NOW.getTime();
+  return {
+    now: () => new Date(ms),
+    advance(minutes: number) {
+      ms += minutes * 60_000;
+    },
+  };
+}
+
+describe("runAll, what runs hourly (D67)", () => {
+  it("does no grant tagging, grant resolution, embedding or theme work", async () => {
     await seedGrant();
     const log: string[] = [];
     const { llm } = fakeLlm({ log });
@@ -542,12 +605,163 @@ describe("runAll, Phase 2 steps", () => {
     );
 
     expect(summary.status).toBe("succeeded");
-    expect(log).toEqual([
-      "llm:extraction_v2",
-      "llm:extraction_v2",
+    expect(log).toEqual(["llm:extraction_v2", "llm:extraction_v2"]);
+    expect(calls).toHaveLength(0);
+    const stats = summary.stats!;
+    expect(stats.grantResolve).toBeUndefined();
+    expect(stats.embed).toBeUndefined();
+    expect(stats.themes).toBeUndefined();
+    const [participant] = await testDb.db.select().from(grantParticipants);
+    expect(participant?.resolvedAt).toBeNull();
+    expect(await testDb.db.select().from(themes)).toHaveLength(0);
+
+    // The cheap rebuilds still ran.
+    expect(stats.locations?.skipped).toBeUndefined();
+    expect(stats.stats?.skipped).toBeUndefined();
+    expect(stats.confirm).toBeDefined();
+    expect(stats.sectors).toBeDefined();
+    expect(stats.stoppedAtTime).toBeUndefined();
+    expect(stats.budgetPaused).toBe(false);
+  });
+
+  it("logs one timed line per step and stores the durations in the stats", async () => {
+    const log: string[] = [];
+    const clock = fakeClock();
+    const { llm } = fakeLlm();
+    const summary = await runAll(
+      deps(slowLlm(llm, clock, 1), fakeCollector(twoRaises), { log, clock }),
+      lock(),
+      "schedule",
+    );
+
+    expect(Object.keys(summary.stats!.stepMs!)).toEqual([
+      "collect",
+      "prefilter",
+      "extract",
+      "resolve",
+      "fx",
+      "locations",
+      "stats",
+      "confirm",
+      "sectors",
+    ]);
+    // Two extraction calls of one minute each.
+    expect(summary.stats?.stepMs?.extract).toBe(120_000);
+    expect(summary.stats?.stepMs?.collect).toBe(0);
+    const steps = log.filter((line) => line.startsWith("step "));
+    expect(steps).toContain("step extract: 120.0s (2 items)");
+    expect(steps).toContain("step collect: 0.0s (3 new items)");
+    expect(steps).toContain("step resolve: 0.0s (2 extractions)");
+    expect(steps).toHaveLength(9);
+    const [run] = await testDb.db.select().from(ingestRuns);
+    expect(run?.stats).toMatchObject({ stepMs: { extract: 120_000 } });
+  });
+
+  it("stops between items at the time limit, still rebuilds, and finishes the rest next run", async () => {
+    const feed = {
+      "techcrunch-venture": ["1", "2", "3", "4"].map((id) =>
+        headline(id, `Co${id} raises €4M seed`),
+      ),
+    };
+    const clock = fakeClock();
+    const { llm, state } = fakeLlm();
+    const log: string[] = [];
+    // Each call takes 5 minutes; the limit is 12, so calls start at 0, 5 and 10.
+    const first = await runAll(
+      deps(slowLlm(llm, clock, 5), fakeCollector(feed), {
+        clock,
+        log,
+        config: { maxIngestMinutesPerRun: 12 },
+      }),
+      lock(),
+      "schedule",
+    );
+
+    expect(first.status).toBe("succeeded");
+    expect(state.calls).toBe(3);
+    const stats = first.stats!;
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(stats.extract.itemsExtracted).toBe(3);
+    // Resolution is also between items, so it waits as well.
+    expect(stats.resolve.extractionsResolved).toBe(0);
+    expect(stats.locations).toBeDefined();
+    expect(stats.stats).toBeDefined();
+    expect(stats.confirm).toBeDefined();
+    expect(stats.sectors).toBeDefined();
+    expect(
+      log.some((line) => /Time limit reached: extraction/.test(line)),
+    ).toBe(true);
+    const pending = await testDb.db
+      .select()
+      .from(sourceItems)
+      .where(eq(sourceItems.status, "pending"));
+    expect(pending).toHaveLength(1);
+
+    // The next run starts a fresh limit and picks up where this one stopped.
+    const second = await runAll(
+      deps(llm, fakeCollector(feed), { clock }),
+      lock(),
+      "schedule",
+    );
+    expect(second.stats?.stoppedAtTime).toBeUndefined();
+    expect(second.stats?.extract.itemsExtracted).toBe(1);
+    expect(second.stats?.resolve.extractionsResolved).toBe(4);
+    expect(state.calls).toBe(4);
+    expect(await testDb.db.select().from(events)).toHaveLength(4);
+  });
+});
+
+const heldElsewhere = {
+  tryAcquire: () => Promise.resolve(false),
+  release: () => Promise.resolve(),
+};
+
+describe("runEnrich", () => {
+  /** Runs the hourly steps once so there are companies and tags to enrich. */
+  async function hourly(
+    llm: LlmClient | null,
+    overrides: Parameters<typeof deps>[2] = {},
+  ) {
+    return runAll(
+      deps(llm, fakeCollector(twoRaises), overrides),
+      lock(),
+      "schedule",
+    );
+  }
+
+  const runsInOrder = () =>
+    testDb.db.select().from(ingestRuns).orderBy(asc(ingestRuns.id));
+
+  it("tags and resolves grants, embeds, then names themes, in the old order", async () => {
+    await seedGrant();
+    const log: string[] = [];
+    const { llm } = fakeLlm({ log });
+    const { embedder, calls } = fakeEmbedder({ log });
+    await hourly(llm, { embedder });
+    log.length = 0;
+
+    const summary = await runEnrich(
+      deps(llm, fakeCollector({}), { embedder, log }),
+      lock(),
+      "schedule",
+    );
+
+    expect(summary.status).toBe("succeeded");
+    expect(log.filter((line) => !line.startsWith("step "))).toEqual([
       `llm:${GRANT_TAGS_SCHEMA_NAME}`,
       "embed",
       `llm:${THEME_NAMES_SCHEMA_NAME}`,
+    ]);
+    expect(
+      log
+        .filter((line) => line.startsWith("step "))
+        .map((line) => line.split(":")[0]),
+    ).toEqual([
+      "step grantTagging",
+      "step grantResolution",
+      "step embed",
+      "step themesAssign",
+      "step themesName",
     ]);
     // Grant tags reach companies before embedding, so they embed in the same run.
     const embedded = calls.flatMap((call) => call.inputs).join(" | ");
@@ -555,6 +769,14 @@ describe("runAll, Phase 2 steps", () => {
     expect(embedded).toMatch(/ai agents/);
 
     const stats = summary.stats!;
+    expect(Object.keys(stats.stepMs!)).toEqual([
+      "grantTagging",
+      "grantResolution",
+      "embed",
+      "themesAssign",
+      "themesName",
+    ]);
+    expect(stats.stoppedAtTime).toBeUndefined();
     expect(stats.grantResolve).toMatchObject({
       projectsTagged: 1,
       participantsResolved: 1,
@@ -567,20 +789,20 @@ describe("runAll, Phase 2 steps", () => {
       themesCreated: 2,
       themesNamed: 1,
     });
-    expect(stats.locations?.skipped).toBeUndefined();
-    expect(stats.stats?.skipped).toBeUndefined();
     expect(stats.budgetPaused).toBe(false);
 
-    // Stats ran after themes and grants: all three companies have a theme.
+    const [, run] = await runsInOrder();
+    expect(run?.status).toBe("succeeded");
+
+    // The next hourly run rebuilds from the new data: stats, locations, sectors.
+    const rebuilt = await hourly(llm, { embedder });
+    expect(rebuilt.stats?.locations?.skipped).toBeUndefined();
+    expect(rebuilt.stats?.stats?.skipped).toBeUndefined();
+    expect(rebuilt.stats?.sectors?.skipped).toBeUndefined();
     const themed = await testDb.db.select().from(companyThemes);
     expect(new Set(themed.map((row) => row.companyId)).size).toBe(3);
-    // Locations ran after grant resolution: the grant company has a postcode.
     expect(await testDb.db.select().from(companyLocations)).not.toHaveLength(0);
-    // Confirm and sectors ran after them: sectors come from the named theme.
-    expect(stats.confirm).toMatchObject({ eventsConfirmed: 0 });
-    expect(stats.confirm?.skipped).toBeUndefined();
-    expect(stats.sectors?.skipped).toBeUndefined();
-    expect(stats.sectors?.rowsBySource.theme).toBeGreaterThan(0);
+    expect(rebuilt.stats?.sectors?.rowsBySource.theme).toBeGreaterThan(0);
     expect(
       (await testDb.db.select().from(companySectors)).map((row) => row.sector),
     ).toContain("software-ai");
@@ -597,18 +819,16 @@ describe("runAll, Phase 2 steps", () => {
     ]);
   });
 
-  it("without a key collects, resolves grants and rebuilds stats, and skips the paid steps", async () => {
+  it("without a key resolves grants and skips the paid steps", async () => {
     await seedGrant();
-    const summary = await runAll(
-      deps(null, fakeCollector(twoRaises)),
+    const summary = await runEnrich(
+      deps(null, fakeCollector({})),
       lock(),
       "schedule",
     );
 
     expect(summary.status).toBe("succeeded");
     const stats = summary.stats!;
-    expect(stats.collect.itemsInserted).toBe(3);
-    expect(stats.extract.skipped).toBe(true);
     expect(stats.grantResolve).toMatchObject({
       taggingSkipped: true,
       projectsTagged: 0,
@@ -617,8 +837,6 @@ describe("runAll, Phase 2 steps", () => {
     });
     expect(stats.embed).toEqual({ tagsEmbedded: 0, batches: 0, skipped: true });
     expect(stats.themes).toMatchObject({ namingSkipped: true, themesNamed: 0 });
-    expect(stats.locations?.skipped).toBeUndefined();
-    expect(stats.stats?.skipped).toBeUndefined();
     expect(stats.spendUsdMicros).toBe(0);
     expect(await testDb.db.select().from(llmUsage)).toHaveLength(0);
 
@@ -627,7 +845,7 @@ describe("runAll, Phase 2 steps", () => {
     expect(run?.error).toBeNull();
   });
 
-  it("a budget pause in embedding skips naming but not locations and stats", async () => {
+  it("a budget pause in embedding skips naming and records budget_paused", async () => {
     const company = await insertCompany(testDb.db, "acme");
     await insertTag(testDb.db, {
       slug: "ai-agents",
@@ -636,7 +854,7 @@ describe("runAll, Phase 2 steps", () => {
     await fillBudget();
     const { llm, state } = fakeLlm();
     const { embedder, calls } = fakeEmbedder();
-    const summary = await runAll(
+    const summary = await runEnrich(
       deps(llm, fakeCollector({}), { embedder, capGbp: 0.001 }),
       lock(),
       "schedule",
@@ -645,21 +863,19 @@ describe("runAll, Phase 2 steps", () => {
     expect(summary.status).toBe("budget_paused");
     const stats = summary.stats!;
     expect(stats.budgetPaused).toBe(true);
+    expect(stats.stoppedAtTime).toBeUndefined();
     expect(stats.embed).toMatchObject({ tagsEmbedded: 0, budgetPaused: true });
     expect(stats.themes).toMatchObject({ skipped: true, themesNamed: 0 });
     expect(state.calls).toBe(0);
     expect(calls).toHaveLength(0);
-    expect(stats.locations).toBeDefined();
-    expect(stats.stats).toBeDefined();
-    expect(stats.stats?.skipped).toBeUndefined();
   });
 
-  it("a budget pause in grant tagging skips embedding and naming", async () => {
+  it("a budget pause in grant tagging skips embedding and naming but still resolves grants", async () => {
     await seedGrant();
     await fillBudget();
     const { llm, state } = fakeLlm();
     const { embedder } = fakeEmbedder();
-    const summary = await runAll(
+    const summary = await runEnrich(
       deps(llm, fakeCollector({}), { embedder, capGbp: 0.001 }),
       lock(),
       "schedule",
@@ -675,22 +891,26 @@ describe("runAll, Phase 2 steps", () => {
     expect(stats.embed?.skipped).toBe(true);
     expect(stats.themes?.skipped).toBe(true);
     expect(state.calls).toBe(0);
-    expect(stats.stats?.skipped).toBeUndefined();
   });
 
-  it("a second identical run creates nothing new and skips stats", async () => {
+  it("a second identical run creates nothing new", async () => {
     await seedGrant();
     await seedGrantRate();
     const log: string[] = [];
     const { llm } = fakeLlm({ log });
     const { embedder } = fakeEmbedder({ log });
-    const collector = fakeCollector(twoRaises);
-    await runAll(deps(llm, collector, { embedder }), lock(), "schedule");
+    await hourly(llm, { embedder });
+    await runEnrich(
+      deps(llm, fakeCollector({}), { embedder }),
+      lock(),
+      "schedule",
+    );
+    await hourly(llm, { embedder });
     const callsAfterFirst = log.length;
     const eventsAfterFirst = (await testDb.db.select().from(events)).length;
 
-    const second = await runAll(
-      deps(llm, collector, { embedder }),
+    const second = await runEnrich(
+      deps(llm, fakeCollector({}), { embedder }),
       lock(),
       "schedule",
     );
@@ -698,7 +918,6 @@ describe("runAll, Phase 2 steps", () => {
     expect(second.status).toBe("succeeded");
     expect(log).toHaveLength(callsAfterFirst);
     const stats = second.stats!;
-    expect(stats.collect.itemsInserted).toBe(0);
     expect(stats.grantResolve).toMatchObject({
       projectsTagged: 0,
       participantsResolved: 0,
@@ -710,43 +929,40 @@ describe("runAll, Phase 2 steps", () => {
       themesCreated: 0,
       themesNamed: 0,
     });
-    expect(stats.locations?.skipped).toBe(true);
-    expect(stats.stats?.skipped).toBe(true);
-    expect(stats.confirm?.skipped).toBe(true);
-    expect(stats.sectors?.skipped).toBe(true);
     expect(stats.spendUsdMicros).toBe(0);
     expect(await testDb.db.select().from(events)).toHaveLength(
       eventsAfterFirst,
     );
+    const third = await hourly(llm, { embedder });
+    expect(third.stats?.locations?.skipped).toBe(true);
+    expect(third.stats?.stats?.skipped).toBe(true);
+    expect(third.stats?.confirm?.skipped).toBe(true);
+    expect(third.stats?.sectors?.skipped).toBe(true);
   });
 
-  it("a thrown error in the themes step leaves Phase 1 results recorded", async () => {
+  it("a thrown error in the themes step is recorded and earlier steps are kept", async () => {
     const { llm } = fakeLlm({
       fail: (_user, schemaName) =>
         schemaName === THEME_NAMES_SCHEMA_NAME ? new Error("boom") : null,
     });
     const { embedder } = fakeEmbedder();
-    const summary = await runAll(
-      deps(llm, fakeCollector(twoRaises), { embedder }),
+    await hourly(llm, { embedder });
+    const summary = await runEnrich(
+      deps(llm, fakeCollector({}), { embedder }),
       lock(),
       "schedule",
     );
 
     expect(summary.status).toBe("failed");
-    const [run] = await testDb.db.select().from(ingestRuns);
+    const [, run] = await runsInOrder();
     expect(run?.status).toBe("failed");
     expect(run?.error).toBe("theme naming: boom");
     expect(run?.stats).toMatchObject({
-      collect: { itemsInserted: 3 },
-      extract: { itemsExtracted: 2 },
-      resolve: { eventsCreated: 2 },
       embed: { tagsEmbedded: 1 },
       themes: { themesCreated: 1, themesNamed: 0 },
     });
     // Not a provider refusal, so it is not reported as one.
     expect(summary.stats?.themes?.providerError).toBeUndefined();
-    // Locations and stats still ran after the failure.
-    expect(summary.stats?.stats?.skipped).toBeUndefined();
     expect(await testDb.db.select().from(events)).toHaveLength(2);
     expect(await testDb.db.select().from(themes)).toHaveLength(1);
   });
@@ -757,23 +973,22 @@ describe("runAll, Phase 2 steps", () => {
     });
     const { llm, state } = fakeLlm();
     const { embedder } = fakeEmbedder({ fail: () => quota });
-    const summary = await runAll(
-      deps(llm, fakeCollector(twoRaises), { embedder }),
+    await hourly(llm, { embedder });
+    const summary = await runEnrich(
+      deps(llm, fakeCollector({}), { embedder }),
       lock(),
       "schedule",
     );
 
     expect(summary.status).toBe("failed");
     const stats = summary.stats!;
-    expect(stats.extract.itemsExtracted).toBe(2);
     expect(stats.embed).toMatchObject({
       tagsEmbedded: 0,
       providerError: "insufficient_quota",
     });
     expect(stats.themes?.skipped).toBe(true);
     expect(state.calls).toBe(2);
-    expect(stats.stats?.skipped).toBeUndefined();
-    const [run] = await testDb.db.select().from(ingestRuns);
+    const [, run] = await runsInOrder();
     expect(run?.error).toBe("embedding: insufficient_quota");
   });
 
@@ -785,7 +1000,7 @@ describe("runAll, Phase 2 steps", () => {
         schemaName === GRANT_TAGS_SCHEMA_NAME ? outage : null,
     });
     const { embedder, calls } = fakeEmbedder();
-    const summary = await runAll(
+    const summary = await runEnrich(
       deps(llm, fakeCollector({}), { embedder }),
       lock(),
       "schedule",
@@ -803,6 +1018,151 @@ describe("runAll, Phase 2 steps", () => {
     expect(participant?.resolvedAt).not.toBeNull();
   });
 
+  it("stops between tagging batches at the time limit and skips embedding and themes", async () => {
+    await seedGrant(25);
+    const clock = fakeClock();
+    const log: string[] = [];
+    const { llm, state } = fakeLlm();
+    const { embedder, calls } = fakeEmbedder();
+    // Batches of 20 projects; the first call takes 20 minutes, the limit is 15.
+    const summary = await runEnrich(
+      deps(slowLlm(llm, clock, 20), fakeCollector({}), {
+        embedder,
+        clock,
+        log,
+        config: { maxEnrichMinutesPerRun: 15 },
+      }),
+      lock(),
+      "schedule",
+    );
+
+    expect(summary.status).toBe("succeeded");
+    expect(state.calls).toBe(1);
+    const stats = summary.stats!;
+    expect(stats.stoppedAtTime).toBe(true);
+    expect(stats.budgetPaused).toBe(false);
+    expect(stats.grantResolve).toMatchObject({
+      projectsTagged: 20,
+      participantsResolved: 25,
+    });
+    expect(stats.grantResolve?.budgetPaused).toBeUndefined();
+    expect(stats.embed?.skipped).toBe(true);
+    expect(stats.themes?.skipped).toBe(true);
+    expect(calls).toHaveLength(0);
+    expect(
+      log.some((line) => /Time limit reached: grant tagging/.test(line)),
+    ).toBe(true);
+    expect(stats.stepMs?.grantTagging).toBe(20 * 60_000);
+
+    // The 5 left over are tagged by the next run.
+    const next = await runEnrich(
+      deps(llm, fakeCollector({}), { embedder, clock }),
+      lock(),
+      "schedule",
+    );
+    expect(next.stats?.stoppedAtTime).toBeUndefined();
+    expect(next.stats?.grantResolve?.projectsTagged).toBe(5);
+  });
+
+  it("does no work when the lock is already held", async () => {
+    const { llm, state } = fakeLlm();
+    const summary = await runEnrich(
+      deps(llm, fakeCollector({})),
+      heldElsewhere,
+      "schedule",
+    );
+    expect(summary).toEqual({ ran: false });
+    expect(state.calls).toBe(0);
+    expect(await testDb.db.select().from(ingestRuns)).toHaveLength(0);
+  });
+});
+
+describe("abandoned runs (D67)", () => {
+  const minutesAgo = (minutes: number) =>
+    new Date(NOW.getTime() - minutes * 60_000);
+
+  it("closes a run left running for over 60 minutes and keeps a recent one", async () => {
+    const [stale, recent, done] = await testDb.db
+      .insert(ingestRuns)
+      .values([
+        { trigger: "schedule", status: "running", startedAt: minutesAgo(61) },
+        { trigger: "schedule", status: "running", startedAt: minutesAgo(10) },
+        {
+          trigger: "schedule",
+          status: "succeeded",
+          startedAt: minutesAgo(300),
+          finishedAt: minutesAgo(299),
+        },
+      ])
+      .returning();
+
+    const log: string[] = [];
+    const summary = await runAll(
+      deps(null, fakeCollector({}), { log }),
+      lock(),
+      "schedule",
+    );
+    expect(summary.status).toBe("succeeded");
+    expect(log).toContain("Closed 1 abandoned run.");
+
+    const rows = await testDb.db.select().from(ingestRuns);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get(stale!.id)).toMatchObject({
+      status: "failed",
+      error: ABANDONED_ERROR,
+    });
+    expect(byId.get(stale!.id)?.finishedAt).toEqual(NOW);
+    expect(byId.get(recent!.id)).toMatchObject({
+      status: "running",
+      error: null,
+      finishedAt: null,
+    });
+    expect(byId.get(done!.id)?.status).toBe("succeeded");
+    expect(byId.get(done!.id)?.error).toBeNull();
+  });
+
+  it("treats exactly 60 minutes as still alive", async () => {
+    await testDb.db.insert(ingestRuns).values({
+      trigger: "manual",
+      status: "running",
+      startedAt: minutesAgo(60),
+    });
+    expect(await closeAbandonedRuns(testDb.db, NOW)).toBe(0);
+  });
+
+  it("is done by every locked run kind, not just run", async () => {
+    await testDb.db.insert(ingestRuns).values({
+      trigger: "schedule",
+      status: "running",
+      startedAt: minutesAgo(120),
+    });
+    await runEnrich(deps(null, fakeCollector({})), lock(), "schedule");
+    const [stale] = await testDb.db
+      .select()
+      .from(ingestRuns)
+      .orderBy(asc(ingestRuns.id));
+    expect(stale?.status).toBe("failed");
+    expect(stale?.error).toBe(ABANDONED_ERROR);
+  });
+
+  it("never touches a run while another run holds the lock", async () => {
+    await testDb.db.insert(ingestRuns).values({
+      trigger: "schedule",
+      status: "running",
+      startedAt: minutesAgo(120),
+    });
+    const summary = await runAll(
+      deps(null, fakeCollector({})),
+      heldElsewhere,
+      "schedule",
+    );
+    expect(summary).toEqual({ ran: false });
+    const [row] = await testDb.db.select().from(ingestRuns);
+    expect(row?.status).toBe("running");
+  });
+});
+
+describe("runAll, feed sources", () => {
   it("never sends the ukri-gtr source to the feed collector", async () => {
     await ensureGtrSource(testDb.db);
     const asked: string[] = [];

@@ -69,7 +69,7 @@ describe("createEdgarClient", () => {
     const { client, log } = setup(() => reply(200, "body"));
     await client.getFormIndex("2026-11-10");
     expect(log[0]?.headers["user-agent"]).toMatch(
-      /^SignalFeed\/\S+ \(\+signalfeed@example\.com\)$/,
+      /^Raisory\/\S+ \(\+signalfeed@example\.com\)$/,
     );
     expect(log[0]?.headers["accept-encoding"]).toBe("gzip, deflate");
   });
